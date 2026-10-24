@@ -1,14 +1,20 @@
 package com.example.txnkeeper
 
 /** Result of cleaning OCR lines: the fixed lines (same sizes) plus a log of what changed. */
-data class CorrectionResult(val lines: List<OcrLine>, val changes: List<String>)
+data class CorrectionResult(
+    val lines: List<OcrLine>,
+    val changes: List<String>,
+    /** Amount read from the words ("Five Hundred Only"), or null if the receipt has none. */
+    val wordsAmount: Long? = null
+)
 
 /**
  * Fixes OCR mistakes that can be VERIFIED from the receipt itself, before TransactionParser runs.
  * It never invents names or IDs: anything it can't double-check is left exactly as read.
  *
  *  1. "Rupees Nine Hundred Two" + "Only" split over two lines  -> joined into one line
- *  2. Amount in figures vs amount in words  (7902 vs "Nine Hundred Two" -> 902)
+ *  2. Amount in figures vs amount in words  (7902 vs "Nine Hundred Two" -> 902).
+ *     Words may read "Rupees ... Only", "... Rupees Only", "... Only" or "500 Only".
  *  3. "Payment of 2945" vs the big standalone amount 945        -> 945
  *  4. 12-digit UPI Ref / UTR with spaces or letters (O, l, I...) -> clean digits
  *  5. Typos in fixed phrases ("Compieted" -> "Completed")
@@ -54,9 +60,9 @@ object OcrCorrector {
         }
         lines = joined
 
-        // Amount in words, e.g. "Rupees One Thousand Fifty One Only" -> 1051
-        val flat = lines.joinToString(" ") { it.text }.trim().replace(Regex("""\s+"""), " ")
-        val wordsValue = rupeesWords.find(flat)?.let { wordsToNumber(it.groupValues[1]) }?.takeIf { it > 0 }
+        // Amount in words (or "500 Only"), e.g. "Rupees One Thousand Fifty One Only" -> 1051
+        // "nl" marks where a new line starts, so an amount in words may begin at the start of any line
+        val wordsValue = findWordsAmount(lines.joinToString(" nl ") { it.text })
 
         // Lines that are only a number, e.g. "7902" or "1,051"
         val numberLines = lines.mapIndexedNotNull { k, l ->
@@ -65,14 +71,14 @@ object OcrCorrector {
             } else null
         }
 
-        // 2. Figure disagrees with words and ends with the same digits -> rupee sign was read as a digit
+        // 2. Figure has ONE extra digit in front of the words amount -> the rupee sign was read as a digit
+        //    (5500 / 1500 vs "Five Hundred": dropping the first digit gives exactly the words amount)
         if (wordsValue != null) {
-            val w = wordsValue.toString()
-            for ((k, v) in numberLines) {
-                val s = v.toString()
-                if (v != wordsValue && s.endsWith(w) && s.length <= w.length + 1) {
-                    changes += "Amount $s -> $w (figure disagreed with the words; rupee sign read as a digit)"
-                    lines[k] = lines[k].copy(text = w)
+            for (k in lines.indices) {
+                val fixed = fixFigures(lines[k].text, wordsValue)
+                if (fixed != lines[k].text) {
+                    changes += "'${lines[k].text.trim()}' -> '${fixed.trim()}' (figure disagreed with the words; rupee sign read as a digit)"
+                    lines[k] = lines[k].copy(text = fixed)
                 }
             }
         }
@@ -121,13 +127,90 @@ object OcrCorrector {
             }
         }
 
-        return CorrectionResult(lines, changes)
+        return CorrectionResult(lines, changes, wordsValue)
     }
 
     private fun fixDigits(raw: String): String =
         raw.filter { !it.isWhitespace() }.map { digitFix[it] ?: it }.joinToString("")
 
+    // ---- amount in words ----
+
+    private val onlyWord = Regex("""\bonly\b""", RegexOption.IGNORE_CASE)
+    private val digitsOnly = Regex("""(\d[\d,]*)(?:\.\d{1,2})?\s*(?:/-)?\s*(?:rupees?\s+)?only\b""", RegexOption.IGNORE_CASE)
+    private val fillerWords = setOf("rupees", "rupee", "rs", "inr", "and", "paise", "paisa", "nl")
+    // words that may sit right before the amount in words ("Amount in words: Five Hundred Only")
+    private val boundaryWords = setOf("words", "word", "in", "amount", "total", "paid", "only", "of", "is",
+        "rupees", "rupee", "rs", "inr", "nl")
+
+    /** Value written in words before "Only"; falls back to "500 Only". Null if nothing trustworthy. */
+    internal fun findWordsAmount(flat: String): Long? {
+        for (m in onlyWord.findAll(flat)) {
+            val tokens = flat.substring(0, m.range.first).lowercase()
+                .replace(Regex("[^a-z]+"), " ").trim().split(" ")
+                .filter { it.isNotEmpty() }
+                .takeLast(14)
+                .map { fixNumberWord(it) }
+            // longest tail made only of number words; it must start at a clean boundary, otherwise a
+            // garbled word ("thousnad") could silently cut the amount short ("... five hundred" = 500, not 2500)
+            for (start in tokens.indices) {
+                if (start > 0 && tokens[start - 1] !in boundaryWords) continue
+                val v = wordsToNumber(tokens.drop(start).joinToString(" "))
+                if (v != null && v > 0) return v
+            }
+        }
+        return digitsOnly.find(flat)?.groupValues?.get(1)?.replace(",", "")?.toLongOrNull()?.takeIf { it > 0 }
+    }
+
+    /** "hundrad" -> "hundred", "thousnad" -> "thousand" (only when exactly one number word is very close). */
+    private fun fixNumberWord(w: String): String {
+        if (w.length < 5 || w in wordValues || w in bigWords || w in fillerWords) return w
+        val best = (wordValues.keys + bigWords)
+            .filter { it.length >= 5 }
+            .map { it to similarity(w, it) }
+            .filter { it.second >= 0.8 }
+        return if (best.size == 1) best[0].first else w
+    }
+
+    // ---- figures vs words ----
+
+    // a figure alone on its line, maybe with a misread rupee sign in front: "?7500", "Z500"
+    private val bareFigure = Regex("""^(\s*)([^\d\s]{0,2})(\s*)(\d[\d,]*)(\.\d{1,2})?(\s*)$""")
+    // a figure after an amount label: "Payment of 2945", "Total ?1500"
+    private val labeledFigure = Regex(
+        """(payment of|amount|total|paid|rs\.?|inr|₹|\?)(\s*)([^\d\s]{0,2})(\s*)(\d[\d,]*)(\.\d{1,2})?""",
+        RegexOption.IGNORE_CASE
+    )
+
+    /** One extra digit in front of the words amount -> the words amount. Otherwise null. */
+    private fun dropJunkDigit(figure: String, words: Long): String? {
+        val f = figure.replace(",", "")
+        val w = words.toString()
+        return if (f.length == w.length + 1 && f.endsWith(w)) w else null
+    }
+
+    private fun fixFigures(text: String, words: Long): String {
+        // very small amounts are only touched when a junk symbol proves there was a rupee sign
+        fun allowed(junk: String) = words >= 100 || junk.isNotEmpty()
+
+        bareFigure.matchEntire(text)?.let { m ->
+            val junk = m.groupValues[2]
+            val fixed = dropJunkDigit(m.groupValues[4], words)
+            return if (fixed != null && allowed(junk))
+                m.groupValues[1] + junk + m.groupValues[3] + fixed + m.groupValues[5] + m.groupValues[6]
+            else text
+        }
+        var out = text
+        for (m in labeledFigure.findAll(text).toList().asReversed()) {
+            val fixed = dropJunkDigit(m.groupValues[5], words) ?: continue
+            if (!allowed(m.groupValues[3])) continue
+            val range = m.groups[5]!!.range
+            out = out.replaceRange(range, fixed)
+        }
+        return out
+    }
+
     // ---- number words ("One Thousand Fifty One" -> 1051) ----
+    private val bigWords = setOf("hundred", "thousand", "lakh", "lakhs", "lac", "lacs", "crore", "crores")
     private val wordValues: Map<String, Long> = buildMap {
         "zero one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen"
             .split(" ").forEachIndexed { n, w -> put(w, n.toLong()) }
@@ -139,17 +222,21 @@ object OcrCorrector {
     internal fun wordsToNumber(text: String): Long? {
         var total = 0L
         var cur = 0L
-        for (w in text.lowercase().split(Regex("""\s+""")).filter { it.isNotEmpty() }) {
+        var any = false
+        for (w in text.lowercase().split(Regex("""[\s-]+""")).filter { it.isNotEmpty() }) {
             val v = wordValues[w]
             when {
+                w in fillerWords -> continue
                 v != null -> cur += v
-                w == "hundred" -> cur *= 100
-                w == "thousand" -> { total += cur * 1000; cur = 0 }
-                w == "lakh" -> { total += cur * 100_000; cur = 0 }
+                w == "hundred" -> cur = if (cur == 0L) 100 else cur * 100
+                w == "thousand" -> { total += maxOf(cur, 1L) * 1000; cur = 0 }
+                w == "lakh" || w == "lakhs" || w == "lac" || w == "lacs" -> { total += maxOf(cur, 1L) * 100_000; cur = 0 }
+                w == "crore" || w == "crores" -> { total += maxOf(cur, 1L) * 10_000_000; cur = 0 }
                 else -> return null
             }
+            any = true
         }
-        return total + cur
+        return if (any) total + cur else null
     }
 
     // ---- fuzzy match: 1.0 = identical, based on edit distance ----
@@ -160,7 +247,8 @@ object OcrCorrector {
         for (x in 1..a.length) for (y in 1..b.length) {
             val cost = if (a[x - 1] == b[y - 1]) 0 else 1
             d[x][y] = minOf(d[x - 1][y] + 1, d[x][y - 1] + 1, d[x - 1][y - 1] + cost)
+            if (x > 1 && y > 1 && a[x - 1] == b[y - 2] && a[x - 2] == b[y - 1]) d[x][y] = minOf(d[x][y], d[x - 2][y - 2] + 1)
         }
         return 1.0 - d[a.length][b.length].toDouble() / maxOf(a.length, b.length)
     }
-}
+}

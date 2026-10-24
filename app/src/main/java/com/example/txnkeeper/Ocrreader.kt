@@ -55,7 +55,12 @@ class OcrController(
                     val lines = result.textBlocks
                         .flatMap { it.lines }
                         .map { OcrLine(it.text, it.boundingBox?.height() ?: 0) }
-                    parsed = TransactionParser.parse(lines)
+                    // Fix verifiable OCR slips first (e.g. rupee sign read as a digit, checked against the words)
+                    val fixed = OcrCorrector.correct(lines)
+                    val base = TransactionParser.parse(fixed.lines)
+                    // Nothing found in figures but the words give an amount -> use it
+                    parsed = if (base.amount == null && fixed.wordsAmount != null)
+                        base.copy(amount = fixed.wordsAmount.toDouble()) else base
                     busy = false
                 }
                 .addOnFailureListener {
