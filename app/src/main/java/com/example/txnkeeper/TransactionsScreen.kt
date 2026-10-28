@@ -52,7 +52,8 @@ import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.components.ManuTextField
-import com.manu.manudesignsystem.components.ManuListItem
+import com.manu.manudesignsystem.components.ManuListCard
+import com.manu.manudesignsystem.components.ManuListItemData
 import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.theme.ExpenseColor
@@ -68,23 +69,26 @@ private const val PAGE_SIZE = 50
 
 private val NoTotals = TransactionTotals(0.0, 0.0, 0)
 
-private sealed class ListRow(val key: String, val kind: Int) {
-    class Header(val dayStart: Long, val label: String) : ListRow("h$dayStart", 0)
-    class Item(val txn: TransactionEntity) : ListRow("t${txn.id}", 1)
+/** One day of transactions: a heading ("Today", "Yesterday", "12 Oct") and one list card. */
+private class DayGroup(val dayStart: Long, val label: String, val txns: List<TransactionEntity>) {
+    val key: String get() = "d$dayStart"
 }
 
-/** Inserts a day heading ("Today", "Yesterday", "12 Oct") before each new day. */
-private fun buildRows(list: List<TransactionEntity>): List<ListRow> {
-    val out = ArrayList<ListRow>(list.size + 8)
-    var lastDay = Long.MIN_VALUE
+/** Groups the (already sorted) transactions by day. */
+private fun buildGroups(list: List<TransactionEntity>): List<DayGroup> {
+    val out = ArrayList<DayGroup>()
+    var day = Long.MIN_VALUE
+    var bucket = ArrayList<TransactionEntity>()
     for (t in list) {
-        val day = startOfDay(t.dateTime)
-        if (day != lastDay) {
-            out += ListRow.Header(day, dayHeading(day))
-            lastDay = day
+        val d = startOfDay(t.dateTime)
+        if (d != day) {
+            if (bucket.isNotEmpty()) out += DayGroup(day, dayHeading(day), bucket)
+            bucket = ArrayList()
+            day = d
         }
-        out += ListRow.Item(t)
+        bucket += t
     }
+    if (bucket.isNotEmpty()) out += DayGroup(day, dayHeading(day), bucket)
     return out
 }
 
@@ -138,7 +142,7 @@ fun TransactionsScreen(
     val overallFlow = remember { dao.getTotalCount() }
     val overall: Int? by overallFlow.collectAsState(initial = null)
 
-    val rows = remember(page) { buildRows(page.orEmpty()) }
+    val groups = remember(page) { buildGroups(page.orEmpty()) }
 
     // Load the next page when the user scrolls near the end
     val listState = rememberLazyListState()
@@ -146,7 +150,8 @@ fun TransactionsScreen(
         derivedStateOf {
             val info = listState.layoutInfo
             val last = info.visibleItemsInfo.lastOrNull()?.index ?: 0
-            info.totalItemsCount > 0 && last >= info.totalItemsCount - 10
+            // Each list item is a whole day now, so "near the end" means the last couple of days
+            info.totalItemsCount > 0 && last >= info.totalItemsCount - 2
         }
     }
     LaunchedEffect(nearEnd, page?.size, limit) {
@@ -276,20 +281,24 @@ fun TransactionsScreen(
                     // Extra room at the bottom so the + button never covers the last row
                     contentPadding = PaddingValues(bottom = 96.dp)
                 ) {
-                    items(items = rows, key = { it.key }, contentType = { it.kind }) { row ->
-                        when (row) {
-                            is ListRow.Header -> Text(
-                                text = row.label,
+                    items(items = groups, key = { it.key }) { group ->
+                        Column {
+                            Text(
+                                text = group.label,
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
                             )
-
-                            is ListRow.Item -> TransactionRow(
-                                txn = row.txn,
-                                accountName = if (showAccountOnRows) accountNames[row.txn.accountId] else null,
-                                onEdit = { editing = row.txn },
-                                onDelete = { deleting = row.txn }
+                            // One lib list card per day, with a divider between its transactions
+                            ManuListCard(
+                                items = group.txns.map { txn ->
+                                    transactionItem(
+                                        txn = txn,
+                                        accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
+                                        onEdit = { editing = txn },
+                                        onDelete = { deleting = txn }
+                                    )
+                                }
                             )
                         }
                     }
@@ -460,50 +469,42 @@ private fun EmptyMessage(
     }
 }
 
-/** One transaction as a lib list item: tap to edit, three-dot menu for Edit / Delete. */
-@Composable
-private fun TransactionRow(
+/** One transaction as a row of the day's list card: tap to edit, three-dot menu for Edit / Delete. */
+private fun transactionItem(
     txn: TransactionEntity,
     accountName: String?,
     onEdit: () -> Unit,
     onDelete: () -> Unit
-) {
+): ManuListItemData {
     val income = txn.type == "INCOME"
     val sign = if (income) "+" else "−"
 
-    ManuCard(
-        contentPadding = PaddingValues(0.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = ManuDesignSystem.spacing.xs)
-    ) {
-        ManuListItem(
-            title = txn.title,
-            description = buildString {
-                append(sign).append(formatMoney(txn.amount))
-                append(" • ").append(txn.paymentMethod)
-                if (accountName != null) append(" • ").append(accountName)
-            },
-            time = buildString {
-                append(formatTime(txn.dateTime))
-                if (txn.description.isNotBlank()) append(" • ").append(txn.description)
-            },
-            leadingContent = {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(if (income) IncomeColor else ExpenseColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(sign, color = Color.White, style = MaterialTheme.typography.titleMedium)
-                }
-            },
-            onClick = onEdit,
-            menuItems = listOf(
-                ManuMenuItem(label = "Edit", onClick = onEdit),
-                ManuMenuItem(label = "Delete", onClick = onDelete)
-            )
+    return ManuListItemData(
+        title = txn.title,
+        description = buildString {
+            append(sign).append(formatMoney(txn.amount))
+            append(" • ").append(txn.paymentMethod)
+            if (accountName != null) append(" • ").append(accountName)
+        },
+        time = buildString {
+            append(formatTime(txn.dateTime))
+            if (txn.description.isNotBlank()) append(" • ").append(txn.description)
+        },
+        leadingContent = {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(if (income) IncomeColor else ExpenseColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(sign, color = Color.White, style = MaterialTheme.typography.titleMedium)
+            }
+        },
+        onClick = onEdit,
+        menuItems = listOf(
+            ManuMenuItem(label = "Edit", onClick = onEdit),
+            ManuMenuItem(label = "Delete", onClick = onDelete)
         )
-    }
+    )
 }

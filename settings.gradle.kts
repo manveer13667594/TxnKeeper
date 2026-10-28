@@ -28,4 +28,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "txnkeeper"
 include(":app")
- 
+include(":whisperkit")
