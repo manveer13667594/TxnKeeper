@@ -74,7 +74,10 @@ class TxnFormState {
     }
 
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
-    fun fill(parsed: ParsedTransaction) {
+    fun fill(
+        parsed: ParsedTransaction,
+        message: String = "Form filled from the receipt. Check it, then save."
+    ) {
         parsed.title?.let { title = it }
         parsed.amount?.let { amount = formatAmount(it) }
         parsed.type?.let { type = it }
@@ -82,7 +85,7 @@ class TxnFormState {
         // The receipt's day, with the current time of day
         parsed.dateMillis?.let { dateTime = onDayAtTimeOf(it, System.currentTimeMillis()) }
         parsed.description?.let { description = it }
-        notice = "Form filled from the receipt. Check it, then save."
+        notice = message
     }
 }
 
@@ -140,6 +143,8 @@ fun AddTransactionScreen(
                         focusManager.clearFocus()
                         onScan()
                     })
+
+                    VoiceBanner(form)
 
                     ManuTextField(
                         value = form.title,
