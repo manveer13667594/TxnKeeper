@@ -1,6 +1,6 @@
 # TxnKeeper 🪙
 
-**TxnKeeper** is a modern, feature-rich Android application designed to help users effortlessly track financial transactions, scan and parse receipts using on-device OCR, manage multiple accounts, and keep tabs on their daily expenses.
+**TxnKeeper** is a modern, feature-rich Android application designed to help users effortlessly track financial transactions, scan and parse receipts using on-device OCR, on--device voice transcription, manage multiple accounts, and keep tabs on their daily expenses.
 
 ---
 
