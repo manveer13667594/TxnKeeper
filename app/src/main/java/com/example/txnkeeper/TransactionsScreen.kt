@@ -13,11 +13,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +60,7 @@ import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.components.ManuListCard
 import com.manu.manudesignsystem.components.ManuListItemData
 import com.manu.manudesignsystem.components.ManuMenuItem
+import com.manu.manudesignsystem.components.ManuDropdownMenu
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.theme.ExpenseColor
 import com.manu.manudesignsystem.theme.IncomeColor
@@ -107,8 +113,12 @@ fun TransactionsScreen(
     onAccountChange: (Long?) -> Unit,
     onManageAccounts: () -> Unit,
     onScan: () -> Unit,
+    /** true = the floating + button should show, false = hide it (scrolling down the list). */
+    onScrollDirection: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    var menuOpen by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val searchFocus = remember { FocusRequester() }
@@ -158,6 +168,10 @@ fun TransactionsScreen(
         // A full page means there may be more
         if (nearEnd && (page?.size ?: 0) >= limit) limit += PAGE_SIZE
     }
+    FabAutoHide(
+        position = { listState.firstVisibleItemIndex * 100_000 + listState.firstVisibleItemScrollOffset },
+        onVisible = onScrollDirection
+    )
     // New filters or search: start from the top
     LaunchedEffect(query) { listState.scrollToItem(0) }
 
@@ -191,8 +205,9 @@ fun TransactionsScreen(
             actions = {
                 IconButton(onClick = {
                     focusManager.clearFocus()
-                    onScan()
-                }) {
+                    onScan() }
+                    )
+                {
                     Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
                 }
                 IconButton(onClick = {
@@ -205,6 +220,26 @@ fun TransactionsScreen(
                     Icon(
                         if (searchOpen) Icons.Default.Close else Icons.Default.Search,
                         contentDescription = if (searchOpen) "Close search" else "Search"
+                    )
+                }
+                // Three-dot menu (the actions are added later)
+               Box {
+                    IconButton(onClick = { menuOpen = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    }
+                    ManuDropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        items = listOf(
+                            ManuMenuItem(label = "Accounts", onClick = { comingSoon(context, "Accounts") }),
+                            ManuMenuItem(label = "Filters", onClick = { comingSoon(context, "Filters") }),
+                            ManuMenuItem(label = "Import / Export data", onClick = { comingSoon(context, "Import / Export") }),
+                            ManuMenuItem(label = "Settings", onClick = { comingSoon(context, "Settings") }),
+                            ManuMenuItem(label = "Help", onClick = { comingSoon(context, "Help") }),
+                            ManuMenuItem(label = "About", onClick = { comingSoon(context, "About") }),
+                            ManuMenuItem(label = "Remove ads", onClick = { comingSoon(context, "Remove ads") }),
+
+                            ),
                     )
                 }
             }
@@ -238,20 +273,24 @@ fun TransactionsScreen(
         // ---- Period stepper: ‹ October 2026 › (only when a period filter is on)
         PeriodNavigator(filters = filters, onChange = { filters = it })
 
-        // ---- Balance, and Income / Expense / Net for everything the filters match
-        TotalsCard(totals, balance, balanceLabel)
-
-        Text(
-            text = countLabel,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
-        )
+        // ---- Balance, and Income / Expense / Net for everything the filters match.
+        // In the list it is the first item, so it scrolls away and gives the rows the whole screen;
+        // scroll back to the top and it is there again. With no list it stays put.
+        val totalsHeader: @Composable () -> Unit = {
+            TotalsCard(totals, balance, balanceLabel)
+            Text(
+                text = countLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
+            )
+        }
 
         // ---- The list, or a message when there is nothing to show
         val loaded = page
         val allCount = overall
         if (loaded != null && allCount != null) {
+            if (loaded.isEmpty() || allCount == 0) totalsHeader()
             when {
                 allCount == 0 -> EmptyMessage(
                     title = "No transactions yet",
@@ -281,6 +320,7 @@ fun TransactionsScreen(
                     // Extra room at the bottom so the + button never covers the last row
                     contentPadding = PaddingValues(bottom = 96.dp)
                 ) {
+                    item(key = "totals") { totalsHeader() }
                     items(items = groups, key = { it.key }) { group ->
                         Column {
                             Text(
@@ -348,6 +388,10 @@ fun TransactionsScreen(
 }
 
 // --------------------------------------------------------------- pieces
+
+private fun comingSoon(context: android.content.Context, what: String) {
+    android.widget.Toast.makeText(context, "$what: coming soon", android.widget.Toast.LENGTH_SHORT).show()
+}
 
 @Composable
 private fun TotalsCard(totals: TransactionTotals, balance: Double, balanceLabel: String) {
@@ -491,15 +535,16 @@ private fun transactionItem(
             if (txn.description.isNotBlank()) append(" • ").append(txn.description)
         },
         leadingContent = {
-            Box(
+            Image(
+                painter = painterResource(
+                    if (income) R.drawable.ic_income else R.drawable.ic_expense
+                ),
+                contentDescription = if (income) "Income" else "Expense",
                 modifier = Modifier
                     .size(40.dp)
-                    .clip(CircleShape)
-                    .background(if (income) IncomeColor else ExpenseColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(sign, color = Color.White, style = MaterialTheme.typography.titleMedium)
-            }
+                    .clip(CircleShape), // remove if your PNGs are already round or have their own shape
+                contentScale = ContentScale.Fit
+            )
         },
         onClick = onEdit,
         menuItems = listOf(
