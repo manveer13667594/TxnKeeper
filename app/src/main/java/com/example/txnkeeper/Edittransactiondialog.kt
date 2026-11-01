@@ -21,6 +21,8 @@ import com.example.txnkeeper.data.local.AccountSummary
 import com.example.txnkeeper.data.local.TransactionEntity
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDatePicker
+import com.manu.manudesignsystem.components.ManuTimePicker
+import java.util.Calendar
 import com.manu.manudesignsystem.components.ManuDialog
 import com.manu.manudesignsystem.components.ManuDropdownMenu
 import com.manu.manudesignsystem.components.ManuMenuItem
@@ -44,6 +46,7 @@ fun EditTransactionDialog(
     var error by remember { mutableStateOf<String?>(null) }
     var payMenuOpen by remember { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
+    var timePickerOpen by remember { mutableStateOf(false) }
     var accountId by remember { mutableStateOf(original.accountId) }
     var accountMenuOpen by remember { mutableStateOf(false) }
 
@@ -137,6 +140,13 @@ fun EditTransactionDialog(
                 trailingIcon = Icons.Default.KeyboardArrowDown,
                 onClick = { datePickerOpen = true }
             )
+            ManuPickerField(
+                value = formatTime(dateTime),
+                label = { Text("Time") },
+                leadingIcon = AppIcons.Schedule,
+                trailingIcon = Icons.Default.KeyboardArrowDown,
+                onClick = { timePickerOpen = true }
+            )
             ManuTextField(
                 value = description,
                 onValueChange = { description = it },
@@ -157,5 +167,13 @@ fun EditTransactionDialog(
             // New day, same time of day as before
             dateTime = onDayAtTimeOf(pickerToLocalDay(it), dateTime)
         }
+    )
+
+    ManuTimePicker(
+        expanded = timePickerOpen,
+        onDismissRequest = { timePickerOpen = false },
+        initialHour = Calendar.getInstance().apply { timeInMillis = dateTime }.get(Calendar.HOUR_OF_DAY),
+        initialMinute = Calendar.getInstance().apply { timeInMillis = dateTime }.get(Calendar.MINUTE),
+        onTimeSelected = { hour, minute -> dateTime = withClockTime(dateTime, hour, minute) }
     )
 }

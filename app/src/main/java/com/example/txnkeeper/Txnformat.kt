@@ -93,7 +93,15 @@ fun onDayAtTimeOf(day: Long, timeSource: Long): Long {
         set(Calendar.MILLISECOND, t.get(Calendar.MILLISECOND))
     }.timeInMillis
 }
-
+/** [millis] with its clock time set to [hour]:[minute] (hour is 0-23); the day is unchanged. */
+fun withClockTime(millis: Long, hour: Int, minute: Int): Long =
+    Calendar.getInstance().apply {
+        timeInMillis = millis
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
 fun formatDateLong(millis: Long): String =
     SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(millis))
 
@@ -113,4 +121,4 @@ fun dayHeading(dayStart: Long): String {
             Calendar.getInstance().get(Calendar.YEAR)
     return SimpleDateFormat(if (sameYear) "d MMM" else "d MMM yyyy", Locale.getDefault())
         .format(Date(dayStart))
-}
+}

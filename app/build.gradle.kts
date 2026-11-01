@@ -57,7 +57,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("com.google.mlkit:text-recognition:16.0.1")
-    implementation("com.github.manveer13667594:ManuDesignSystem:v1.0.5")
+    implementation("com.github.manveer13667594:ManuDesignSystem:v1.0.6")
    // implementation("com.github.manveer13667594:oneui-design:v1.0.1")
     val camerax = "1.6.2"
     implementation("androidx.camera:camera-core:$camerax")
