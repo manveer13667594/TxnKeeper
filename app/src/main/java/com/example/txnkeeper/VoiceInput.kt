@@ -8,7 +8,16 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
 import android.widget.Toast
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,6 +35,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -38,7 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
-import com.manu.manudesignsystem.components.ManuListItem
+import com.manu.manudesignsystem.components.ManuFab
+import com.manu.manudesignsystem.theme.ExpenseColor
 import io.whisperkit.TranscribeOptions
 import io.whisperkit.WhisperKit
 import io.whisperkit.WhisperModel
@@ -177,9 +188,13 @@ object VoiceEngine {
 
 // ------------------------------------------------------------------ the button
 
-/** Tap to speak a transaction ("paid 500 to Rahul for groceries"); tap again to fill the form. */
+/**
+ * Floating mic button: tap and say one or several transactions ("paid 500 to Rahul for groceries and
+ * 120 for chai"), tap again to stop.
+ * Progress and problems are shown in the note above the form ([TxnFormState.notice]).
+ */
 @Composable
-fun VoiceBanner(form: TxnFormState) {
+fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -188,7 +203,6 @@ fun VoiceBanner(form: TxnFormState) {
     var recording by remember { mutableStateOf(false) }
     var seconds by remember { mutableIntStateOf(0) }
     var working by remember { mutableStateOf<String?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
     // Set when a transcription finishes; the dialog below shows it
     var result by remember { mutableStateOf<VoiceTranscript?>(null) }
 
@@ -201,17 +215,19 @@ fun VoiceBanner(form: TxnFormState) {
         scope.launch {
             val samples = recorder.stop()
             if (samples.size < SAMPLE_RATE) {
-                error = "That was too short. Tap and speak for at least a second."
+                form.notice = "That was too short. Tap and speak for at least a second."
                 return@launch
             }
             working = "Working…"
+            form.notice = "Working…"
             try {
                 // Nothing is filled yet: the dialog shows the text and the parsed fields first
-                result = VoiceEngine.transcribe(context, samples) { working = it }
+                result = VoiceEngine.transcribe(context, samples) { working = it; form.notice = it }
+                form.notice = null
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.message ?: "Voice input failed"
+                form.notice = e.message ?: "Voice input failed"
             } finally {
                 working = null
             }
@@ -219,7 +235,7 @@ fun VoiceBanner(form: TxnFormState) {
     }
 
     fun start() {
-        error = null
+        form.notice = null
         focusManager.clearFocus()
         seconds = 0
         recording = true
@@ -227,12 +243,12 @@ fun VoiceBanner(form: TxnFormState) {
             scope = scope,
             onSecond = { seconds = it },
             onLimit = { finish() },
-            onError = { recording = false; error = it }
+            onError = { recording = false; form.notice = it }
         )
     }
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) start() else error = "Microphone permission is needed for voice input."
+        if (granted) start() else form.notice = "Microphone permission is needed for voice input."
     }
 
     fun onClick() {
@@ -245,22 +261,28 @@ fun VoiceBanner(form: TxnFormState) {
         }
     }
 
-    ManuListItem(
-        title = when {
-            working != null -> working!!
-            recording -> "Listening… ${seconds}s"
-            else -> "Speak transaction"
-        },
-        description = when {
-            working != null -> "Please wait"
-            recording -> "Tap to stop and fill the form"
-            error != null -> error!!
-            else -> "Say it, e.g. \"paid 500 to Rahul for groceries\""
-        },
-        time = "",
-        leadingContent = { Icon(Icons.Default.Mic, contentDescription = null) },
-        onClick = { onClick() }
-    )
+    ManuFab(
+        onClick = { onClick() },
+        modifier = modifier,
+        // Red while recording so it is obvious the mic is live
+        containerColor = if (recording) ExpenseColor else Color.Unspecified,
+        contentColor = if (recording) Color.White else Color.Unspecified,
+        contentPadding = if (recording) PaddingValues(horizontal = 20.dp, vertical = 16.dp) else PaddingValues(16.dp)
+    ) {
+        when {
+            working != null -> CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp
+            )
+            recording -> Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Stop, contentDescription = "Stop and fill the form")
+                Spacer(Modifier.width(8.dp))
+                Text("${seconds}s")
+            }
+            else -> Icon(Icons.Default.Mic, contentDescription = "Speak a transaction")
+        }
+    }
 
     result?.let { heard ->
         VoiceResultDialog(
@@ -268,37 +290,55 @@ fun VoiceBanner(form: TxnFormState) {
             onClose = { result = null },
             onFill = { parsed ->
                 form.fill(parsed, message = "Heard: \"${heard.text}\". Check the form, then save.")
-            }
+            },
+            onReviewAll = { list -> form.startBatch(list, heard.text) }
         )
     }
 }
+
+private fun voiceAmount(a: Double): String =
+    "₹" + if (a % 1.0 == 0.0) a.toLong().toString() else a.toString()
+
+private fun voiceDate(millis: Long): String =
+    java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
 
 private fun voiceSummaryLines(p: ParsedTransaction): List<String> = buildList {
     p.title?.let { add("Title: $it") }
-    p.amount?.let {
-        add("Amount: ₹" + if (it % 1.0 == 0.0) it.toLong().toString() else it.toString())
-    }
+    p.amount?.let { add("Amount: " + voiceAmount(it)) }
     p.type?.let { add("Type: " + it.lowercase().replaceFirstChar { c -> c.uppercase() }) }
     p.paymentMethod?.let { add("Payment: $it") }
-    p.dateMillis?.let {
-        add(
-            "Date: " + java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault())
-                .format(java.util.Date(it))
-        )
-    }
+    p.dateMillis?.let { add("Date: " + voiceDate(it)) }
     p.description?.let { add(it) }
 }
 
-/** What was heard, how long it took, and what the parser found. "Fill form" only fills; it never saves. */
+/** One line per transaction when a recording holds several: "Rahul · ₹500 · Expense · UPI". */
+private fun voiceOneLine(p: ParsedTransaction): String = listOfNotNull(
+    p.title ?: "Voice entry",
+    p.amount?.let { voiceAmount(it) },
+    p.type?.lowercase()?.replaceFirstChar { it.uppercase() },
+    p.paymentMethod,
+    p.dateMillis?.let { voiceDate(it) },
+    p.description
+).joinToString(" · ")
+
+/**
+ * What was heard, how long it took, and what the parser found.
+ * One transaction: "Fill form" fills the form, nothing is saved.
+ * Several: they are listed, and "Review" opens them one by one in the form (Save & next).
+ */
 @Composable
 private fun VoiceResultDialog(
     heard: VoiceTranscript,
     onClose: () -> Unit,
-    onFill: (ParsedTransaction) -> Unit
+    onFill: (ParsedTransaction) -> Unit,
+    onReviewAll: (List<ParsedTransaction>) -> Unit
 ) {
     val context = LocalContext.current
-    val parsed = remember(heard) { SpokenTransactionParser.parse(heard.text) }
-    val summary = remember(parsed) { voiceSummaryLines(parsed) }
+    val found = remember(heard) { SpokenTransactionParser.parseAll(heard.text) }
+    // Nothing with an amount: still show whatever the parser could pick up (a title, a date...)
+    val single = remember(found) { found.firstOrNull() ?: SpokenTransactionParser.parse(heard.text) }
+    val summary = remember(single) { voiceSummaryLines(single) }
+    val several = found.size > 1
 
     ManuCustomDialog(
         onDismissRequest = onClose,
@@ -312,9 +352,14 @@ private fun VoiceResultDialog(
                     Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
                 }) { Text("Copy") }
             }
-            if (!parsed.isEmpty) {
-                ManuButton(onClick = {
-                    onFill(parsed)
+            when {
+                several -> ManuButton(onClick = {
+                    onReviewAll(found)
+                    onClose()
+                }) { Text("Review ${found.size}") }
+
+                !single.isEmpty -> ManuButton(onClick = {
+                    onFill(single)
                     onClose()
                 }) { Text("Fill form") }
             }
@@ -334,24 +379,43 @@ private fun VoiceResultDialog(
             SelectionContainer {
                 Text(heard.text, style = MaterialTheme.typography.bodyMedium)
             }
-            if (summary.isEmpty()) {
-                Text(
+            when {
+                several -> {
+                    Text(
+                        "Found ${found.size} transactions",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                    )
+                    found.forEachIndexed { i, p ->
+                        Text("${i + 1}. ${voiceOneLine(p)}", modifier = Modifier.padding(bottom = 4.dp))
+                    }
+                    Text(
+                        "Tap Review: they open one at a time in the form so you can edit each, then Save & next.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Normal,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                summary.isEmpty() -> Text(
                     "Couldn't find transaction details in this.",
                     modifier = Modifier.padding(top = 12.dp)
                 )
-            } else {
-                Text(
-                    "Found",
-                    style = MaterialTheme.typography.labelMedium,
-                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-                )
-                summary.forEach { Text(it) }
-                Text(
-                    "Check these, then tap Fill form. Nothing is saved automatically.",
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+
+                else -> {
+                    Text(
+                        "Found",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                    )
+                    summary.forEach { Text(it) }
+                    Text(
+                        "Check these, then tap Fill form. Nothing is saved automatically.",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Normal,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
             }
         }
     }

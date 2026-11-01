@@ -61,6 +61,12 @@ object TransactionParser {
         """\b(balance|bal|avl|available|limit|cashback|reward|offer|discount|saved|saving|mrp)\b"""
     )
 
+    // A line that ends with "Avl Bal Rs": the number on the next line is the balance
+    private val balanceTail = Regex("""(?:balance|bal|avl|available|limit)\W*(?:rs|inr|₹)?\W*$""")
+
+    // A line that ends with "Rs" / "INR": the number is on the next line
+    private val currencyTail = Regex("""(?:₹|\brs\.?|\binr|\brupees?)\s*$""")
+
     // Words that mark the final payable figure on bills ("Net Amount 2622.00")
     private val strongAmountWords = listOf(
         "net amount", "grand total", "total amount", "net payable",
@@ -79,7 +85,18 @@ object TransactionParser {
 
         lines.forEachIndexed { i, line ->
             val lowerLine = line.text.lowercase(Locale.ROOT)
-            if (ignoreWords.containsMatchIn(lowerLine)) return@forEachIndexed
+            // SMS put the amount and the balance on one line: "Rs 500 debited ... Avl Bal Rs 9000".
+            // Only look at the part before the first balance / limit word.
+            val cut = ignoreWords.find(lowerLine)?.range?.first
+            if (cut == 0) return@forEachIndexed
+            val scan = if (cut == null) line.text else line.text.substring(0, cut)
+            // A wrapped line: "Avl Bal Rs" / "20632.17"
+            val prevEndsInBalance = lines.getOrNull(i - 1)?.text?.lowercase(Locale.ROOT)
+                ?.let { balanceTail.containsMatchIn(it) } == true
+            // A wrapped line: "credited with Rs" / "2,622.00 on 18/09/2026"
+            val currencyFromAbove = !prevEndsInBalance && lines.getOrNull(i - 1)?.text?.lowercase(Locale.ROOT)
+                ?.let { currencyTail.containsMatchIn(it) } == true
+            val withCurrencyFromAbove = if (currencyFromAbove) "Rs " + scan else scan
 
             val nearby = listOfNotNull(
                 lines.getOrNull(i - 1)?.text, line.text, lines.getOrNull(i + 1)?.text
@@ -90,14 +107,14 @@ object TransactionParser {
             val sizeBonus = 3.0 * line.height / maxHeight
 
             // Candidates with a currency marker
-            currencyAmount.findAll(line.text).forEach { match ->
+            currencyAmount.findAll(withCurrencyFromAbove).forEach { match ->
                 val value = toAmount(match.groupValues[1]) ?: return@forEach
                 val score = 4.0 + keywordBonus + sizeBonus
                 if (score > bestScore) { bestScore = score; best = value }
             }
 
             // Candidates that are just a big number on their own line
-            bareAmountLine.find(line.text)?.let { match ->
+            (if (prevEndsInBalance) null else bareAmountLine.find(scan))?.let { match ->
                 val value = toAmount(match.groupValues[1]) ?: return@let
                 val score = 1.0 + keywordBonus + sizeBonus
                 if (score > bestScore) { bestScore = score; best = value }
@@ -141,7 +158,7 @@ object TransactionParser {
         if (outgoingHints.containsMatchIn(lower)) return "EXPENSE"
 
         // 3. Direction words. "credit card" / "debit card" describe the method, not the direction
-        val text = lower.replace("credit card", "card").replace("debit card", "card")
+        val text = lower.replace(Regex("""(credit|debit)\s+card"""), "card")
         val expense = expenseRegex.findAll(text).count()
         val income = incomeRegex.findAll(text).count()
         if (expense > income) return "EXPENSE"
@@ -162,7 +179,7 @@ object TransactionParser {
     private val upiRegex = Regex("""\b(upi|gpay|google pay|phonepe|paytm|bhim|amazon pay)\b""")
     private val vpaRegex = Regex("""[\w.\-]{2,}@[a-z]{2,}""")
     private val bankRegex = Regex("""\b(neft|imps|rtgs|bank transfer|net banking|netbanking)\b""")
-    private val cardRegex = Regex("""\b(card|visa|mastercard|rupay|pos)\b|x{2,}\s?\d{4}""")
+    private val cardRegex = Regex("""\b(card|visa|mastercard|rupay|pos)\b|(?<!a/c\s)(?<!ac\s)(?<!acct\s)x{2,}\s?\d{4}""")
     private val cashRegex = Regex("""\bcash\b""")
 
     private fun findPaymentMethod(lower: String): String? = when {
@@ -211,21 +228,25 @@ object TransactionParser {
         }
     }
 
+    /** Like findAll, but a failed match doesn't swallow the start of the real date ("99 Completed 25 Jul 2026"). */
+    private fun Regex.allMatches(text: String): Sequence<MatchResult> =
+        generateSequence(find(text)) { find(text, it.range.first + 1) }
+
     private fun findDate(text: String): Long? {
         // Indian formats are day first: 16/10/2026
-        numericDate.findAll(text).forEach { m ->
+        numericDate.allMatches(text).forEach { m ->
             buildDate(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt())
                 ?.let { return it }
         }
-        dayMonthYear.findAll(text).forEach { m ->
+        dayMonthYear.allMatches(text).forEach { m ->
             val month = monthIndex(m.groupValues[2]) ?: return@forEach
             buildDate(m.groupValues[1].toInt(), month, m.groupValues[3].toInt())?.let { return it }
         }
-        monthDayYear.findAll(text).forEach { m ->
+        monthDayYear.allMatches(text).forEach { m ->
             val month = monthIndex(m.groupValues[1]) ?: return@forEach
             buildDate(m.groupValues[2].toInt(), month, m.groupValues[3].toInt())?.let { return it }
         }
-        isoDate.findAll(text).forEach { m ->
+        isoDate.allMatches(text).forEach { m ->
             buildDate(m.groupValues[3].toInt(), m.groupValues[2].toInt(), m.groupValues[1].toInt())
                 ?.let { return it }
         }
@@ -308,4 +329,4 @@ object TransactionParser {
 
     private fun findReference(text: String): String? =
         referenceRegex.find(text)?.groupValues?.get(1)?.let { "Ref: $it" }
-}
+}

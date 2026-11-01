@@ -1,11 +1,18 @@
 package com.example.txnkeeper
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -25,7 +32,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,10 +43,11 @@ import com.example.txnkeeper.data.local.AccountSummary
 import com.example.txnkeeper.data.local.TransactionEntity
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuCard
+import com.manu.manudesignsystem.components.ManuOutlineButton
 import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.components.ManuChip
-import com.manu.manudesignsystem.components.ManuListItem
+import com.manu.manudesignsystem.components.ManuFab
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import com.manu.manudesignsystem.components.ManuDropdownMenu
 import com.manu.manudesignsystem.components.ManuMenuItem
@@ -63,7 +73,41 @@ class TxnFormState {
     /** A short note shown above the form (for example after scanning a receipt). */
     var notice by mutableStateOf<String?>(null)
 
+    /** Entries still waiting from one voice recording that held several transactions. */
+    var pending by mutableStateOf<List<ParsedTransaction>>(emptyList())
+    /** How many entries that recording held (0 = not reviewing a batch). */
+    var batchTotal by mutableStateOf(0)
+
+    /** Starts reviewing several spoken entries one by one: the first goes into the form. */
+    fun startBatch(list: List<ParsedTransaction>, heard: String) {
+        if (list.isEmpty()) return
+        batchTotal = list.size
+        showEntry(list.first(), 1, list.size, heard)
+        pending = list.drop(1)
+    }
+
+    /** After saving one: fills the next waiting entry. Returns false when none are left. */
+    fun nextFromBatch(): Boolean {
+        val next = pending.firstOrNull() ?: return false
+        val rest = pending.drop(1)
+        val number = batchTotal - pending.size + 1
+        showEntry(next, number, batchTotal, null)   // this clears the waiting list...
+        pending = rest                              // ...so put the rest back
+        return true
+    }
+
+    private fun showEntry(p: ParsedTransaction, number: Int, total: Int, heard: String?) {
+        val account = accountId
+        reset()
+        accountId = account
+        batchTotal = total
+        fill(p, message = "Entry $number of $total" + (heard?.let { " (heard: \"$it\")" } ?: "") +
+                ". Check it, then Save & next.")
+    }
+
     fun reset() {
+        pending = emptyList()
+        batchTotal = 0
         title = ""
         amount = ""
         type = "EXPENSE"
@@ -95,11 +139,13 @@ fun AddTransactionScreen(
     form: TxnFormState,
     accounts: List<AccountSummary>,
     onClose: () -> Unit,
-    onSubmit: (TransactionEntity) -> Unit,
+    /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
+    onSubmit: (TransactionEntity, stay: Boolean) -> Unit,
     onScan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
+    val scrollState = rememberScrollState()
     var error by remember { mutableStateOf<String?>(null) }
     var payMenuOpen by remember { mutableStateOf(false) }
     var accountMenuOpen by remember { mutableStateOf(false) }
@@ -123,10 +169,11 @@ fun AddTransactionScreen(
             )
         }
     ) { _ ->
+      Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -139,13 +186,6 @@ fun AddTransactionScreen(
                     modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    ScanBanner(onClick = {
-                        focusManager.clearFocus()
-                        onScan()
-                    })
-
-                    VoiceBanner(form)
-
                     ManuTextField(
                         value = form.title,
                         onValueChange = { form.title = it },
@@ -221,29 +261,36 @@ fun AddTransactionScreen(
                         singleLine = false
                     )
 
-                    ManuButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = {
-                            val value = form.amount.replace(",", "").trim().toDoubleOrNull()
-                            if (form.title.isBlank() || value == null || value <= 0) {
-                                error = "Enter a valid title and amount."
-                            } else {
-                                error = null
-                                focusManager.clearFocus()
-                                onSubmit(
-                                    TransactionEntity(
-                                        title = form.title.trim(),
-                                        amount = value,
-                                        type = form.type,
-                                        paymentMethod = form.payment,
-                                        dateTime = form.dateTime,
-                                        description = form.description.trim(),
-                                        accountId = account?.id ?: 1L
-                                    )
-                                )
-                            }
+                    // Both buttons save; "Save & next" stays here for another entry
+                    fun submit(stay: Boolean) {
+                        val value = form.amount.replace(",", "").trim().toDoubleOrNull()
+                        if (form.title.isBlank() || value == null || value <= 0) {
+                            error = "Enter a valid title and amount."
+                        } else {
+                            error = null
+                            focusManager.clearFocus()
+                            onSubmit(
+                                TransactionEntity(
+                                    title = form.title.trim(),
+                                    amount = value,
+                                    type = form.type,
+                                    paymentMethod = form.payment,
+                                    dateTime = form.dateTime,
+                                    description = form.description.trim(),
+                                    accountId = account?.id ?: 1L
+                                ),
+                                stay
+                            )
                         }
-                    ) { Text("Save Transaction") }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                        ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
+                            Text("Save & exit", maxLines = 1)
+                        }
+                        ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
+                            Text("Save & next", maxLines = 1)
+                        }
+                    }
 
                     error?.let {
                         Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
@@ -251,8 +298,35 @@ fun AddTransactionScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            // Room at the bottom so the floating buttons never cover the Save button
+            Spacer(Modifier.height(150.dp))
         }
+
+        // Floating buttons: mic (speak a transaction) and camera (scan a receipt).
+        // Hidden while the keyboard is open so they don't cover what you are typing.
+        val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+        // ...and while scrolling down, so they never sit on top of fields or buttons
+        var fabsVisible by remember { mutableStateOf(true) }
+        FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
+        AnimatedVisibility(
+            visible = !keyboardOpen && fabsVisible,
+            enter = fadeIn() + scaleIn(),
+            exit = fadeOut() + scaleOut(),
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            Column(
+                modifier = Modifier.padding(end = 20.dp, bottom = 16.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                VoiceFab(form)
+                ManuFab(onClick = {
+                    focusManager.clearFocus()
+                    onScan()
+                }) { Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt") }
+            }
+        }
+      }
     }
 
     ManuDatePicker(
@@ -263,17 +337,5 @@ fun AddTransactionScreen(
             // Chosen day, keeping the current time of day
             form.dateTime = onDayAtTimeOf(pickerToLocalDay(it), form.dateTime)
         }
-    )
-}
-
-/** Tap to scan a receipt: opens the camera, and the detected details fill this form. */
-@Composable
-private fun ScanBanner(onClick: () -> Unit) {
-    ManuListItem(
-        title = "Scan receipt",
-        description = "Fill this form from a payment screenshot or photo",
-        time = "",
-        leadingContent = { Icon(AppIcons.CameraAlt, contentDescription = null) },
-        onClick = onClick
     )
 }

@@ -11,6 +11,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -42,6 +44,11 @@ import com.example.txnkeeper.data.local.DatabaseModule
 import com.manu.manudesignsystem.theme.ManuDesignSystemTheme
 import kotlinx.coroutines.launch
 import com.manu.manudesignsystem.components.ManuButton
+import com.manu.manudesignsystem.components.ManuFab
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Icon
+import androidx.compose.ui.Alignment
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -124,6 +131,7 @@ fun TxnkeeperApp(
 
     val form = remember { TxnFormState() }
     var showAdd by remember { mutableStateOf(false) }
+    var fabVisible by remember { mutableStateOf(true) }
     var showCamera by remember { mutableStateOf(false) }
     // Text recognition runs here, after the camera has closed
     val ocr = rememberOcrController()
@@ -166,18 +174,6 @@ fun TxnkeeperApp(
                         type = ManuSnackbarType.Success,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
-                },
-                bottomBar = {
-                    ManuButton(
-                        onClick = {
-                            // New entries go to the account you are looking at (or the last one used)
-                            form.accountId = accountFilter ?: form.accountId
-                            showAdd = true
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = ManuDesignSystem.spacing.md)
-                    ) { Text("Add transaction") }
                 }
             ) { _ ->
                 Box(
@@ -191,8 +187,28 @@ fun TxnkeeperApp(
                         accountId = accountFilter,
                         onAccountChange = { accountFilter = it },
                         onManageAccounts = { showAccounts = true },
-                        onScan = { openCamera() }
+                        onScan = { openCamera() },
+                        onScrollDirection = { fabVisible = it }
                     )
+
+                    // Floating + button: opens the Add transaction page. It slips away while you
+                    // scroll down the list, so it never covers a row, and returns on scroll up.
+                    AnimatedVisibility(
+                        visible = fabVisible,
+                        enter = fadeIn() + scaleIn(),
+                        exit = fadeOut() + scaleOut(),
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp, bottom = 16.dp)
+                    ) {
+                        ManuFab(
+                            onClick = {
+                                // New entries go to the account you are looking at (or the last one used)
+                                form.accountId = accountFilter ?: form.accountId
+                                showAdd = true
+                            }
+                        ) { Icon(Icons.Default.Add, contentDescription = "Add transaction") }
+                    }
                 }
             }
 
@@ -207,11 +223,20 @@ fun TxnkeeperApp(
                     accounts = accounts,
                     onClose = { showAdd = false },
                     onScan = { openCamera() },
-                    onSubmit = { entity ->
+                    onSubmit = { entity, stay ->
                         scope.launch {
                             dao.insert(entity)
-                            form.reset()
-                            showAdd = false
+                            if (stay) {
+                                // Save & next: the next spoken entry, or an empty form
+                                if (!form.nextFromBatch()) {
+                                    val account = form.accountId
+                                    form.reset()
+                                    form.accountId = account
+                                }
+                            } else {
+                                form.reset()
+                                showAdd = false
+                            }
                             snackbarMessage = "Transaction saved"
                         }
                     }
