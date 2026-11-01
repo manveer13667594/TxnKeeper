@@ -1,0 +1,815 @@
+0	colloquial	paid five fifty to Amit	Amit~550~EXPENSE~~~
+1	noisy	"Um, bought a phone cover for 85k thanks [BLANK_AUDIO]."	Phone cover~85000~EXPENSE~~~
+2	short_note	Chai 80.	Chai~80~~~~
+3	single	spent Rs. 18500 on breakfast at Blinkit using my credit card 10 days ago.	Blinkit~18500~EXPENSE~CARD~10~Breakfast
+4	multi_elided	"Received one thousand five hundred from Manpreet, and 8000 from Amit."	Manpreet~1500~INCOME~~~;;Amit~8000~INCOME~~~
+5	multi	"paid 250 to Uber uhh, for internet bill, plus paid two thousand five hundred for taxi fare by UPI after that got a refund of 18500 from Amazon using my credit card, plus Dominos 3000"	Uber~250~EXPENSE~~~Internet bill;;Taxi fare~2500~EXPENSE~UPI~~;;Amazon~18500~INCOME~CARD~~;;Dominos~3000~~~~
+6	multi_elided	"received 300 from Priya, 300 from Ramesh and 800 from Sunita."	Priya~300~INCOME~~~;;Ramesh~300~INCOME~~~;;Sunita~800~INCOME~~~
+7	noisy	On 19th September got a refund of 4200 from Swiggy.	Swiggy~4200~INCOME~~40~
+8	multi_elided	Received 100k from Dad and 4200 from Deepak.	Dad~100000~INCOME~~~;;Deepak~4200~INCOME~~~
+9	noisy	"um, paid Dad 800 for birthday gift day before yesterday"	Dad~800~EXPENSE~~2~Birthday gift
+10	multi	"Alright, got a refund of 3500 from Amazon, dividend credited 12000. Also bonus credited 250, and then Suresh paid uhh, me 750 day before yesterday."	Amazon~3500~INCOME~~2~;;Dividend~12000~INCOME~~2~;;Bonus~250~INCOME~~2~;;Suresh~750~INCOME~~2~
+11	multi	"Paid three thousand to Electricity Board today, and then received 1200 rupees from Deepak for water bill."	Electricity Board~3000~EXPENSE~~~;;Deepak~1200~INCOME~~~Water bill
+12	multi_elided	"Sent forty to Uber, six hundred to Blinkit, and 500,000 to Zomato"	Uber~40~EXPENSE~~~;;Blinkit~600~EXPENSE~~~;;Zomato~500000~EXPENSE~~~
+13	single	Anil sent me 15000 by cash last Friday	Anil~15000~INCOME~CASH~6~
+14	negative	"um, uh, hmm."	
+15	multi	"sent 250 to Apollo Pharmacy for gym membership this morning, and then gave two thousand rs to Reliance Fresh, plus spent 200000 rupees on water bill at Ola after that sent one thousand rs to Flipkart for movie tickets"	Apollo Pharmacy~250~EXPENSE~~~Gym membership;;Reliance Fresh~2000~EXPENSE~~~;;Ola~200000~EXPENSE~~~Water bill;;Flipkart~1000~EXPENSE~~~Movie tickets
+16	multi	"Four days ago got a refund of 1800 rupees from Swiggy, paid ₹1800 to Starbucks."	Swiggy~1800~INCOME~~4~;;Starbucks~1800~EXPENSE~~4~
+17	multi	bought a phone cover for ₹800 next paid kuldip kaur 250 for gym membership bought headphones for ₹500	Phone cover~800~EXPENSE~~~;;Kuldip Kaur~250~EXPENSE~~~Gym membership;;Headphones~500~EXPENSE~~~
+18	short_note	Movie 500	Movie~500~~~~
+19	multi	"Got a refund of Rs. 950 from Amazon, cashback credited 800, plus spent 8000 on movie tickets. bought flowers for 1000"	Amazon~950~INCOME~~~;;Cashback~800~INCOME~~~;;Movie tickets~8000~EXPENSE~~~;;Flowers~1000~EXPENSE~~~
+20	multi_elided	Paid ₹85000 to Starbucks and eight hundred to Apollo Pharmacy	Starbucks~85000~EXPENSE~~~;;Apollo Pharmacy~800~EXPENSE~~~
+21	list_style	"groceries 600, coffee one hundred"	Groceries~600~~~~;;Coffee~100~~~~
+22	multi	"Paid Rs. 120 to Neha, salary credited 85000."	Neha~120~EXPENSE~~~;;Salary~85000~INCOME~~~
+23	multi_elided	Got 40 from Deepak and four thousand two hundred from Neha	Deepak~40~INCOME~~~;;Neha~4200~INCOME~~~
+24	noisy	"paid 100000 to uh, Vikram for lunch."	Vikram~100000~EXPENSE~~~Lunch
+25	multi	"airtel 2300 via phonepe, and then salary credited 30,000, also received eight thousand rs from dad"	Airtel~2300~~UPI~~;;Salary~30000~INCOME~~~;;Dad~8000~INCOME~~~
+26	multi	Priya paid me 250000 2 days ago. Also bought a shirt for Rs. 1000 and paid eighty to Dad for school fees.	Priya~250000~INCOME~~2~;;Shirt~1000~EXPENSE~~~;;Dad~80~EXPENSE~~~School fees
+27	multi_elided	"paid 30 to gurpreet, and 450 to suresh"	Gurpreet~30~EXPENSE~~~;;Suresh~450~EXPENSE~~~
+28	list_style	Chai 300 and petrol eight hundred and newspaper Rs 800 and lunch 800	Chai~300~~~~;;Petrol~800~~~~;;Newspaper~800~~~~;;Lunch~800~~~~
+29	multi	"Please add paid 30 to Sunita, also paid 500,000 hmm, to Zomato and then paid seven thousand five hundred to Amazon for coffee."	Sunita~30~EXPENSE~~~;;Zomato~500000~EXPENSE~~~;;Amazon~7500~EXPENSE~~~Coffee
+30	multi	"gave 85000 rupees to Amazon. Next Swiggy Rs 60, plus paid 200k for rent and then Decathlon 25,000"	Amazon~85000~EXPENSE~~~;;Swiggy~60~~~~;;Rent~200000~EXPENSE~~~;;Decathlon~25000~~~~
+31	single	Day before yesterday bonus credited Rs 80.	Bonus~80~INCOME~~2~
+32	negative	I walked 5000 steps today	
+33	multi	Paid ten thousand to Kuldip Kaur using net banking and Gurpreet paid me 120 rupees	Kuldip Kaur~10000~EXPENSE~BANK TRANSFER~~;;Gurpreet~120~INCOME~~~
+34	multi	spent 600 rupees on water bill at Electricity Board. Also got 500 rupees salary	Electricity Board~600~EXPENSE~~~Water bill;;Salary~500~INCOME~~~
+35	multi	"Got 950 salary, received 3500 from Ramesh, also paid six thousand five hundred rupees to Swiggy after that spent 45000 on books at Zomato."	Salary~950~INCOME~~~;;Ramesh~3500~INCOME~~~;;Swiggy~6500~EXPENSE~~~;;Zomato~45000~EXPENSE~~~Books
+36	single	this morning paid 750 to dad for taxi fare using net banking	Dad~750~EXPENSE~BANK TRANSFER~~Taxi fare
+37	multi	"Bought groceries for ₹2,500. Next Dominos eighty five thousand both via PhonePe"	Groceries~2500~EXPENSE~UPI~~;;Dominos~85000~~UPI~~
+38	multi_elided	"sent 45k to Starbucks, and 50000 rupees to Manpreet."	Starbucks~45000~EXPENSE~~~;;Manpreet~50000~EXPENSE~~~
+39	short_note	lunch one thousand eight hundred rs	Lunch~1800~~~~
+40	colloquial	Paid hundred rupees to Mom.	Mom~100~EXPENSE~~~
+41	noisy	"hey, spent ₹20 on medicine at jio uh, day before yesterday thanks"	Jio~20~EXPENSE~~2~Medicine
+42	single	gave 800 rupees to Gurpreet on Friday.	Gurpreet~800~EXPENSE~~6~
+43	colloquial	Paid two thousand five hundred to Suresh	Suresh~2500~EXPENSE~~~
+44	negative	Remind me to call Rahul tomorrow	
+45	single	"Last night received salary of 85,000."	Salary~85000~INCOME~~1~
+46	multi	"i want to add that i paid 1800 to rahul, also paid seven hundred fifty rs to vikram for movie tickets, received 15k from suresh"	Rahul~1800~EXPENSE~~~;;Vikram~750~EXPENSE~~~Movie tickets;;Suresh~15000~INCOME~~~
+47	list_style	Movie 150 and chai ninety nine and newspaper 400 and lunch three hundred.	Movie~150~~~~;;Chai~99~~~~;;Newspaper~400~~~~;;Lunch~300~~~~
+48	negative	open the camera	
+49	single	Paid 45 rupees to Mom yesterday.	Mom~45~EXPENSE~~1~
+50	single	Sent 1500 to Swiggy for books on Friday	Swiggy~1500~EXPENSE~~6~Books
+51	single	Priya sent me four hundred and fifty rs 4 days ago	Priya~450~INCOME~~4~
+52	noisy	uh swiggy 150000 yeah	Swiggy~150000~~~~
+53	multi_elided	"Gave 600 rupees to McDonalds, and 6,500 to Kuldip Kaur."	McDonalds~600~EXPENSE~~~;;Kuldip Kaur~6500~EXPENSE~~~
+54	single	spent three hundred on breakfast.	Breakfast~300~EXPENSE~~~
+55	noisy	I want to add that I paid seventy five thousand to Airtel using cash on October 19th that's it	Airtel~75000~EXPENSE~CASH~10~
+56	single	spent 1200 on rent using cash	Rent~1200~EXPENSE~CASH~~
+57	multi	"three days ago gave 250 to gurpreet, plus bought headphones for twelve thousand also received ₹5000 from neha"	Gurpreet~250~EXPENSE~~3~;;Headphones~12000~EXPENSE~~3~;;Neha~5000~INCOME~~3~
+58	noisy	"I want to add that I paid 12,000 uh, to Deepak."	Deepak~12000~EXPENSE~~~
+59	multi_elided	"sent 5000 to Reliance Fresh, 450 rupees to Amazon, and one thousand eight hundred to McDonalds"	Reliance Fresh~5000~EXPENSE~~~;;Amazon~450~EXPENSE~~~;;McDonalds~1800~EXPENSE~~~
+60	multi	"Yesterday Electricity Board sixty, paid Starbucks 9999 for groceries. Then Ramesh sent me fifteen thousand, plus Ola 10,000."	Electricity Board~60~~~1~;;Starbucks~9999~EXPENSE~~1~Groceries;;Ramesh~15000~INCOME~~1~;;Ola~10000~~~1~
+61	list_style	"auto fare rs 200, coffee Rs. 500, lunch two hundred and fifty"	Auto Fare~200~~~~;;Coffee~500~~~~;;Lunch~250~~~~
+62	multi_elided	"Sent ten thousand to Zomato, and ₹250,000 to Rahul"	Zomato~10000~EXPENSE~~~;;Rahul~250000~EXPENSE~~~
+63	multi	Spent 4200 rupees on rent at Amazon. Next received 10000 from Amit for birthday gift both using UPI.	Amazon~4200~EXPENSE~UPI~~Rent;;Amit~10000~INCOME~UPI~~Birthday gift
+64	single	two days ago I paid ₹800 to Amit for movie tickets	Amit~800~EXPENSE~~2~Movie tickets
+65	single	received eight thousand from Deepak for rent by cash.	Deepak~8000~INCOME~CASH~~Rent
+66	multi_elided	"Received 100000 from Anil, and 750 from Deepak"	Anil~100000~INCOME~~~;;Deepak~750~INCOME~~~
+67	multi	"on september 22nd bought flowers for 120, also got seventy five rupees from deepak also received 8000 from manpreet for school fees also paid 2000 rupees to neha for internet bill"	Flowers~120~EXPENSE~~37~;;Deepak~75~INCOME~~37~;;Manpreet~8000~INCOME~~37~School fees;;Neha~2000~EXPENSE~~37~Internet bill
+68	single	Paid Rs 450 to Deepak for books.	Deepak~450~EXPENSE~~~Books
+69	single	bought chocolates for 15000 cash	Chocolates~15000~EXPENSE~CASH~~
+70	noisy	I want to add that I salary credited 9999 yeah.	Salary~9999~INCOME~~~
+71	multi	"I want to add that I paid 5000 to Apollo Pharmacy. Next paid twelve thousand uhh, rupees to Suresh both using UPI."	Apollo Pharmacy~5000~EXPENSE~UPI~~;;Suresh~12000~EXPENSE~UPI~~
+72	colloquial	paid 100 to dad	Dad~100~EXPENSE~~~
+73	single	sent 5000 to Starbucks for electricity bill using net banking	Starbucks~5000~EXPENSE~BANK TRANSFER~~Electricity bill
+74	multi	"Received 50,000 from Mom by card, and then salary credited 4200 rupees using net banking. Next spent 5000 rupees on coffee."	Mom~50000~INCOME~CARD~~;;Salary~4200~INCOME~BANK TRANSFER~~;;Coffee~5000~EXPENSE~~~
+75	short_note	100 groceries.	Groceries~100~~~~
+76	noisy	Transferred eighteen thousand five hundred rupees to Jio	Jio~18500~EXPENSE~~~
+77	noisy	"10 days ago um, got a refund of 9,999 from flipkart"	Flipkart~9999~INCOME~~10~
+78	noisy	Spent thirty on rent by UPI thanks [BLANK_AUDIO]	Rent~30~EXPENSE~UPI~~
+79	single	spent one thousand rs on petrol	Petrol~1000~EXPENSE~~~
+80	noisy	So basically Manpreet paid me 40	Manpreet~40~INCOME~~~
+81	negative	"um, uh, hmm."	
+82	single	Sent 45000 to Amit for rent.	Amit~45000~EXPENSE~~~Rent
+83	negative	I walked 5000 steps today.	
+84	multi_elided	"received 1250 from Manpreet, and 5000 from Sunita"	Manpreet~1250~INCOME~~~;;Sunita~5000~INCOME~~~
+85	single	Gave rs 50000 to Gurpreet on 3rd October.	Gurpreet~50000~EXPENSE~~26~
+86	multi	"Uh spent ₹3500 on breakfast and then Ramesh sent me ₹10,000, plus spent nine thousand nine hundred ninety nine rs on birthday gift at Big Bazaar."	Breakfast~3500~EXPENSE~~~;;Ramesh~10000~INCOME~~~;;Big Bazaar~9999~EXPENSE~~~Birthday gift
+87	multi	"Salary credited 250, Reliance Fresh 2,500. Also Anil paid me 450 all on credit card."	Salary~250~INCOME~CARD~~;;Reliance Fresh~2500~~CARD~~;;Anil~450~INCOME~CARD~~
+88	multi	So basically sent ₹2300 to Decathlon for recharge. received one thousand eight hundred from Neha. Also got 950 salary by bank transfer thanks.	Decathlon~2300~EXPENSE~~~Recharge;;Neha~1800~INCOME~~~;;Salary~950~INCOME~BANK TRANSFER~~
+89	single	got a refund of ₹950 from Flipkart yesterday.	Flipkart~950~INCOME~~1~
+90	single	Apollo Pharmacy Rs. 2300.	Apollo Pharmacy~2300~~~~
+91	noisy	"I want to add that I Vikram paid me 15,000 in cash."	Vikram~15000~INCOME~CASH~~
+92	single	got a refund of 350 from Flipkart.	Flipkart~350~INCOME~~~
+93	single	gave 150 to uber two days ago	Uber~150~EXPENSE~~2~
+94	multi_elided	sent eight thousand rupees to Amit and rs 120 to Jio.	Amit~8000~EXPENSE~~~;;Jio~120~EXPENSE~~~
+95	single	Paid 45k for birthday gift	Birthday gift~45000~EXPENSE~~~
+96	multi	"Paid 3,500 for taxi fare, spent 500 on recharge at Decathlon and then on Friday Vikram sent me rs 12000."	Taxi fare~3500~EXPENSE~~~;;Decathlon~500~EXPENSE~~~Recharge;;Vikram~12000~INCOME~~6~
+97	multi	"paid rs 50000 to zomato, bought a shirt for 8000 rupees, and then paid 50k for taxi fare"	Zomato~50000~EXPENSE~~~;;Shirt~8000~EXPENSE~~~;;Taxi fare~50000~EXPENSE~~~
+98	single	this morning received 12000 rupees from Vikram via IMPS.	Vikram~12000~INCOME~BANK TRANSFER~~
+99	single	Sent 30 to Amit using my credit card last night.	Amit~30~EXPENSE~CARD~1~
+100	multi	"Ola 9,999, also sent 7,500 to Starbucks for school fees, gave ₹45 to Decathlon three days ago."	Ola~9999~~~3~;;Starbucks~7500~EXPENSE~~3~School fees;;Decathlon~45~EXPENSE~~3~
+101	short_note	Coffee one thousand rupees.	Coffee~1000~~~~
+102	single	Bought headphones for 3500	Headphones~3500~EXPENSE~~~
+103	single	Yesterday paid Ramesh 50k for petrol cash	Ramesh~50000~EXPENSE~CASH~1~Petrol
+104	short_note	Movie one hundred rs.	Movie~100~~~~
+105	single	got 450 from Neha in cash on Friday	Neha~450~INCOME~CASH~6~
+106	negative	What is the weather today	
+107	single	Yesterday cashback credited 1800	Cashback~1800~INCOME~~1~
+108	noisy	"Okay so hmm, bought chocolates for 8000"	Chocolates~8000~EXPENSE~~~
+109	list_style	Auto fare 300 and parking six hundred and chai rs 800	Auto Fare~300~~~~;;Parking~600~~~~;;Chai~800~~~~
+110	multi	"Okay so received 60 from uhh, Infosys, plus Amit sent me 18500 rupees"	Infosys~60~INCOME~~~;;Amit~18500~INCOME~~~
+111	single	Vikram sent me 60 rupees by cash last night.	Vikram~60~INCOME~CASH~1~
+112	noisy	so basically spent 600 on taxi fare at Starbucks through NEFT	Starbucks~600~EXPENSE~BANK TRANSFER~~Taxi fare
+113	single	Paid rs 18500 to Jio for medicine	Jio~18500~EXPENSE~~~Medicine
+114	noisy	"I want to add um, that I Jio 2500 on PhonePe"	Jio~2500~~UPI~~
+115	colloquial	Paid zero fifty to Vikram.	Vikram~50~EXPENSE~~~
+116	single	I paid Rs 1800 to Vikram for gym membership.	Vikram~1800~EXPENSE~~~Gym membership
+117	noisy	On October 16th paid 30k to Reliance Fresh.	Reliance Fresh~30000~EXPENSE~~13~
+118	list_style	Newspaper rs 600 and lunch five hundred.	Newspaper~600~~~~;;Lunch~500~~~~
+119	short_note	350 groceries	Groceries~350~~~~
+120	multi	So basically I paid ten thousand rupees to Suresh for coffee and then paid rs 150 to Deepak and paid 15k to Manpreet.	Suresh~10000~EXPENSE~~~Coffee;;Deepak~150~EXPENSE~~~;;Manpreet~15000~EXPENSE~~~
+121	single	spent 40 on lunch at Zomato day before yesterday	Zomato~40~EXPENSE~~2~Lunch
+122	multi	Bought vegetables for fifty thousand rupees and then I paid 60 to Ola for lunch.	Vegetables~50000~EXPENSE~~~;;Ola~60~EXPENSE~~~Lunch
+123	multi	"Gave 250000 to Vikram, paid Mom 750 for recharge after that paid ₹1800 to Manpreet"	Vikram~250000~EXPENSE~~~;;Mom~750~EXPENSE~~~Recharge;;Manpreet~1800~EXPENSE~~~
+124	multi	"um, paid uhh, 500k to Ola. gave nine thousand nine hundred and ninety nine to Suresh, plus spent ₹2,000 on school fees at Dominos by bank transfer. Then paid 2300 to Jio for water bill."	Ola~500000~EXPENSE~~~;;Suresh~9999~EXPENSE~~~;;Dominos~2000~EXPENSE~BANK TRANSFER~~School fees;;Jio~2300~EXPENSE~~~Water bill
+125	multi_elided	"Transferred 85000 to Apollo Pharmacy and Rs. 450 to Dad, and 3000 to Amazon."	Apollo Pharmacy~85000~EXPENSE~~~;;Dad~450~EXPENSE~~~;;Amazon~3000~EXPENSE~~~
+126	single	Paid eighteen thousand five hundred to Neha.	Neha~18500~EXPENSE~~~
+127	multi	"Bought a phone cover for 600 via PhonePe, and then paid 2500 rupees to Decathlon. received 25,000 from Kuldip Kaur. Then spent one thousand eight hundred on taxi fare at McDonalds."	Phone cover~600~EXPENSE~UPI~~;;Decathlon~2500~EXPENSE~~~;;Kuldip Kaur~25000~INCOME~~~;;McDonalds~1800~EXPENSE~~~Taxi fare
+128	single	salary credited rs 10000.	Salary~10000~INCOME~~~
+129	noisy	please add paid 10000 to gurpreet	Gurpreet~10000~EXPENSE~~~
+130	single	got a refund of forty five thousand rupees from Flipkart by bank transfer.	Flipkart~45000~INCOME~BANK TRANSFER~~
+131	multi	Got one thousand eight hundred from Infosys. Next gave 8000 to Airtel both using Google Pay yeah.	Infosys~1800~INCOME~UPI~~;;Airtel~8000~EXPENSE~UPI~~
+132	multi	gave ₹9999 to Uber after that interest credited 250.	Uber~9999~EXPENSE~~~;;Interest~250~INCOME~~~
+133	colloquial	paid hundred rupees to Kuldip Kaur.	Kuldip Kaur~100~EXPENSE~~~
+134	negative	open the camera	
+135	single	spent 9999 on school fees on wednesday	School fees~9999~EXPENSE~~1~
+136	colloquial	paid two thousand five hundred to Anil.	Anil~2500~EXPENSE~~~
+137	single	gave 100000 to neha by card 10 days ago	Neha~100000~EXPENSE~CARD~10~
+138	noisy	"hey, received five hundred from Infosys for books yesterday [BLANK_AUDIO]."	Infosys~500~INCOME~~1~Books
+139	list_style	parking two hundred and fifty and groceries Rs. 300	Parking~250~~~~;;Groceries~300~~~~
+140	multi	"Uh spent 85000 to Amit, and then got 45 salary cash that's it"	Amit~85000~EXPENSE~~~;;Salary~45~INCOME~CASH~~
+141	multi	"so cashback credited 500000. Next paid Zomato 800 for lunch after that spent Rs. 200000 on uhh, coffee at Flipkart with debit card."	Cashback~500000~INCOME~~~;;Zomato~800~EXPENSE~~~Lunch;;Flipkart~200000~EXPENSE~CARD~~Coffee
+142	noisy	"On September 29th spent one thousand two hundred uhh, on taxi fare at Swiggy [BLANK_AUDIO]"	Swiggy~1200~EXPENSE~~30~Taxi fare
+143	multi_elided	"got rs 80 from Neha, eighty five thousand from Gurpreet, and 2500 from Manpreet."	Neha~80~INCOME~~~;;Gurpreet~85000~INCOME~~~;;Manpreet~2500~INCOME~~~
+144	noisy	please add paid 8000 for taxi fare 4 days ago.	Taxi fare~8000~EXPENSE~~4~
+145	single	bought groceries for six hundred rupees by card last sunday	Groceries~600~EXPENSE~CARD~4~
+146	multi_elided	"paid 300 to Suresh, 9999 to Amit, and 100000 to Amazon"	Suresh~300~EXPENSE~~~;;Amit~9999~EXPENSE~~~;;Amazon~100000~EXPENSE~~~
+147	noisy	please add bought fruits for 50000 yesterday	Fruits~50000~EXPENSE~~1~
+148	single	Day before yesterday sent 18500 to Decathlon for dinner.	Decathlon~18500~EXPENSE~~2~Dinner
+149	single	Got 8000 rupees from Infosys.	Infosys~8000~INCOME~~~
+150	negative	Remind me to call Rahul tomorrow.	
+151	multi	"Airtel 7,500, and then salary credited 250. paid Priya six hundred rupees for breakfast"	Airtel~7500~~~~;;Salary~250~INCOME~~~;;Priya~600~EXPENSE~~~Breakfast
+152	multi	"paid Ramesh 20 for breakfast, and then paid Vikram 2500 for dinner through NEFT, plus Flipkart twenty five thousand rupees. Then I paid 9999 to Suresh for lunch thanks"	Ramesh~20~EXPENSE~~~Breakfast;;Vikram~2500~EXPENSE~BANK TRANSFER~~Dinner;;Flipkart~25000~~~~;;Suresh~9999~EXPENSE~~~Lunch
+153	multi_elided	"Gave 200k to Priya, and 2500 rupees to Reliance Fresh."	Priya~200000~EXPENSE~~~;;Reliance Fresh~2500~EXPENSE~~~
+154	noisy	"I want to add that I spent rs hmm, 180 on lunch [BLANK_AUDIO]."	Lunch~180~EXPENSE~~~
+155	multi_elided	"transferred 18,500 to Kuldip Kaur and 950 to Jio."	Kuldip Kaur~18500~EXPENSE~~~;;Jio~950~EXPENSE~~~
+156	multi	i want to add that i anil paid me fifteen thousand rs on gpay and spent 25000 rupees on coffee at starbucks day before yesterday	Anil~15000~INCOME~UPI~2~;;Starbucks~25000~EXPENSE~~2~Coffee
+157	single	received salary of 150 last Thursday.	Salary~150~INCOME~~7~
+158	list_style	Newspaper Rs. 500 and parking one hundred.	Newspaper~500~~~~;;Parking~100~~~~
+159	multi_elided	received 950 from Manpreet and ₹2500 from Priya.	Manpreet~950~INCOME~~~;;Priya~2500~INCOME~~~
+160	multi	"please add paid seventy five rupees for internet bill, also received 9999 rupees from manpreet, cashback credited seventy five thousand rupees"	Internet bill~75~EXPENSE~~~;;Manpreet~9999~INCOME~~~;;Cashback~75000~INCOME~~~
+161	multi_elided	got twenty five thousand rs from Rahul and 3500 from Deepak	Rahul~25000~INCOME~~~;;Deepak~3500~INCOME~~~
+162	single	"Got a refund of 85,000 from Amazon."	Amazon~85000~INCOME~~~
+163	multi	"Please add bought milk for 150000, also paid 80 to Kuldip Kaur for gym membership, paid 1k to Neha yesterday [BLANK_AUDIO]"	Milk~150000~EXPENSE~~1~;;Kuldip Kaur~80~EXPENSE~~1~Gym membership;;Neha~1000~EXPENSE~~1~
+164	multi	last night salary credited 85000. Next received 30 from Flipkart.	Salary~85000~INCOME~~1~;;Flipkart~30~INCOME~~1~
+165	single	Bought vegetables for 18500 yesterday.	Vegetables~18500~EXPENSE~~1~
+166	multi_elided	"received 1,800 from sunita and 20 from priya"	Sunita~1800~INCOME~~~;;Priya~20~INCOME~~~
+167	single	paid Rs. 750 to Reliance Fresh	Reliance Fresh~750~EXPENSE~~~
+168	colloquial	paid hundred rupees to kuldip kaur	Kuldip Kaur~100~EXPENSE~~~
+169	multi_elided	"Received 180 from Vikram, and 10000 from Gurpreet"	Vikram~180~INCOME~~~;;Gurpreet~10000~INCOME~~~
+170	single	got a refund of 25000 from Flipkart.	Flipkart~25000~INCOME~~~
+171	multi	sent 1500 rupees to decathlon for movie tickets on gpay two days ago after that suresh paid me 950 on 11th october after that got a refund of 5000 from myntra	Decathlon~1500~EXPENSE~UPI~2~Movie tickets;;Suresh~950~INCOME~~18~;;Myntra~5000~INCOME~~~
+172	multi	got a refund of 30 rupees from Flipkart. Also received 1200 from Ramesh for groceries.	Flipkart~30~INCOME~~~;;Ramesh~1200~INCOME~~~Groceries
+173	single	Got 18500 salary by UPI.	Salary~18500~INCOME~UPI~~
+174	single	Paid 350 for electricity bill using cash on 8th October	Electricity bill~350~EXPENSE~CASH~21~
+175	colloquial	Paid 100 to Rahul.	Rahul~100~EXPENSE~~~
+176	single	yesterday paid 950 to Neha for birthday gift	Neha~950~EXPENSE~~1~Birthday gift
+177	multi	"Swiggy 2300. Then salary credited ₹500. Also bought medicines for 7,500"	Swiggy~2300~~~~;;Salary~500~INCOME~~~;;Medicines~7500~EXPENSE~~~
+178	single	starbucks one thousand two hundred rs by upi	Starbucks~1200~~UPI~~
+179	single	Blinkit 500 on PhonePe 3 days ago.	Blinkit~500~~UPI~3~
+180	multi	"alright, sent eight thousand rs to Kuldip Kaur for dinner, also paid McDonalds 1250 rupees for coffee by bank transfer, and then paid 18,500 to Starbucks for gym membership after that bought vegetables for 250"	Kuldip Kaur~8000~EXPENSE~~~Dinner;;McDonalds~1250~EXPENSE~BANK TRANSFER~~Coffee;;Starbucks~18500~EXPENSE~~~Gym membership;;Vegetables~250~EXPENSE~~~
+181	single	gave 300 to kuldip kaur in cash	Kuldip Kaur~300~EXPENSE~CASH~~
+182	short_note	100 chai.	Chai~100~~~~
+183	multi	"hey, Uber 2300, Apollo Pharmacy 600, and then gave 2300 to McDonalds"	Uber~2300~~~~;;Apollo Pharmacy~600~~~~;;McDonalds~2300~EXPENSE~~~
+184	multi_elided	"Got four hundred and fifty rs from Kuldip Kaur, and 3500 rupees from Ramesh"	Kuldip Kaur~450~INCOME~~~;;Ramesh~3500~INCOME~~~
+185	single	Bought chocolates for rs 10000 6 days ago.	Chocolates~10000~EXPENSE~~6~
+186	single	Jio 80.	Jio~80~~~~
+187	single	Jio ₹950 day before yesterday	Jio~950~~~2~
+188	single	i paid 30 to ramesh for gym membership through neft two days ago	Ramesh~30~EXPENSE~BANK TRANSFER~2~Gym membership
+189	multi	"received 4200 from Amazon for groceries and got Rs. 8000 from Rahul, plus got 4,200 salary all using my credit card"	Amazon~4200~INCOME~CARD~~Groceries;;Rahul~8000~INCOME~CARD~~;;Salary~4200~INCOME~CARD~~
+190	single	spent 500000 rupees on breakfast at dominos	Dominos~500000~EXPENSE~~~Breakfast
+191	multi	So Manpreet paid me ₹450. Next gave twenty five thousand to Rahul.	Manpreet~450~INCOME~~~;;Rahul~25000~EXPENSE~~~
+192	multi	Day before yesterday Vikram sent me 500k after that gave 45000 rupees to Rahul. Also sent 75000 to Uber for recharge.	Vikram~500000~INCOME~~2~;;Rahul~45000~EXPENSE~~2~;;Uber~75000~EXPENSE~~2~Recharge
+193	list_style	"Petrol rs 700, movie Rs. 80, parking Rs 500."	Petrol~700~~~~;;Movie~80~~~~;;Parking~500~~~~
+194	single	received salary of 250 rupees cash today	Salary~250~INCOME~CASH~~
+195	negative	Open the camera	
+196	noisy	please add bought headphones for 80.	Headphones~80~EXPENSE~~~
+197	single	Received ₹300 from Manpreet for taxi fare.	Manpreet~300~INCOME~~~Taxi fare
+198	negative	"Um, uh, hmm.."	
+199	multi	"paid Big Bazaar 30,000 for dinner, and then Anil sent me 2,000 both by UPI"	Big Bazaar~30000~EXPENSE~UPI~~Dinner;;Anil~2000~INCOME~UPI~~
+200	noisy	"so Gurpreet sent me 450 on uhh, credit card [BLANK_AUDIO]."	Gurpreet~450~INCOME~CARD~~
+201	single	Bought bread and eggs for ₹10000 last Friday.	Bread and eggs~10000~EXPENSE~~6~
+202	single	Last night received rs 250000 from Anil	Anil~250000~INCOME~~1~
+203	multi	"bought a phone cover for ₹150000. got 18,500 from Manpreet and spent 1000 rupees on water bill at Airtel."	Phone cover~150000~EXPENSE~~~;;Manpreet~18500~INCOME~~~;;Airtel~1000~EXPENSE~~~Water bill
+204	colloquial	paid four fifty to Gurpreet.	Gurpreet~450~EXPENSE~~~
+205	noisy	"alright, paid 30 for movie tickets in cash."	Movie tickets~30~EXPENSE~CASH~~
+206	noisy	paid uber 180 for petrol	Uber~180~EXPENSE~~~Petrol
+207	multi	Yesterday gave ₹180 to Zomato and spent 800 on movie tickets at Uber	Zomato~180~EXPENSE~~1~;;Uber~800~EXPENSE~~1~Movie tickets
+208	multi_elided	"Got eighteen thousand five hundred rupees from Ramesh, 1250 from Deepak, and Rs 50000 from Amit."	Ramesh~18500~INCOME~~~;;Deepak~1250~INCOME~~~;;Amit~50000~INCOME~~~
+209	negative	What is the weather today.	
+210	multi	"Gave 750 to Vikram, paid Dad 15,000 for electricity bill and then gave 350 to Apollo Pharmacy five days ago."	Vikram~750~EXPENSE~~5~;;Dad~15000~EXPENSE~~5~Electricity bill;;Apollo Pharmacy~350~EXPENSE~~5~
+211	single	manpreet sent me one thousand two hundred fifty rupees by upi on 15th october	Manpreet~1250~INCOME~UPI~14~
+212	multi	"gave 7,500 to Manpreet after that paid Sunita 1800 for dinner and received ₹350 from HDFC Bank for dinner in cash"	Manpreet~7500~EXPENSE~~~;;Sunita~1800~EXPENSE~~~Dinner;;HDFC Bank~350~INCOME~CASH~~Dinner
+213	short_note	coffee 450 by cash.	Coffee~450~~CASH~~
+214	negative	The meeting is at 5 pm.	
+215	short_note	lunch 1000	Lunch~1000~~~~
+216	noisy	gurpreet paid me 20 using net banking on 22nd september	Gurpreet~20~INCOME~BANK TRANSFER~37~
+217	multi	"Spent forty rupees on internet bill at Blinkit, and then got 45000 rupees from Manpreet on PhonePe, plus got a refund of 800 from Flipkart in cash."	Blinkit~40~EXPENSE~~~Internet bill;;Manpreet~45000~INCOME~UPI~~;;Flipkart~800~INCOME~CASH~~
+218	list_style	"Groceries fifty, then movie Rs. 800, then auto fare 350, then petrol 50."	Groceries~50~~~~;;Movie~800~~~~;;Auto Fare~350~~~~;;Petrol~50~~~~
+219	single	Apollo Pharmacy three thousand rs.	Apollo Pharmacy~3000~~~~
+220	single	Got a refund of three hundred from Flipkart	Flipkart~300~INCOME~~~
+221	single	got a refund of seven hundred and fifty rs from Myntra cash ten days ago.	Myntra~750~INCOME~CASH~10~
+222	multi	"Amit paid me ₹10,000. Next paid 800 rupees to Ola. Next received 2500 from Flipkart for movie tickets."	Amit~10000~INCOME~~~;;Ola~800~EXPENSE~~~;;Flipkart~2500~INCOME~~~Movie tickets
+223	negative	I am going to the market	
+224	colloquial	Paid five fifty to Neha	Neha~550~EXPENSE~~~
+225	noisy	okay so got 120 salary on gpay	Salary~120~INCOME~UPI~~
+226	single	This morning spent 6500 on recharge at Swiggy by cash.	Swiggy~6500~EXPENSE~CASH~~Recharge
+227	list_style	groceries 180 and movie 700	Groceries~180~~~~;;Movie~700~~~~
+228	multi	"Day before yesterday gave 150k to Vikram, also gave 50000 to Amit. got rs 1200 from Ramesh."	Vikram~150000~EXPENSE~~2~;;Amit~50000~EXPENSE~~2~;;Ramesh~1200~INCOME~~2~
+229	multi_elided	"Paid 30 rupees to Jio and 60 to Electricity Board and 10,000 to Sunita."	Jio~30~EXPENSE~~~;;Electricity Board~60~EXPENSE~~~;;Sunita~10000~EXPENSE~~~
+230	list_style	parking rs 700 and lunch forty and newspaper five hundred	Parking~700~~~~;;Lunch~40~~~~;;Newspaper~500~~~~
+231	single	Amazon ₹1200 by bank transfer.	Amazon~1200~~BANK TRANSFER~~
+232	multi	"Uh received five hmm, hundred from Kuldip Kaur for recharge. Also paid 350 to Amit both in cash"	Kuldip Kaur~500~INCOME~CASH~~Recharge;;Amit~350~EXPENSE~CASH~~
+233	single	Received 5000 from Dad.	Dad~5000~INCOME~~~
+234	noisy	Received six thousand five hundred rupees from Flipkart yeah	Flipkart~6500~INCOME~~~
+235	single	I paid 150 to Decathlon for birthday gift with debit card.	Decathlon~150~EXPENSE~CARD~~Birthday gift
+236	multi	"please add gave 1250 to Amit, paid 1000 to Vikram. Also paid two thousand five hundred rupees to McDonalds, gave 4200 rupees to Swiggy yesterday"	Amit~1250~EXPENSE~~1~;;Vikram~1000~EXPENSE~~1~;;McDonalds~2500~EXPENSE~~1~;;Swiggy~4200~EXPENSE~~1~
+237	single	Bought headphones for one hundred and fifty rs.	Headphones~150~EXPENSE~~~
+238	multi_elided	Got ₹450 from Vikram and 2000 rupees from Rahul	Vikram~450~INCOME~~~;;Rahul~2000~INCOME~~~
+239	multi	"paid ₹1800 to Anil. Next Vikram paid me 450 and then received salary of 1,250 today"	Anil~1800~EXPENSE~~~;;Vikram~450~INCOME~~~;;Salary~1250~INCOME~~~
+240	single	spent ₹10000 on movie tickets via PhonePe	Movie tickets~10000~EXPENSE~UPI~~
+241	short_note	40 parking.	Parking~40~~~~
+242	short_note	1500 groceries.	Groceries~1500~~~~
+243	multi	"dividend credited ₹1,800, also gave eight hundred to Zomato, also Anil paid me 45k, plus received ₹1000 from HDFC Bank for breakfast."	Dividend~1800~INCOME~~~;;Zomato~800~EXPENSE~~~;;Anil~45000~INCOME~~~;;HDFC Bank~1000~INCOME~~~Breakfast
+244	single	got a refund of four hundred fifty rs from Flipkart.	Flipkart~450~INCOME~~~
+245	noisy	So bought medicines for seven thousand five hundred on 15th September	Medicines~7500~EXPENSE~~44~
+246	noisy	Okay so paid Dad 12000 rupees for breakfast on credit card.	Dad~12000~EXPENSE~CARD~~Breakfast
+247	multi	"Airtel ₹50,000, plus spent 5000 rupees on medicine both by cash."	Airtel~50000~~CASH~~;;Medicine~5000~EXPENSE~CASH~~
+248	multi_elided	"sent 3,500 to Electricity Board, and 150k to Rahul."	Electricity Board~3500~EXPENSE~~~;;Rahul~150000~EXPENSE~~~
+249	noisy	i want to add that i i paid one thousand two hundred fifty rupees to ola for medicine	Ola~1250~EXPENSE~~~Medicine
+250	multi_elided	"Received rs 1200 from Dad, 30,000 from Mom, and three hundred fifty rupees from Rahul"	Dad~1200~INCOME~~~;;Mom~30000~INCOME~~~;;Rahul~350~INCOME~~~
+251	short_note	chai one thousand rupees.	Chai~1000~~~~
+252	multi	"um, got a refund of 1200 from Flipkart. Also bought bread and eggs for one thousand two hundred fifty rs. Also Uber 7500 all by cash yeah."	Flipkart~1200~INCOME~CASH~~;;Bread and eggs~1250~EXPENSE~CASH~~;;Uber~7500~~CASH~~
+253	multi	"Received Rs. 40 from Manpreet for coffee. Then paid 2,000 for gym membership both on GPay"	Manpreet~40~INCOME~UPI~~Coffee;;Gym membership~2000~EXPENSE~UPI~~
+254	single	"On 27th October got a refund of ₹6,500 from Swiggy"	Swiggy~6500~INCOME~~2~
+255	short_note	450 newspaper by bank transfer	Newspaper~450~~BANK TRANSFER~~
+256	single	"paid 6,500 to Rahul for medicine"	Rahul~6500~EXPENSE~~~Medicine
+257	single	yesterday sent 1800 to Anil for dinner.	Anil~1800~EXPENSE~~1~Dinner
+258	multi	"note down that I spent 150 on dinner. Next spent ₹4200 on recharge, plus received ₹10000 from Neha for taxi fare."	Dinner~150~EXPENSE~~~;;Recharge~4200~EXPENSE~~~;;Neha~10000~INCOME~~~Taxi fare
+259	short_note	groceries 100 through NEFT.	Groceries~100~~BANK TRANSFER~~
+260	multi	"neha sent me 80 after that got a refund of 30,000 from amazon on 22nd september swiggy rs 18500"	Neha~80~INCOME~~~;;Amazon~30000~INCOME~~37~;;Swiggy~18500~~~~
+261	multi	"received 2000 uhh, rupees from Kuldip Kaur for medicine after that spent Rs. 180 on books [BLANK_AUDIO]."	Kuldip Kaur~2000~INCOME~~~Medicine;;Books~180~EXPENSE~~~
+262	single	Gave 6500 to Airtel on 16th October	Airtel~6500~EXPENSE~~13~
+263	short_note	Coffee 1800.	Coffee~1800~~~~
+264	multi_elided	"sent six thousand five hundred rupees to Reliance Fresh, and 40 to McDonalds"	Reliance Fresh~6500~EXPENSE~~~;;McDonalds~40~EXPENSE~~~
+265	noisy	"please add paid starbucks 30,000 for school fees by uh, cash thanks"	Starbucks~30000~EXPENSE~CASH~~School fees
+266	single	Gave rs 150000 to Zomato.	Zomato~150000~EXPENSE~~~
+267	multi	"Got ₹2500 salary. gave 6500 rupees to Neha and paid 1,500 for books thanks."	Salary~2500~INCOME~~~;;Neha~6500~EXPENSE~~~;;Books~1500~EXPENSE~~~
+268	negative	"hello, how are you?"	
+269	multi	On 9th October sent six thousand five hundred rupees to Amazon for recharge. cashback credited 8000. Next received 75000 rupees from Amazon for water bill. Next paid sixty to Apollo Pharmacy.	Amazon~6500~EXPENSE~~20~Recharge;;Cashback~8000~INCOME~~20~;;Amazon~75000~INCOME~~20~Water bill;;Apollo Pharmacy~60~EXPENSE~~20~
+270	single	bought vegetables for 2500 using cash yesterday	Vegetables~2500~EXPENSE~CASH~1~
+271	single	Ramesh sent me 45 on Friday	Ramesh~45~INCOME~~6~
+272	multi	"Gave 200k to Big Bazaar through Paytm. gave rs 100000 to Flipkart on October 7th, plus got ₹6,500 salary on October 27th."	Big Bazaar~200000~EXPENSE~UPI~~;;Flipkart~100000~EXPENSE~~22~;;Salary~6500~INCOME~~2~
+273	single	today paid 950 to zomato for water bill through paytm	Zomato~950~EXPENSE~UPI~~Water bill
+274	list_style	"lunch 200, then auto fare three hundred, then coffee five hundred, then groceries rs 500"	Lunch~200~~~~;;Auto Fare~300~~~~;;Coffee~500~~~~;;Groceries~500~~~~
+275	noisy	I want to add that I got a refund of 350 from Swiggy in cash.	Swiggy~350~INCOME~CASH~~
+276	noisy	"spent 45000 on uh, movie tickets at Ola using my credit card on Saturday."	Ola~45000~EXPENSE~CARD~5~Movie tickets
+277	single	spent Rs. 40 on birthday gift.	Birthday gift~40~EXPENSE~~~
+278	short_note	auto fare one thousand five hundred rs.	Auto Fare~1500~~~~
+279	noisy	paid rs 3500 for rent	Rent~3500~EXPENSE~~~
+280	multi	spent 250 on medicine at mcdonalds and then paid eighty rupees to dad for water bill	McDonalds~250~EXPENSE~~~Medicine;;Dad~80~EXPENSE~~~Water bill
+281	multi	Manpreet paid me 750. gave 9999 to Priya both by card.	Manpreet~750~INCOME~CARD~~;;Priya~9999~EXPENSE~CARD~~
+282	multi	"Alright, Amazon 60. Then got a refund of 2,000 from Flipkart."	Amazon~60~~~~;;Flipkart~2000~INCOME~~~
+283	list_style	"Chai Rs. 20, then groceries rs 99, then petrol fifty"	Chai~20~~~~;;Groceries~99~~~~;;Petrol~50~~~~
+284	multi_elided	"paid 3,500 to Reliance Fresh, and 2500 to Big Bazaar."	Reliance Fresh~3500~EXPENSE~~~;;Big Bazaar~2500~EXPENSE~~~
+285	single	received 20 rupees from Vikram via PhonePe	Vikram~20~INCOME~UPI~~
+286	negative	I have two kids and one dog.	
+287	noisy	uh this morning sent 150 to Neha for school fees yeah	Neha~150~EXPENSE~~~School fees
+288	multi_elided	"Sent 100000 to Reliance Fresh, and one thousand two hundred to Uber"	Reliance Fresh~100000~EXPENSE~~~;;Uber~1200~EXPENSE~~~
+289	multi	"um, 10 days ago paid 6500 rupees to Amazon, and then sent 8k to Flipkart for recharge and then paid two hundred fifty for books"	Amazon~6500~EXPENSE~~10~;;Flipkart~8000~EXPENSE~~10~Recharge;;Books~250~EXPENSE~~10~
+290	negative	thank you.	
+291	list_style	chai 20 and movie 500 and newspaper rs 150 and coffee 700.	Chai~20~~~~;;Movie~500~~~~;;Newspaper~150~~~~;;Coffee~700~~~~
+292	multi	"Okay so spent 60 rupees on birthday gift at Flipkart, plus paid fifty thousand for breakfast. last hmm, Wednesday gave 180 rupees to Reliance Fresh. Next got a refund of one thousand from Swiggy."	Flipkart~60~EXPENSE~~~Birthday gift;;Breakfast~50000~EXPENSE~~~;;Reliance Fresh~180~EXPENSE~~1~;;Swiggy~1000~INCOME~~~
+293	single	on September 30th Zomato 30 through NEFT	Zomato~30~~BANK TRANSFER~29~
+294	single	received ₹85000 from gurpreet using net banking	Gurpreet~85000~INCOME~BANK TRANSFER~~
+295	single	On October 22nd received ₹3000 from Vikram for rent using cash.	Vikram~3000~INCOME~CASH~7~Rent
+296	noisy	"Alright, Big Bazaar twenty five thousand"	Big Bazaar~25000~~~~
+297	multi	Six days ago spent 300 on lunch at Zomato. Also paid Apollo Pharmacy six hundred rs for groceries.	Zomato~300~EXPENSE~~6~Lunch;;Apollo Pharmacy~600~EXPENSE~~6~Groceries
+298	single	spent three hundred and fifty on breakfast at airtel this morning	Airtel~350~EXPENSE~~~Breakfast
+299	multi	"okay so got one thousand five hundred rs from HDFC Bank and uh, spent seventy five thousand to Zomato with debit card."	HDFC Bank~1500~INCOME~~~;;Zomato~75000~EXPENSE~CARD~~
+300	single	Starbucks 50000 rupees on Wednesday	Starbucks~50000~~~1~
+301	multi_elided	Sent 2300 to Zomato and Rs. 1250 to Big Bazaar	Zomato~2300~EXPENSE~~~;;Big Bazaar~1250~EXPENSE~~~
+302	colloquial	Paid three fifty to Priya.	Priya~350~EXPENSE~~~
+303	short_note	Groceries 1000 via IMPS.	Groceries~1000~~BANK TRANSFER~~
+304	single	Salary credited 350 rupees yesterday	Salary~350~INCOME~~1~
+305	single	Got Rs 600 from Mom day before yesterday.	Mom~600~INCOME~~2~
+306	single	Bought chocolates for 8000 rupees by bank transfer.	Chocolates~8000~EXPENSE~BANK TRANSFER~~
+307	multi	"hey, paid 45 rupees for birthday gift and spent Rs 20 on birthday gift at Decathlon with debit card after that McDonalds 10k and then gave 2500 to Blinkit."	Birthday gift~45~EXPENSE~~~;;Decathlon~20~EXPENSE~CARD~~Birthday gift;;McDonalds~10000~~~~;;Blinkit~2500~EXPENSE~~~
+308	noisy	Okay so spent 500000 on dinner at Electricity Board on October 26th	Electricity Board~500000~EXPENSE~~3~Dinner
+309	negative	I have two kids and one dog.	
+310	noisy	"hey, received 200000 from Amit for recharge"	Amit~200000~INCOME~~~Recharge
+311	colloquial	paid fifteen hundred to Rahul.	Rahul~1500~EXPENSE~~~
+312	multi	"Please add dividend credited 6,500, spent one thousand five hundred rs on hmm, taxi fare at Uber."	Dividend~6500~INCOME~~~;;Uber~1500~EXPENSE~~~Taxi fare
+313	multi	On 4th October spent 1800 rupees on dinner at Airtel and paid one hundred and fifty to Electricity Board.	Airtel~1800~EXPENSE~~25~Dinner;;Electricity Board~150~EXPENSE~~25~
+314	list_style	groceries Rs. 45 and parking Rs 400.	Groceries~45~~~~;;Parking~400~~~~
+315	single	Dividend credited two thousand three hundred rs day before yesterday.	Dividend~2300~INCOME~~2~
+316	single	paid Rs. 250 to Swiggy for groceries	Swiggy~250~EXPENSE~~~Groceries
+317	single	paid ₹120 to Blinkit	Blinkit~120~EXPENSE~~~
+318	multi	"sent two thousand five hundred rupees to Apollo Pharmacy for recharge and then sent 30000 rupees to Manpreet for petrol, paid eight thousand rupees for medicine."	Apollo Pharmacy~2500~EXPENSE~~~Recharge;;Manpreet~30000~EXPENSE~~~Petrol;;Medicine~8000~EXPENSE~~~
+319	single	dividend credited eight thousand	Dividend~8000~INCOME~~~
+320	single	"spent ₹2,000 on breakfast"	Breakfast~2000~EXPENSE~~~
+321	multi	"Paid Amit ₹4200 for books, plus spent 800 on movie tickets"	Amit~4200~EXPENSE~~~Books;;Movie tickets~800~EXPENSE~~~
+322	single	sent five hundred to Blinkit today.	Blinkit~500~EXPENSE~~~
+323	multi	Please add sent ₹9999 to Anil for coffee. Then received 250000 rupees from Amazon using UPI and then sent 1000 to Reliance Fresh for school fees.	Anil~9999~EXPENSE~~~Coffee;;Amazon~250000~INCOME~UPI~~;;Reliance Fresh~1000~EXPENSE~~~School fees
+324	single	received 45 from flipkart in cash	Flipkart~45~INCOME~CASH~~
+325	multi_elided	"Paid 80 to Neha, 30 rupees to Decathlon and 450 to Jio."	Neha~80~EXPENSE~~~;;Decathlon~30~EXPENSE~~~;;Jio~450~EXPENSE~~~
+326	noisy	note down that I paid six hundred rupees to Blinkit today.	Blinkit~600~EXPENSE~~~
+327	colloquial	Paid four fifty to Priya	Priya~450~EXPENSE~~~
+328	multi	"today paid fifteen thousand to Mom via IMPS, Ramesh paid me 15000 rupees. Next got a refund of twelve thousand rupees from Flipkart."	Mom~15000~EXPENSE~BANK TRANSFER~~;;Ramesh~15000~INCOME~~~;;Flipkart~12000~INCOME~~~
+329	multi	paid twenty five thousand for breakfast and then paid 1200 rupees to Vikram [BLANK_AUDIO]	Breakfast~25000~EXPENSE~~~;;Vikram~1200~EXPENSE~~~
+330	multi	"So basically Gurpreet sent me 800 after that gave seventy five thousand rs to Uber, also Ola 40 all using my credit card."	Gurpreet~800~INCOME~CARD~~;;Uber~75000~EXPENSE~CARD~~;;Ola~40~~CARD~~
+331	colloquial	Paid four fifty to Rahul.	Rahul~450~EXPENSE~~~
+332	single	dividend credited 45000 by card	Dividend~45000~INCOME~CARD~~
+333	list_style	"movie four hundred, then auto fare five hundred."	Movie~400~~~~;;Auto Fare~500~~~~
+334	negative	I walked 5000 steps today.	
+335	multi	"got a refund of ₹75,000 from Swiggy, and then received 45,000 from Priya for water bill. hmm, Next got eighteen thousand five hundred from Flipkart, and then sent 2300 to Anil for taxi fare all using Google Pay."	Swiggy~75000~INCOME~UPI~~;;Priya~45000~INCOME~UPI~~Water bill;;Flipkart~18500~INCOME~UPI~~;;Anil~2300~EXPENSE~UPI~~Taxi fare
+336	single	Cashback credited 12000 rupees.	Cashback~12000~INCOME~~~
+337	noisy	Okay so dividend credited 75000 [BLANK_AUDIO]	Dividend~75000~INCOME~~~
+338	short_note	40 newspaper	Newspaper~40~~~~
+339	colloquial	Paid hundred rupees to Dad	Dad~100~EXPENSE~~~
+340	negative	you	
+341	negative	Remind me to call Rahul tomorrow	
+342	noisy	"Add a transaction, gave 250,000 to Sunita yesterday"	Sunita~250000~EXPENSE~~1~
+343	multi	paid ₹500 to deepak yesterday then paid 10000 to dominos after that ramesh paid me 1250	Deepak~500~EXPENSE~~1~;;Dominos~10000~EXPENSE~~~;;Ramesh~1250~INCOME~~~
+344	noisy	"um, paid 120 rupees to Zomato [BLANK_AUDIO]"	Zomato~120~EXPENSE~~~
+345	noisy	Okay so paid 2500 to Uber.	Uber~2500~EXPENSE~~~
+346	single	"Got a refund of ₹3,500 from Flipkart"	Flipkart~3500~INCOME~~~
+347	short_note	1500 coffee.	Coffee~1500~~~~
+348	single	3 days ago paid 2500 to Mom.	Mom~2500~EXPENSE~~3~
+349	multi	"paid manpreet 150000 for school fees and reliance fresh ₹7,500, plus got ₹150,000 salary"	Manpreet~150000~EXPENSE~~~School fees;;Reliance Fresh~7500~~~~;;Salary~150000~INCOME~~~
+350	short_note	150 chai	Chai~150~~~~
+351	colloquial	paid three fifty to Priya	Priya~350~EXPENSE~~~
+352	noisy	So basically got 450 from Flipkart last Thursday	Flipkart~450~INCOME~~7~
+353	noisy	"Hey, received salary of 45."	Salary~45~INCOME~~~
+354	list_style	"Parking 300, then chai 700, then newspaper seven hundred fifty"	Parking~300~~~~;;Chai~700~~~~;;Newspaper~750~~~~
+355	multi_elided	"Received 80 from Ramesh, and 8k from Kuldip Kaur."	Ramesh~80~INCOME~~~;;Kuldip Kaur~8000~INCOME~~~
+356	short_note	lunch 300.	Lunch~300~~~~
+357	multi	spent 250000 to Blinkit. Next gave seventy five thousand to Ramesh via IMPS. Suresh paid me 250000 rupees	Blinkit~250000~EXPENSE~~~;;Ramesh~75000~EXPENSE~BANK TRANSFER~~;;Suresh~250000~INCOME~~~
+358	multi_elided	"received four hundred and fifty from neha, 120 from rahul and thirty thousand from amit"	Neha~450~INCOME~~~;;Rahul~120~INCOME~~~;;Amit~30000~INCOME~~~
+359	noisy	Note down that I I paid ₹180 to Amit for recharge.	Amit~180~EXPENSE~~~Recharge
+360	colloquial	paid zero fifty to mom	Mom~50~EXPENSE~~~
+361	single	paid thirty thousand to Suresh last Friday.	Suresh~30000~EXPENSE~~6~
+362	negative	The meeting is at 5 pm	
+363	list_style	Petrol rs 700 and groceries rs 750 and coffee Rs 300 and movie 100.	Petrol~700~~~~;;Groceries~750~~~~;;Coffee~300~~~~;;Movie~100~~~~
+364	noisy	"Um, bought milk for 150000 rupees last Saturday yeah."	Milk~150000~EXPENSE~~5~
+365	noisy	"alright, today hmm, spent 200k on recharge"	Recharge~200000~EXPENSE~~~
+366	multi_elided	"sent Rs. 150000 to Dad, and rs 950 to Amazon"	Dad~150000~EXPENSE~~~;;Amazon~950~EXPENSE~~~
+367	single	Gave thirty thousand to Amazon on credit card last night.	Amazon~30000~EXPENSE~CARD~1~
+368	multi_elided	"got 75 from Sunita, three thousand five hundred rupees from Anil, and 25k from Ramesh."	Sunita~75~INCOME~~~;;Anil~3500~INCOME~~~;;Ramesh~25000~INCOME~~~
+369	noisy	so this morning spent two thousand three hundred rupees on books at uber	Uber~2300~EXPENSE~~~Books
+370	single	6 days ago interest credited 120 via IMPS.	Interest~120~INCOME~BANK TRANSFER~6~
+371	single	paid 12000 rupees to Mom for rent.	Mom~12000~EXPENSE~~~Rent
+372	single	paid Flipkart 3k for groceries on PhonePe	Flipkart~3000~EXPENSE~UPI~~Groceries
+373	multi	"Manpreet paid me 2300 rupees, also interest credited Rs 75 and Deepak paid me 30,000. Next bought chocolates for ₹85000 all using net banking"	Manpreet~2300~INCOME~BANK TRANSFER~~;;Interest~75~INCOME~BANK TRANSFER~~;;Deepak~30000~INCOME~BANK TRANSFER~~;;Chocolates~85000~EXPENSE~BANK TRANSFER~~
+374	single	received 85k from Amazon.	Amazon~85000~INCOME~~~
+375	single	"2 days ago paid Dad 200,000 for school fees by bank transfer."	Dad~200000~EXPENSE~BANK TRANSFER~2~School fees
+376	multi	gave 85000 to Gurpreet. Next received salary of 3500. Also sent eight thousand rs to Reliance Fresh.	Gurpreet~85000~EXPENSE~~~;;Salary~3500~INCOME~~~;;Reliance Fresh~8000~EXPENSE~~~
+377	negative	[BLANK_AUDIO].	
+378	single	Priya paid me Rs. 15000 via IMPS.	Priya~15000~INCOME~BANK TRANSFER~~
+379	multi	Neha paid me 2300 rupees. received 10000 from Amazon.	Neha~2300~INCOME~~~;;Amazon~10000~INCOME~~~
+380	list_style	"Chai Rs 500, parking 300"	Chai~500~~~~;;Parking~300~~~~
+381	single	Spent 150000 to Sunita by card	Sunita~150000~EXPENSE~CARD~~
+382	short_note	Lunch one thousand five hundred rs	Lunch~1500~~~~
+383	short_note	lunch 1000 rupees by UPI.	Lunch~1000~~UPI~~
+384	single	paid 60 to Manpreet by card.	Manpreet~60~EXPENSE~CARD~~
+385	single	"Paid Amit 85,000 for breakfast via PhonePe on Saturday"	Amit~85000~EXPENSE~UPI~5~Breakfast
+386	single	sent ₹300 to anil for movie tickets	Anil~300~EXPENSE~~~Movie tickets
+387	single	got a refund of Rs. 2300 from Amazon yesterday.	Amazon~2300~INCOME~~1~
+388	multi	paid twenty for movie tickets and received salary of rs 150	Movie tickets~20~EXPENSE~~~;;Salary~150~INCOME~~~
+389	single	On September 26th paid two thousand five hundred rupees to Mom for books by cash.	Mom~2500~EXPENSE~CASH~33~Books
+390	multi	Deepak sent me 1800 and paid Rs 85000 to Amazon and got a refund of Rs. 500000 from Flipkart 5 days ago	Deepak~1800~INCOME~~5~;;Amazon~85000~EXPENSE~~5~;;Flipkart~500000~INCOME~~5~
+391	single	Sent three thousand five hundred rupees to Anil for lunch.	Anil~3500~EXPENSE~~~Lunch
+392	single	Received one thousand two hundred fifty from Mom	Mom~1250~INCOME~~~
+393	multi	"Add a transaction, paid 50000 for taxi fare. Next interest credited sixty rs six days ago after that got a refund of 180 from Flipkart [BLANK_AUDIO]."	Taxi fare~50000~EXPENSE~~~;;Interest~60~INCOME~~6~;;Flipkart~180~INCOME~~~
+394	multi	"Bonus credited 150. Next got 4,200 from Neha with debit card."	Bonus~150~INCOME~~~;;Neha~4200~INCOME~CARD~~
+395	single	Paid 2500 for lunch	Lunch~2500~EXPENSE~~~
+396	list_style	Petrol eight hundred and newspaper 60 and coffee Rs 300	Petrol~800~~~~;;Newspaper~60~~~~;;Coffee~300~~~~
+397	multi	Bought vegetables for 9999 rupees. received 25000 from Amazon three days ago	Vegetables~9999~EXPENSE~~3~;;Amazon~25000~INCOME~~3~
+398	short_note	Groceries 1000 rupees cash.	Groceries~1000~~CASH~~
+399	multi	Paid 1250 rupees for lunch. interest credited ₹2000.	Lunch~1250~EXPENSE~~~;;Interest~2000~INCOME~~~
+400	multi	"Zomato ₹950, plus paid ₹2300 to Mom for medicine, plus Deepak sent me 750, plus I paid 5000 to Starbucks for movie tickets all by cash"	Zomato~950~~CASH~~;;Mom~2300~EXPENSE~CASH~~Medicine;;Deepak~750~INCOME~CASH~~;;Starbucks~5000~EXPENSE~CASH~~Movie tickets
+401	list_style	"chai thirty, parking Rs 350, auto fare 800."	Chai~30~~~~;;Parking~350~~~~;;Auto Fare~800~~~~
+402	multi	"Deepak sent me one thousand five hundred rupees and dividend credited 250000 rupees, also received salary of 450."	Deepak~1500~INCOME~~~;;Dividend~250000~INCOME~~~;;Salary~450~INCOME~~~
+403	multi_elided	"got two hundred fifty rs from Kuldip Kaur, ₹2500 from Sunita, and ₹1250 from Suresh."	Kuldip Kaur~250~INCOME~~~;;Sunita~2500~INCOME~~~;;Suresh~1250~INCOME~~~
+404	multi	Gave 3500 to Neha. paid eighty five thousand to Swiggy. Also paid rs 5000 to Uber day before yesterday	Neha~3500~EXPENSE~~2~;;Swiggy~85000~EXPENSE~~2~;;Uber~5000~EXPENSE~~2~
+405	short_note	coffee one hundred rupees using Google Pay	Coffee~100~~UPI~~
+406	single	paid Rahul seventy five thousand for birthday gift by cash.	Rahul~75000~EXPENSE~CASH~~Birthday gift
+407	single	Airtel ₹300 through NEFT.	Airtel~300~~BANK TRANSFER~~
+408	multi	"Sunita sent me 4200 rupees. spent one thousand five hundred on coffee at Apollo Pharmacy, also gave thirty to Mom in cash"	Sunita~4200~INCOME~~~;;Apollo Pharmacy~1500~EXPENSE~~~Coffee;;Mom~30~EXPENSE~CASH~~
+409	noisy	"I want to add that I 10 days ago paid 4,200 to Mom by bank transfer"	Mom~4200~EXPENSE~BANK TRANSFER~10~
+410	noisy	uh yesterday Manpreet paid me 1800.	Manpreet~1800~INCOME~~1~
+411	multi	Paid 2k to Manpreet and then salary credited thirty thousand after that Suresh paid me 20 rupees all cash	Manpreet~2000~EXPENSE~CASH~~;;Salary~30000~INCOME~CASH~~;;Suresh~20~INCOME~CASH~~
+412	list_style	"auto fare 150, petrol six hundred."	Auto Fare~150~~~~;;Petrol~600~~~~
+413	multi	"I want to add that I spent rs 800 on coffee. Next paid Amazon 100k for water bill, and then got 450 salary on Monday"	Coffee~800~EXPENSE~~3~;;Amazon~100000~EXPENSE~~3~Water bill;;Salary~450~INCOME~~3~
+414	multi	"Okay so paid Zomato rs 7500 for breakfast, and then bought fruits for 2000 rupees. Then Anil sent me five thousand rs."	Zomato~7500~EXPENSE~~~Breakfast;;Fruits~2000~EXPENSE~~~;;Anil~5000~INCOME~~~
+415	multi	So basically I paid 7500 to Zomato for internet bill after that got a refund of 500 from Amazon [BLANK_AUDIO].	Zomato~7500~EXPENSE~~~Internet bill;;Amazon~500~INCOME~~~
+416	noisy	please add paid Flipkart Rs 180 for internet bill	Flipkart~180~EXPENSE~~~Internet bill
+417	single	10 days ago cashback credited ₹40.	Cashback~40~INCOME~~10~
+418	multi	Gave 600 to Ola yesterday and Deepak sent me three hundred and fifty rupees	Ola~600~EXPENSE~~1~;;Deepak~350~INCOME~~~
+419	multi	paid 1k to Uber for electricity bill using net banking. Next paid ₹200000 to Deepak. got a refund of one thousand two hundred and fifty rupees from Flipkart	Uber~1000~EXPENSE~BANK TRANSFER~~Electricity bill;;Deepak~200000~EXPENSE~~~;;Flipkart~1250~INCOME~~~
+420	multi	"Paid Dad thirty thousand rupees for water bill, plus sent four hundred and fifty rupees to Rahul for electricity bill."	Dad~30000~EXPENSE~~~Water bill;;Rahul~450~EXPENSE~~~Electricity bill
+421	single	Received 250000 from Neha by UPI.	Neha~250000~INCOME~UPI~~
+422	list_style	"auto fare five hundred, movie 600, coffee rs 50."	Auto Fare~500~~~~;;Movie~600~~~~;;Coffee~50~~~~
+423	noisy	"spent 12,000 on groceries at Decathlon."	Decathlon~12000~EXPENSE~~~Groceries
+424	short_note	Chai 750.	Chai~750~~~~
+425	negative	[BLANK_AUDIO]	
+426	short_note	coffee three hundred rupees.	Coffee~300~~~~
+427	multi_elided	"received 200000 from suresh, and 2,000 from ramesh"	Suresh~200000~INCOME~~~;;Ramesh~2000~INCOME~~~
+428	single	Paid 5000 to Starbucks.	Starbucks~5000~EXPENSE~~~
+429	multi	today bought chocolates for nine thousand nine hundred and ninety nine rupees next gave 7500 to priya	Chocolates~9999~EXPENSE~~~;;Priya~7500~EXPENSE~~~
+430	multi	so basically sent 1000 rupees to Kuldip Kaur for rent. received 45000 from Flipkart.	Kuldip Kaur~1000~EXPENSE~~~Rent;;Flipkart~45000~INCOME~~~
+431	multi_elided	Got twenty five thousand rs from Manpreet and 1200 from Suresh	Manpreet~25000~INCOME~~~;;Suresh~1200~INCOME~~~
+432	list_style	"Lunch 50, then coffee Rs. 250."	Lunch~50~~~~;;Coffee~250~~~~
+433	single	Paid Swiggy 20 for birthday gift using net banking	Swiggy~20~EXPENSE~BANK TRANSFER~~Birthday gift
+434	noisy	so two days ago paid 2300 to swiggy that's it	Swiggy~2300~EXPENSE~~2~
+435	multi	got 30 salary then got a refund of 40 rupees from flipkart	Salary~30~INCOME~~~;;Flipkart~40~INCOME~~~
+436	single	Yesterday received 2300 from Suresh for breakfast	Suresh~2300~INCOME~~1~Breakfast
+437	multi	"gave Rs. 500 to Decathlon, and then bought vegetables for 1200. Next interest credited thirty thousand rupees."	Decathlon~500~EXPENSE~~~;;Vegetables~1200~EXPENSE~~~;;Interest~30000~INCOME~~~
+438	list_style	"Groceries 300, petrol two hundred, newspaper Rs. 350, movie Rs 700"	Groceries~300~~~~;;Petrol~200~~~~;;Newspaper~350~~~~;;Movie~700~~~~
+439	multi	yesterday paid Anil ₹180 for internet bill. Then bought flowers for 60	Anil~180~EXPENSE~~1~Internet bill;;Flowers~60~EXPENSE~~1~
+440	negative	Set an alarm for 6 am.	
+441	multi	"Electricity Board six hundred rupees with debit card, Rahul paid me 500000."	Electricity Board~600~~CARD~~;;Rahul~500000~INCOME~~~
+442	negative	Set an alarm for 6 am	
+443	noisy	Note down that I gave 2k to Anil by cash ten days ago	Anil~2000~EXPENSE~CASH~10~
+444	single	Received three hundred from Amazon	Amazon~300~INCOME~~~
+445	multi_elided	"Paid ₹500 to Anil, and ₹25000 to McDonalds"	Anil~500~EXPENSE~~~;;McDonalds~25000~EXPENSE~~~
+446	single	got ₹30000 from Kuldip Kaur.	Kuldip Kaur~30000~INCOME~~~
+447	colloquial	paid hundred rupees to neha	Neha~100~EXPENSE~~~
+448	single	Priya sent me two thousand rupees.	Priya~2000~INCOME~~~
+449	single	On 22nd October paid McDonalds 300 for internet bill.	McDonalds~300~EXPENSE~~7~Internet bill
+450	single	On October 9th bought bread and eggs for 2000 cash	Bread and eggs~2000~EXPENSE~CASH~20~
+451	short_note	Auto fare 1800	Auto Fare~1800~~~~
+452	single	Paid 80 to Priya by UPI.	Priya~80~EXPENSE~UPI~~
+453	multi	"got rs 18500 salary by upi then sent seven thousand five hundred to vikram for coffee after that paid 150,000 to kuldip kaur for rent"	Salary~18500~INCOME~UPI~~;;Vikram~7500~EXPENSE~~~Coffee;;Kuldip Kaur~150000~EXPENSE~~~Rent
+454	multi_elided	received ₹150 from Vikram and 45 rupees from Rahul.	Vikram~150~INCOME~~~;;Rahul~45~INCOME~~~
+455	multi	Priya paid me 12000 via IMPS and got fifty thousand from Suresh.	Priya~12000~INCOME~BANK TRANSFER~~;;Suresh~50000~INCOME~~~
+456	colloquial	Paid two fifty to Anil	Anil~250~EXPENSE~~~
+457	noisy	"alright, gave five hundred rupees to swiggy"	Swiggy~500~EXPENSE~~~
+458	multi	"Alright, Sunita paid me 600 rupees, paid 75 to Starbucks yeah"	Sunita~600~INCOME~~~;;Starbucks~75~EXPENSE~~~
+459	noisy	interest credited ₹50000.	Interest~50000~INCOME~~~
+460	single	"Gave ₹6,500 to Amazon."	Amazon~6500~EXPENSE~~~
+461	negative	I need to buy milk	
+462	multi	"dominos ₹75,000, also got a refund of 7500 rupees from swiggy next bought headphones for 600 also dividend credited 1000"	Dominos~75000~~~~;;Swiggy~7500~INCOME~~~;;Headphones~600~EXPENSE~~~;;Dividend~1000~INCOME~~~
+463	multi_elided	paid 75000 rupees to Swiggy and rs 9999 to Dominos.	Swiggy~75000~EXPENSE~~~;;Dominos~9999~EXPENSE~~~
+464	short_note	Groceries one thousand rs.	Groceries~1000~~~~
+465	negative	Call Mom.	
+466	negative	I have two kids and one dog	
+467	noisy	"please add um, bonus credited 750."	Bonus~750~INCOME~~~
+468	single	on september 29th spent 1500 rupees on movie tickets at zomato	Zomato~1500~EXPENSE~~30~Movie tickets
+469	single	received ₹1500 from Flipkart using UPI last night.	Flipkart~1500~INCOME~UPI~1~
+470	single	on 15th October spent 5000 rupees on recharge.	Recharge~5000~EXPENSE~~14~
+471	noisy	note down that I received ₹80 from HDFC Bank	HDFC Bank~80~INCOME~~~
+472	multi	"Got a refund of 150k from Myntra, plus got 2500 salary."	Myntra~150000~INCOME~~~;;Salary~2500~INCOME~~~
+473	single	spent 75 rupees on lunch at Blinkit day before yesterday	Blinkit~75~EXPENSE~~2~Lunch
+474	colloquial	paid five fifty to Vikram	Vikram~550~EXPENSE~~~
+475	multi	"got 45 from Anil, and then paid 20 to Dominos. Then spent ₹10000 on rent day before yesterday."	Anil~45~INCOME~~2~;;Dominos~20~EXPENSE~~2~;;Rent~10000~EXPENSE~~2~
+476	single	"sent ₹9,999 to Kuldip Kaur for birthday gift in cash"	Kuldip Kaur~9999~EXPENSE~CASH~~Birthday gift
+477	noisy	Uh sent 40 to Mom for internet bill using net banking.	Mom~40~EXPENSE~BANK TRANSFER~~Internet bill
+478	single	Amit sent me Rs 2000	Amit~2000~INCOME~~~
+479	multi	"paid ₹18500 for groceries, also manpreet sent me rs 85000"	Groceries~18500~EXPENSE~~~;;Manpreet~85000~INCOME~~~
+480	multi	"Suresh sent me 10,000 and then received three hundred from Amazon, plus Vikram paid me thirty thousand, Airtel 1000."	Suresh~10000~INCOME~~~;;Amazon~300~INCOME~~~;;Vikram~30000~INCOME~~~;;Airtel~1000~~~~
+481	noisy	"gave 25,000 to Dad."	Dad~25000~EXPENSE~~~
+482	noisy	"add a transaction, last Tuesday paid Swiggy ₹45 for gym membership."	Swiggy~45~EXPENSE~~2~Gym membership
+483	multi	"got 180 from Suresh and got a refund of rs uh, 45000 from Swiggy. Sunita sent me four thousand two hundred rupees by cash."	Suresh~180~INCOME~~~;;Swiggy~45000~INCOME~~~;;Sunita~4200~INCOME~CASH~~
+484	multi	"yesterday spent rs 40 to Mom, also spent 1500 on medicine at Dominos. Also paid 1500 for gym membership. cashback credited 1200 rupees."	Mom~40~EXPENSE~~1~;;Dominos~1500~EXPENSE~~1~Medicine;;Gym membership~1500~EXPENSE~~1~;;Cashback~1200~INCOME~~1~
+485	multi	Last Wednesday received ₹12000 from Mom for breakfast. Also spent 2500 rupees on petrol at Reliance Fresh.	Mom~12000~INCOME~~1~Breakfast;;Reliance Fresh~2500~EXPENSE~~1~Petrol
+486	multi_elided	"Received ₹10,000 from Gurpreet, two thousand from Manpreet, and 120 from Neha."	Gurpreet~10000~INCOME~~~;;Manpreet~2000~INCOME~~~;;Neha~120~INCOME~~~
+487	negative	thank you.	
+488	multi	Salary credited two thousand rs. paid 1500 to Suresh for rent. Next received six thousand five hundred from Amazon.	Salary~2000~INCOME~~~;;Suresh~1500~EXPENSE~~~Rent;;Amazon~6500~INCOME~~~
+489	multi	"spent ₹2000 on recharge at Big Bazaar, plus gave 500000 to Dad, plus spent two hundred and fifty rs on birthday gift. Next bought milk for Rs. 4200 ten days ago."	Big Bazaar~2000~EXPENSE~~10~Recharge;;Dad~500000~EXPENSE~~10~;;Birthday gift~250~EXPENSE~~10~;;Milk~4200~EXPENSE~~10~
+490	multi	"on Wednesday gave Rs 950 to Amazon. Then paid Big Bazaar 250 for recharge, and then paid 2500 to Priya, also bought milk for 500"	Amazon~950~EXPENSE~~1~;;Big Bazaar~250~EXPENSE~~1~Recharge;;Priya~2500~EXPENSE~~1~;;Milk~500~EXPENSE~~1~
+491	multi	"on 27th October paid 75 to Blinkit. Also got 30,000 from Deepak. Also gave 45 to Kuldip Kaur after that paid Rs 6500 to Sunita for movie tickets."	Blinkit~75~EXPENSE~~2~;;Deepak~30000~INCOME~~2~;;Kuldip Kaur~45~EXPENSE~~2~;;Sunita~6500~EXPENSE~~2~Movie tickets
+492	single	Paid 6500 to Deepak.	Deepak~6500~EXPENSE~~~
+493	multi	"uh yesterday received salary of forty, also gave 1200 rupees to Gurpreet."	Salary~40~INCOME~~1~;;Gurpreet~1200~EXPENSE~~1~
+494	noisy	"uh got a refund uhh, of 18500 from Amazon yesterday."	Amazon~18500~INCOME~~1~
+495	multi_elided	"Got two thousand five hundred rs from Sunita, and 12000 from Ramesh"	Sunita~2500~INCOME~~~;;Ramesh~12000~INCOME~~~
+496	multi_elided	"sent two thousand to zomato, one thousand two hundred fifty to decathlon, and ₹9,999 to rahul"	Zomato~2000~EXPENSE~~~;;Decathlon~1250~EXPENSE~~~;;Rahul~9999~EXPENSE~~~
+497	multi_elided	got 250000 rupees from Manpreet and 500 rupees from Dad.	Manpreet~250000~INCOME~~~;;Dad~500~INCOME~~~
+498	single	Ola sixty rupees.	Ola~60~~~~
+499	multi	Reliance Fresh 15k. Then gave 450 to Big Bazaar.	Reliance Fresh~15000~~~~;;Big Bazaar~450~EXPENSE~~~
+500	multi	"paid 45,000 for rent, plus i paid 85000 to decathlon for coffee both by upi"	Rent~45000~EXPENSE~UPI~~;;Decathlon~85000~EXPENSE~UPI~~Coffee
+501	list_style	"Coffee rs 100, lunch 50."	Coffee~100~~~~;;Lunch~50~~~~
+502	multi_elided	"Received 1000 from Anil, and 200000 from Ramesh"	Anil~1000~INCOME~~~;;Ramesh~200000~INCOME~~~
+503	single	"paid ₹1,250 to Amazon on credit card on October 8th."	Amazon~1250~EXPENSE~CARD~21~
+504	multi	"Starbucks two thousand five hundred on 3rd October, plus Reliance Fresh 75, also got 100k from Amazon and received ₹150000 from Infosys."	Starbucks~2500~~~26~;;Reliance Fresh~75~~~~;;Amazon~100000~INCOME~~~;;Infosys~150000~INCOME~~~
+505	multi	"Amazon 120 after that salary credited ₹1,250"	Amazon~120~~~~;;Salary~1250~INCOME~~~
+506	noisy	"Got a refund of two hundred fifty rupees from hmm, Swiggy."	Swiggy~250~INCOME~~~
+507	single	Vikram paid me 950 rupees.	Vikram~950~INCOME~~~
+508	multi	"Please add paid eighty five thousand to Dominos after that paid 12,000 for taxi fare, plus paid ₹75000 to Ramesh by cash"	Dominos~85000~EXPENSE~~~;;Taxi fare~12000~EXPENSE~~~;;Ramesh~75000~EXPENSE~CASH~~
+509	single	Received 750 from Amit for taxi fare using Google Pay	Amit~750~INCOME~UPI~~Taxi fare
+510	multi	"On 23rd September Zomato ₹60 and then paid Ola one hundred and twenty for taxi fare. Next Vikram sent me 500,000."	Zomato~60~~~36~;;Ola~120~EXPENSE~~36~Taxi fare;;Vikram~500000~INCOME~~36~
+511	multi	Priya sent me Rs. 300 after that spent one thousand eight hundred on coffee yesterday.	Priya~300~INCOME~~1~;;Coffee~1800~EXPENSE~~1~
+512	multi	"paid Dad 100,000 for movie tickets, also sent 18,500 to McDonalds for breakfast."	Dad~100000~EXPENSE~~~Movie tickets;;McDonalds~18500~EXPENSE~~~Breakfast
+513	multi_elided	got 4200 from Dad and rs 2300 from Mom.	Dad~4200~INCOME~~~;;Mom~2300~INCOME~~~
+514	short_note	parking 600.	Parking~600~~~~
+515	single	three days ago bought milk for 2300.	Milk~2300~EXPENSE~~3~
+516	noisy	"Alright, transferred one thousand to Airtel thank you."	Airtel~1000~EXPENSE~~~
+517	short_note	one thousand two hundred and fifty rupees groceries by card.	Groceries~1250~~CARD~~
+518	noisy	"alright, bought chocolates for 1,000 thank you"	Chocolates~1000~EXPENSE~~~
+519	single	I paid four thousand two hundred rs to Anil for coffee this morning	Anil~4200~EXPENSE~~~Coffee
+520	single	"interest credited 1,200 using my credit card"	Interest~1200~INCOME~CARD~~
+521	noisy	so Manpreet sent me 500000 day before yesterday.	Manpreet~500000~INCOME~~2~
+522	short_note	petrol 500 rupees through Paytm.	Petrol~500~~UPI~~
+523	noisy	"Hey, got a refund of 50000 from Myntra [BLANK_AUDIO]."	Myntra~50000~INCOME~~~
+524	single	three days ago paid Electricity Board 18500 rupees for movie tickets with debit card.	Electricity Board~18500~EXPENSE~CARD~3~Movie tickets
+525	noisy	"um, day before yesterday spent ₹15,000 on school fees on PhonePe thanks"	School fees~15000~EXPENSE~UPI~2~
+526	multi_elided	Sent ₹1000 to Deepak and 3000 rupees to Dad and 7500 to Priya.	Deepak~1000~EXPENSE~~~;;Dad~3000~EXPENSE~~~;;Priya~7500~EXPENSE~~~
+527	multi	"Spent 85000 on birthday gift at Reliance Fresh on credit card. sent 80 rupees to Dad for taxi fare and got a refund of 1,500 from Flipkart"	Reliance Fresh~85000~EXPENSE~CARD~~Birthday gift;;Dad~80~EXPENSE~~~Taxi fare;;Flipkart~1500~INCOME~~~
+528	multi	"last night spent eight thousand on lunch. Next interest uhh, credited 9,999."	Lunch~8000~EXPENSE~~1~;;Interest~9999~INCOME~~1~
+529	noisy	"paid Suresh 7,500 hmm, for breakfast [BLANK_AUDIO]"	Suresh~7500~EXPENSE~~~Breakfast
+530	single	paid 10000 to Vikram for medicine by cash.	Vikram~10000~EXPENSE~CASH~~Medicine
+531	multi	got sixty rupees from Deepak. Also paid 350 to Kuldip Kaur.	Deepak~60~INCOME~~~;;Kuldip Kaur~350~EXPENSE~~~
+532	single	paid 2000 rupees to Kuldip Kaur.	Kuldip Kaur~2000~EXPENSE~~~
+533	single	Got a refund of Rs 300 from Amazon	Amazon~300~INCOME~~~
+534	single	"cashback credited 150,000."	Cashback~150000~INCOME~~~
+535	multi	Note down that I bought fruits for two thousand three hundred rupees and then gave 6500 to Gurpreet. paid Kuldip Kaur eight thousand rupees for dinner.	Fruits~2300~EXPENSE~~~;;Gurpreet~6500~EXPENSE~~~;;Kuldip Kaur~8000~EXPENSE~~~Dinner
+536	noisy	uh got 120 from Manpreet.	Manpreet~120~INCOME~~~
+537	list_style	petrol rs 300 and auto fare two hundred and parking fifty and newspaper eight hundred	Petrol~300~~~~;;Auto Fare~200~~~~;;Parking~50~~~~;;Newspaper~800~~~~
+538	single	"Received ₹3,000 from Anil."	Anil~3000~INCOME~~~
+539	single	Paid 250k for breakfast using Google Pay 5 days ago.	Breakfast~250000~EXPENSE~UPI~5~
+540	single	paid 3000 rupees to Electricity Board for gym membership on October 5th	Electricity Board~3000~EXPENSE~~24~Gym membership
+541	multi	"Okay so salary credited Rs 10000, also received eighteen thousand five hundred rs from HDFC hmm, Bank last Friday."	Salary~10000~INCOME~~6~;;HDFC Bank~18500~INCOME~~6~
+542	single	Got thirty thousand from Flipkart.	Flipkart~30000~INCOME~~~
+543	single	bought shoes for 500000 using UPI.	Shoes~500000~EXPENSE~UPI~~
+544	short_note	100 newspaper by bank transfer	Newspaper~100~~BANK TRANSFER~~
+545	multi	"Uh paid seven um, thousand five hundred to Amit and received 150 from Kuldip Kaur and paid 1000 for recharge."	Amit~7500~EXPENSE~~~;;Kuldip Kaur~150~INCOME~~~;;Recharge~1000~EXPENSE~~~
+546	single	"paid 30,000 for internet bill"	Internet bill~30000~EXPENSE~~~
+547	multi_elided	sent sixty to Vikram and Rs 500 to Amit.	Vikram~60~EXPENSE~~~;;Amit~500~EXPENSE~~~
+548	multi	"please add Airtel 20, paid 75k for petrol. Then four days ago bought groceries for ₹30, also spent ₹15,000 uh, on petrol."	Airtel~20~~~~;;Petrol~75000~EXPENSE~~~;;Groceries~30~EXPENSE~~4~;;Petrol~15000~EXPENSE~~~
+549	noisy	Please add bought fruits for 150000.	Fruits~150000~EXPENSE~~~
+550	noisy	"add a transaction, sent 350 to Sunita for uh, books yeah"	Sunita~350~EXPENSE~~~Books
+551	multi	bonus credited 40 and then paid nine thousand nine hundred ninety nine for birthday gift.	Bonus~40~INCOME~~~;;Birthday gift~9999~EXPENSE~~~
+552	multi	"gave ₹10000 to Starbucks, and then bonus credited three thousand five hundred rupees, plus Amazon ₹750. Next got 12,000 salary all using UPI"	Starbucks~10000~EXPENSE~UPI~~;;Bonus~3500~INCOME~UPI~~;;Amazon~750~~UPI~~;;Salary~12000~INCOME~UPI~~
+553	multi	last night transferred twenty to McDonalds and then spent 7500 on breakfast at Apollo Pharmacy thanks.	McDonalds~20~EXPENSE~~1~;;Apollo Pharmacy~7500~EXPENSE~~1~Breakfast
+554	colloquial	Paid three fifty to Rahul.	Rahul~350~EXPENSE~~~
+555	noisy	"I want to uhh, add that I sent ₹4,200 to McDonalds for movie tickets using Google Pay."	McDonalds~4200~EXPENSE~UPI~~Movie tickets
+556	short_note	auto fare five hundred rupees.	Auto Fare~500~~~~
+557	multi_elided	"got 5k from Mom, 300 from Ramesh, and 45 from Kuldip Kaur."	Mom~5000~INCOME~~~;;Ramesh~300~INCOME~~~;;Kuldip Kaur~45~INCOME~~~
+558	multi	"I paid eighty five thousand to Ramesh for internet bill. spent Rs. 75000 on breakfast at McDonalds, also dividend credited 15,000 with debit card."	Ramesh~85000~EXPENSE~~~Internet bill;;McDonalds~75000~EXPENSE~~~Breakfast;;Dividend~15000~INCOME~CARD~~
+559	single	"paid ₹5,000 to Suresh."	Suresh~5000~EXPENSE~~~
+560	noisy	"Today received fifteen uhh, thousand from Amazon using UPI"	Amazon~15000~INCOME~UPI~~
+561	short_note	Lunch 1200.	Lunch~1200~~~~
+562	multi_elided	"got seven thousand five hundred rupees from rahul, and 180 from vikram"	Rahul~7500~INCOME~~~;;Vikram~180~INCOME~~~
+563	colloquial	paid hundred rupees to Kuldip Kaur.	Kuldip Kaur~100~EXPENSE~~~
+564	multi_elided	"received 200000 from Anil, and six thousand five hundred rs from Rahul."	Anil~200000~INCOME~~~;;Rahul~6500~INCOME~~~
+565	single	got a refund of two thousand three hundred rs from Swiggy.	Swiggy~2300~INCOME~~~
+566	multi	Paid ₹750 to Kuldip Kaur. paid 10000 rupees for electricity bill	Kuldip Kaur~750~EXPENSE~~~;;Electricity bill~10000~EXPENSE~~~
+567	multi	4 days ago paid 1200 for electricity bill after that spent 1000 on medicine at Big Bazaar and dividend credited two thousand three hundred rs	Electricity bill~1200~EXPENSE~~4~;;Big Bazaar~1000~EXPENSE~~4~Medicine;;Dividend~2300~INCOME~~4~
+568	negative	"Hello, how are you?"	
+569	multi	"please add paid fifteen thousand rupees to Amazon, and then received fifty thousand from Amazon for um, rent"	Amazon~15000~EXPENSE~~~;;Amazon~50000~INCOME~~~Rent
+570	multi_elided	"sent thirty thousand to Sunita, and twenty to Deepak."	Sunita~30000~EXPENSE~~~;;Deepak~20~EXPENSE~~~
+571	multi	"Big Bazaar Rs 25000, also cashback credited 2k, plus spent ₹1,200 to Airtel all by cash."	Big Bazaar~25000~~CASH~~;;Cashback~2000~INCOME~CASH~~;;Airtel~1200~EXPENSE~CASH~~
+572	single	got a refund of 1k from swiggy	Swiggy~1000~INCOME~~~
+573	negative	"Hello, how are you?"	
+574	noisy	"hey, received 20 rupees from Amazon thanks [BLANK_AUDIO]"	Amazon~20~INCOME~~~
+575	multi	"Airtel 5000 rupees. Also bought shoes for 180 using Google Pay, paid ₹100,000 to Zomato for school fees on PhonePe."	Airtel~5000~~~~;;Shoes~180~EXPENSE~UPI~~;;Zomato~100000~EXPENSE~UPI~~School fees
+576	single	Got a refund of 40 from Swiggy.	Swiggy~40~INCOME~~~
+577	list_style	"lunch 120, movie Rs. 750, chai two hundred, petrol 700"	Lunch~120~~~~;;Movie~750~~~~;;Chai~200~~~~;;Petrol~700~~~~
+578	single	Amit paid me 1250 in cash	Amit~1250~INCOME~CASH~~
+579	multi_elided	"received rs 80 from manpreet, 45000 from priya, and 6500 from kuldip kaur"	Manpreet~80~INCOME~~~;;Priya~45000~INCOME~~~;;Kuldip Kaur~6500~INCOME~~~
+580	noisy	"So paid uh, Anil 100,000 for petrol thank you."	Anil~100000~EXPENSE~~~Petrol
+581	multi	"alright, paid 150000 to Reliance Fresh, gave ₹1200 to Manpreet on Wednesday"	Reliance Fresh~150000~EXPENSE~~1~;;Manpreet~1200~EXPENSE~~1~
+582	short_note	One thousand rupees lunch.	Lunch~1000~~~~
+583	multi_elided	"received 75 rupees from Sunita, 500 from Anil and ₹75,000 from Vikram."	Sunita~75~INCOME~~~;;Anil~500~INCOME~~~;;Vikram~75000~INCOME~~~
+584	multi	"Um, last Friday paid 85000 rupees for water bill, plus interest credited 3000 rupees. Next Flipkart Rs. 15000 [BLANK_AUDIO]"	Water bill~85000~EXPENSE~~6~;;Interest~3000~INCOME~~6~;;Flipkart~15000~~~6~
+585	single	Last Sunday paid 150000 to Flipkart for rent through NEFT	Flipkart~150000~EXPENSE~BANK TRANSFER~4~Rent
+586	multi_elided	"Gave 250000 to Anil, and 30000 to Sunita."	Anil~250000~EXPENSE~~~;;Sunita~30000~EXPENSE~~~
+587	list_style	Coffee 500 and parking 120 and auto fare 400 and lunch 800	Coffee~500~~~~;;Parking~120~~~~;;Auto Fare~400~~~~;;Lunch~800~~~~
+588	noisy	So 5 days ago Suresh sent me 1500 by bank transfer.	Suresh~1500~INCOME~BANK TRANSFER~5~
+589	noisy	"Alright, Decathlon four hundred and fifty hmm, using net banking last night yeah."	Decathlon~450~~BANK TRANSFER~1~
+590	multi_elided	"paid 750 to ramesh, forty five thousand rs to electricity board and 5k to blinkit"	Ramesh~750~EXPENSE~~~;;Electricity Board~45000~EXPENSE~~~;;Blinkit~5000~EXPENSE~~~
+591	single	Paid two thousand rs to Ramesh for breakfast on GPay	Ramesh~2000~EXPENSE~UPI~~Breakfast
+592	multi	Got a refund of 3000 from Swiggy and spent 5k on taxi fare.	Swiggy~3000~INCOME~~~;;Taxi fare~5000~EXPENSE~~~
+593	list_style	newspaper Rs 180 and coffee 80.	Newspaper~180~~~~;;Coffee~80~~~~
+594	noisy	I want to add that I spent 500 on school fees by bank transfer.	School fees~500~EXPENSE~BANK TRANSFER~~
+595	list_style	"movie 400, then auto fare rs 250"	Movie~400~~~~;;Auto Fare~250~~~~
+596	single	"paid ₹9,999 to airtel for books"	Airtel~9999~EXPENSE~~~Books
+597	multi_elided	"received thirty thousand from Priya, 3k from Deepak, and fifty thousand rupees from Manpreet."	Priya~30000~INCOME~~~;;Deepak~3000~INCOME~~~;;Manpreet~50000~INCOME~~~
+598	single	I paid 25000 rupees to Starbucks for dinner cash	Starbucks~25000~EXPENSE~CASH~~Dinner
+599	colloquial	Paid hundred rupees to Amit	Amit~100~EXPENSE~~~
+600	single	gave 3000 rupees to Ramesh using cash last night	Ramesh~3000~EXPENSE~CASH~1~
+601	negative	set an alarm for 6 am	
+602	multi	Uh sent six hundred to Dad for lunch using cash. Also bought medicines for 950.	Dad~600~EXPENSE~CASH~~Lunch;;Medicines~950~EXPENSE~~~
+603	negative	call mom	
+604	colloquial	Paid three fifty to Priya.	Priya~350~EXPENSE~~~
+605	multi	Apollo Pharmacy 30 after that interest credited 950.	Apollo Pharmacy~30~~~~;;Interest~950~INCOME~~~
+606	negative	i am going to the market	
+607	multi_elided	"Got 250 rupees from Dad, Rs. 85000 from Neha and 3500 rupees from Gurpreet."	Dad~250~INCOME~~~;;Neha~85000~INCOME~~~;;Gurpreet~3500~INCOME~~~
+608	single	last Wednesday Gurpreet sent me 800.	Gurpreet~800~INCOME~~1~
+609	multi_elided	"got 250,000 from suresh and twenty five thousand rupees from amit"	Suresh~250000~INCOME~~~;;Amit~25000~INCOME~~~
+610	multi	Salary credited 250. Then spent 150 on movie tickets at Reliance Fresh.	Salary~250~INCOME~~~;;Reliance Fresh~150~EXPENSE~~~Movie tickets
+611	multi	sent 5000 to Rahul for internet bill in cash yesterday. Next Priya sent me 10k. Also salary credited 1800 rupees. Then Dominos 5000	Rahul~5000~EXPENSE~CASH~1~Internet bill;;Priya~10000~INCOME~~~;;Salary~1800~INCOME~~~;;Dominos~5000~~~~
+612	negative	[blank_audio]	
+613	multi	"Sunita sent me sixty rs. Then paid Neha 18,500 for lunch, plus sent ₹600 to Zomato for books after that bought medicines for 5000 six days ago."	Sunita~60~INCOME~~6~;;Neha~18500~EXPENSE~~6~Lunch;;Zomato~600~EXPENSE~~6~Books;;Medicines~5000~EXPENSE~~6~
+614	multi	Paid seventy five thousand rs to Zomato. Also bought a shirt for twenty five thousand rs 5 days ago.	Zomato~75000~EXPENSE~~5~;;Shirt~25000~EXPENSE~~5~
+615	single	Paid Ola 1500 for electricity bill 2 days ago	Ola~1500~EXPENSE~~2~Electricity bill
+616	multi_elided	transferred 350 to Swiggy and 18500 to Sunita.	Swiggy~350~EXPENSE~~~;;Sunita~18500~EXPENSE~~~
+617	noisy	"Add a transaction, got six thousand five hundred from Infosys four days ago"	Infosys~6500~INCOME~~4~
+618	noisy	"okay so spent rs 75000 um, to anil"	Anil~75000~EXPENSE~~~
+619	single	bonus credited Rs 750.	Bonus~750~INCOME~~~
+620	multi_elided	"Transferred 25k to Suresh and ₹45,000 to Amazon"	Suresh~25000~EXPENSE~~~;;Amazon~45000~EXPENSE~~~
+621	list_style	"Parking 300, then auto fare five hundred, then coffee 40, then newspaper rs 700"	Parking~300~~~~;;Auto Fare~500~~~~;;Coffee~40~~~~;;Newspaper~700~~~~
+622	negative	You.	
+623	multi	"Zomato 150 with debit card, also on 23rd October gave two thousand five hundred to Ramesh"	Zomato~150~~CARD~~;;Ramesh~2500~EXPENSE~~6~
+624	multi	"Uh received um, 2500 rupees from Dad for water bill, also Starbucks 1000."	Dad~2500~INCOME~~~Water bill;;Starbucks~1000~~~~
+625	short_note	movie one thousand rs	Movie~1000~~~~
+626	single	got 300 salary.	Salary~300~INCOME~~~
+627	noisy	Uh received 12000 from Deepak for lunch.	Deepak~12000~INCOME~~~Lunch
+628	noisy	"okay so sent 3000 to Gurpreet for groceries with debit card um, yesterday"	Gurpreet~3000~EXPENSE~CARD~1~Groceries
+629	multi	"Hey, received rs 3000 from Priya. Next got a refund of 7500 from Swiggy both via IMPS yeah"	Priya~3000~INCOME~BANK TRANSFER~~;;Swiggy~7500~INCOME~BANK TRANSFER~~
+630	short_note	parking 250 rupees	Parking~250~~~~
+631	noisy	please add Amit paid me ₹500 last Tuesday	Amit~500~INCOME~~2~
+632	multi_elided	"Got one thousand two hundred rupees from Dad, and 75 from Amit."	Dad~1200~INCOME~~~;;Amit~75~INCOME~~~
+633	negative	Thank you.	
+634	single	On 30th September paid two thousand to Deepak.	Deepak~2000~EXPENSE~~29~
+635	noisy	"Note down that I Ramesh sent me 1,800."	Ramesh~1800~INCOME~~~
+636	single	Uber rs 600 via PhonePe on 23rd October.	Uber~600~~UPI~6~
+637	multi	"Received 85000 rupees from Infosys for birthday gift, also got eighty rupees from Ramesh after that got a refund of 2,500 from Myntra"	Infosys~85000~INCOME~~~Birthday gift;;Ramesh~80~INCOME~~~;;Myntra~2500~INCOME~~~
+638	multi_elided	"Got 300 from Manpreet, 75 from Kuldip Kaur, and 3000 from Amit."	Manpreet~300~INCOME~~~;;Kuldip Kaur~75~INCOME~~~;;Amit~3000~INCOME~~~
+639	short_note	One thousand five hundred rs auto fare.	Auto Fare~1500~~~~
+640	colloquial	paid two fifty to anil	Anil~250~EXPENSE~~~
+641	multi	"Ramesh sent me 2,500 and then got a refund of 18,500 from Flipkart both using my credit card."	Ramesh~2500~INCOME~CARD~~;;Flipkart~18500~INCOME~CARD~~
+642	list_style	"auto fare rs 500, movie three hundred, newspaper 600."	Auto Fare~500~~~~;;Movie~300~~~~;;Newspaper~600~~~~
+643	multi	"Sent five thousand rupees to Ola for recharge 2 days ago, paid Manpreet rs 4200 for coffee."	Ola~5000~EXPENSE~~2~Recharge;;Manpreet~4200~EXPENSE~~~Coffee
+644	noisy	uh on 13th October spent twenty five thousand rupees on medicine at Dominos	Dominos~25000~EXPENSE~~16~Medicine
+645	noisy	"Hey, paid 150k to uhh, Manpreet."	Manpreet~150000~EXPENSE~~~
+646	noisy	"uh paid 4200 to McDonalds uh, for lunch by bank transfer."	McDonalds~4200~EXPENSE~BANK TRANSFER~~Lunch
+647	colloquial	Paid fifteen hundred to Suresh.	Suresh~1500~EXPENSE~~~
+648	single	"Priya sent me 3,500 using UPI"	Priya~3500~INCOME~UPI~~
+649	noisy	"alright, manpreet sent me 3000 three days ago"	Manpreet~3000~INCOME~~3~
+650	colloquial	Paid fifteen hundred to Vikram	Vikram~1500~EXPENSE~~~
+651	single	sent 45000 to mom for birthday gift	Mom~45000~EXPENSE~~~Birthday gift
+652	single	yesterday spent one hundred and eighty on gym membership at Amazon.	Amazon~180~EXPENSE~~1~Gym membership
+653	list_style	"groceries 600, then newspaper Rs. 500, then petrol Rs 30"	Groceries~600~~~~;;Newspaper~500~~~~;;Petrol~30~~~~
+654	list_style	Coffee Rs 800 and newspaper thirty.	Coffee~800~~~~;;Newspaper~30~~~~
+655	negative	I need to buy milk	
+656	single	Four days ago paid twelve thousand for dinner through Paytm.	Dinner~12000~EXPENSE~UPI~4~
+657	single	Got 9999 salary by card 2 days ago	Salary~9999~INCOME~CARD~2~
+658	multi	"Received 80 from Dad for groceries and received 1,500 from Flipkart, also got one hundred and fifty rupees from Mom."	Dad~80~INCOME~~~Groceries;;Flipkart~1500~INCOME~~~;;Mom~150~INCOME~~~
+659	colloquial	paid two fifty to Mom	Mom~250~EXPENSE~~~
+660	colloquial	paid three fifty to Rahul	Rahul~350~EXPENSE~~~
+661	multi	"spent Rs. 120 on birthday gift, plus paid six thousand five hundred rupees to Priya for internet bill both by UPI"	Birthday gift~120~EXPENSE~UPI~~;;Priya~6500~EXPENSE~UPI~~Internet bill
+662	multi	"Alright, paid Sunita 45,000 for books, Swiggy 250000 both cash."	Sunita~45000~EXPENSE~CASH~~Books;;Swiggy~250000~~CASH~~
+663	colloquial	Paid 100 to Sunita	Sunita~100~EXPENSE~~~
+664	single	bought milk for 45000 rupees	Milk~45000~EXPENSE~~~
+665	single	Neha sent me 25000.	Neha~25000~INCOME~~~
+666	multi	"received eighty rupees from Infosys for movie tickets six days ago, plus gave six thousand five hundred to Decathlon. Next uhh, gave one hundred and fifty to Jio. Next bought shoes for 250 rupees [BLANK_AUDIO]"	Infosys~80~INCOME~~6~Movie tickets;;Decathlon~6500~EXPENSE~~~;;Jio~150~EXPENSE~~~;;Shoes~250~EXPENSE~~~
+667	single	Last Monday received 15k from HDFC Bank for medicine	HDFC Bank~15000~INCOME~~3~Medicine
+668	multi	"Swiggy rs 1250, plus received eighteen thousand five hundred rs from Deepak, and then paid uh, Rs. 1800 to Kuldip Kaur."	Swiggy~1250~~~~;;Deepak~18500~INCOME~~~;;Kuldip Kaur~1800~EXPENSE~~~
+669	multi_elided	"got 4,200 from mom, and 150 rupees from rahul"	Mom~4200~INCOME~~~;;Rahul~150~INCOME~~~
+670	multi	Vikram paid me 950 by card. Next received 600 from Anil. Also I paid Rs 600 to Swiggy for gym membership.	Vikram~950~INCOME~CARD~~;;Anil~600~INCOME~~~;;Swiggy~600~EXPENSE~~~Gym membership
+671	noisy	"hey, gave eighteen thousand five hmm, hundred to Vikram."	Vikram~18500~EXPENSE~~~
+672	multi	"Reliance Fresh 2000 rupees, paid six hundred to Manpreet for petrol after that Electricity Board rs 85000"	Reliance Fresh~2000~~~~;;Manpreet~600~EXPENSE~~~Petrol;;Electricity Board~85000~~~~
+673	single	sent forty to Starbucks for groceries on October 18th	Starbucks~40~EXPENSE~~11~Groceries
+674	multi	"Please add spent ₹750 on birthday gift at Airtel after that received 75000 rupees from Suresh and received 500 rupees from Infosys for groceries and got 2,000 from Neha yesterday yeah"	Airtel~750~EXPENSE~~1~Birthday gift;;Suresh~75000~INCOME~~1~;;Infosys~500~INCOME~~1~Groceries;;Neha~2000~INCOME~~1~
+675	single	paid 80 to manpreet using upi	Manpreet~80~EXPENSE~UPI~~
+676	noisy	"Transferred 30 to uh, Gurpreet last Wednesday."	Gurpreet~30~EXPENSE~~1~
+677	noisy	spent one hundred and twenty rs on petrol on september 18th	Petrol~120~EXPENSE~~41~
+678	colloquial	Paid 100 to Vikram	Vikram~100~EXPENSE~~~
+679	negative	The meeting is at 5 pm	
+680	single	Rahul sent me 4200 rupees yesterday.	Rahul~4200~INCOME~~1~
+681	multi_elided	"Received 1200 from Deepak, and 3500 from Priya"	Deepak~1200~INCOME~~~;;Priya~3500~INCOME~~~
+682	noisy	Uh paid Kuldip Kaur 1200 rupees for petrol by card.	Kuldip Kaur~1200~EXPENSE~CARD~~Petrol
+683	colloquial	paid three fifty to Neha.	Neha~350~EXPENSE~~~
+684	noisy	so basically gave one thousand rupees to Priya.	Priya~1000~EXPENSE~~~
+685	multi	"So basically Ramesh sent me 80, sent Rs. 120 to Airtel for school fees"	Ramesh~80~INCOME~~~;;Airtel~120~EXPENSE~~~School fees
+686	single	got ₹80 from suresh using net banking on friday	Suresh~80~INCOME~BANK TRANSFER~6~
+687	multi	"Um, spent 30,000 on breakfast at Apollo Pharmacy. Next gave 600 to Jio both by card."	Apollo Pharmacy~30000~EXPENSE~CARD~~Breakfast;;Jio~600~EXPENSE~CARD~~
+688	colloquial	Paid three fifty to Sunita	Sunita~350~EXPENSE~~~
+689	multi	I want to add that I Amit paid me Rs 10000. Then paid 1250 for movie tickets. Also Gurpreet sent me Rs. 2500 all by card	Amit~10000~INCOME~CARD~~;;Movie tickets~1250~EXPENSE~CARD~~;;Gurpreet~2500~INCOME~CARD~~
+690	single	"received 30,000 from Infosys for water bill"	Infosys~30000~INCOME~~~Water bill
+691	single	Paid 2300 for taxi fare last Wednesday.	Taxi fare~2300~EXPENSE~~1~
+692	multi	Spent Rs. 30 on groceries at Flipkart. Next spent 12000 on medicine last Saturday [BLANK_AUDIO].	Flipkart~30~EXPENSE~~5~Groceries;;Medicine~12000~EXPENSE~~5~
+693	single	Got a refund of 8k from Myntra day before yesterday.	Myntra~8000~INCOME~~2~
+694	short_note	Coffee one thousand rupees cash.	Coffee~1000~~CASH~~
+695	multi	Spent eighty five thousand to Priya after that Gurpreet sent me 1250 on 23rd September.	Priya~85000~EXPENSE~~36~;;Gurpreet~1250~INCOME~~36~
+696	noisy	"add a transaction, paid 600 to ola"	Ola~600~EXPENSE~~~
+697	single	paid rs 120 for rent by bank transfer	Rent~120~EXPENSE~BANK TRANSFER~~
+698	multi	"paid 18500 for books, paid Rs 3000 to Electricity Board and bought a shirt for 25000 using my credit card"	Books~18500~EXPENSE~~~;;Electricity Board~3000~EXPENSE~~~;;Shirt~25000~EXPENSE~CARD~~
+699	single	received 150 from Suresh for groceries	Suresh~150~INCOME~~~Groceries
+700	single	"Suresh paid me 10,000 last night."	Suresh~10000~INCOME~~1~
+701	multi	"got 1500 from gurpreet, and then paid 30,000 to ramesh for coffee"	Gurpreet~1500~INCOME~~~;;Ramesh~30000~EXPENSE~~~Coffee
+702	single	bought vegetables for 150k by bank transfer	Vegetables~150000~EXPENSE~BANK TRANSFER~~
+703	negative	I am going to the market	
+704	single	Received eighteen thousand five hundred from Amazon yesterday	Amazon~18500~INCOME~~1~
+705	single	bonus credited 500 day before yesterday.	Bonus~500~INCOME~~2~
+706	negative	What is the weather today.	
+707	multi	"Paid 1,500 for taxi fare and received 1800 from Amazon for rent."	Taxi fare~1500~EXPENSE~~~;;Amazon~1800~INCOME~~~Rent
+708	multi_elided	"received 6500 rupees from Sunita, 120 rupees from Ramesh and 1500 from Mom."	Sunita~6500~INCOME~~~;;Ramesh~120~INCOME~~~;;Mom~1500~INCOME~~~
+709	short_note	One thousand rupees movie by UPI	Movie~1000~~UPI~~
+710	multi	"add a transaction, last Wednesday paid 3500 for electricity bill. Next paid 300 for movie tickets."	Electricity bill~3500~EXPENSE~~1~;;Movie tickets~300~EXPENSE~~1~
+711	single	spent 450 on books at Electricity Board	Electricity Board~450~EXPENSE~~~Books
+712	single	yesterday got 3500 salary.	Salary~3500~INCOME~~1~
+713	noisy	okay so got ₹500 from HDFC Bank.	HDFC Bank~500~INCOME~~~
+714	multi	paid 45 to ola also zomato 85k	Ola~45~EXPENSE~~~;;Zomato~85000~~~~
+715	multi	"paid 50k to Deepak for groceries. Next gave Rs 3000 to Sunita, plus got a refund of 5000 from Myntra."	Deepak~50000~EXPENSE~~~Groceries;;Sunita~3000~EXPENSE~~~;;Myntra~5000~INCOME~~~
+716	multi	"got a refund of rs 1200 from myntra, received ₹85,000 from amit, plus on september 27th gave 2k to ola"	Myntra~1200~INCOME~~~;;Amit~85000~INCOME~~~;;Ola~2000~EXPENSE~~32~
+717	multi	"Received ₹100,000 from HDFC Bank for rent. Next I paid 120 to Priya for lunch, plus paid 18500 for breakfast, also sent 180 to Amit for petrol"	HDFC Bank~100000~INCOME~~~Rent;;Priya~120~EXPENSE~~~Lunch;;Breakfast~18500~EXPENSE~~~;;Amit~180~EXPENSE~~~Petrol
+718	single	Salary credited 750 using cash.	Salary~750~INCOME~CASH~~
+719	multi_elided	got 4200 from Vikram and 2500 from Amit	Vikram~4200~INCOME~~~;;Amit~2500~INCOME~~~
+720	noisy	"Note down that I got a refund of 75,000 from Flipkart."	Flipkart~75000~INCOME~~~
+721	colloquial	Paid two thousand five hundred to Sunita	Sunita~2500~EXPENSE~~~
+722	short_note	One thousand two hundred fifty rupees lunch	Lunch~1250~~~~
+723	multi	"Uh gave ₹8,000 to Big Bazaar and then last night gave 800 to Big Bazaar using UPI"	Big Bazaar~8000~EXPENSE~~~;;Big Bazaar~800~EXPENSE~UPI~1~
+724	multi	Sent four thousand two hundred to Anil for rent after that Gurpreet paid me three thousand five hundred both on PhonePe	Anil~4200~EXPENSE~UPI~~Rent;;Gurpreet~3500~INCOME~UPI~~
+725	noisy	Note down that I spent 1000 on groceries at Ola	Ola~1000~EXPENSE~~~Groceries
+726	noisy	okay so Manpreet sent me 3500	Manpreet~3500~INCOME~~~
+727	colloquial	Paid five fifty to Rahul.	Rahul~550~EXPENSE~~~
+728	multi	4 days ago paid Vikram 80 for groceries. Also cashback credited ₹450.	Vikram~80~EXPENSE~~4~Groceries;;Cashback~450~INCOME~~4~
+729	multi_elided	received 500 rupees from Dad and 45 from Deepak.	Dad~500~INCOME~~~;;Deepak~45~INCOME~~~
+730	multi	"I want to add that I yesterday received two thousand from Infosys for lunch, and then paid Priya um, ₹1,800 for water bill"	Infosys~2000~INCOME~~1~Lunch;;Priya~1800~EXPENSE~~1~Water bill
+731	short_note	auto fare one thousand two hundred fifty rupees on phonepe	Auto Fare~1250~~UPI~~
+732	multi	interest credited 450 via IMPS. Also paid 2000 for electricity bill yesterday.	Interest~450~INCOME~BANK TRANSFER~1~;;Electricity bill~2000~EXPENSE~~1~
+733	colloquial	paid two thousand five hundred to Manpreet.	Manpreet~2500~EXPENSE~~~
+734	multi	bought medicines for seventy five day before yesterday and then paid Priya 15000 rupees for petrol.	Medicines~75~EXPENSE~~2~;;Priya~15000~EXPENSE~~~Petrol
+735	multi	"spent 800 on rent at reliance fresh, also got 60 from vikram then sunita sent me ₹180 after that priya sent me rs 250000 yesterday"	Reliance Fresh~800~EXPENSE~~1~Rent;;Vikram~60~INCOME~~1~;;Sunita~180~INCOME~~1~;;Priya~250000~INCOME~~1~
+736	multi	"Got ₹85,000 from Flipkart. Next spent forty five rupees on uhh, birthday gift"	Flipkart~85000~INCOME~~~;;Birthday gift~45~EXPENSE~~~
+737	short_note	movie 100 rupees.	Movie~100~~~~
+738	single	last night paid 75000 for petrol via PhonePe.	Petrol~75000~EXPENSE~UPI~1~
+739	single	paid Vikram 100000 for recharge using cash	Vikram~100000~EXPENSE~CASH~~Recharge
+740	noisy	"Okay so paid 1000 to Swiggy for uh, electricity bill in cash yesterday."	Swiggy~1000~EXPENSE~CASH~1~Electricity bill
+741	multi	"Note down that I spent ₹1,200 on coffee, plus sent ₹80 to Kuldip Kaur for electricity bill both on credit card thank you."	Coffee~1200~EXPENSE~CARD~~;;Kuldip Kaur~80~EXPENSE~CARD~~Electricity bill
+742	noisy	uh spent 180 rupees on gym membership at Apollo Pharmacy through Paytm.	Apollo Pharmacy~180~EXPENSE~UPI~~Gym membership
+743	multi	on 18th October received thirty thousand from Infosys. Next transferred 200000 rupees to Priya	Infosys~30000~INCOME~~11~;;Priya~200000~EXPENSE~~11~
+744	multi	"Spent ₹250,000 on dinner. Next Big Bazaar 750"	Dinner~250000~EXPENSE~~~;;Big Bazaar~750~~~~
+745	noisy	Note down that I paid one thousand two hundred and fifty rupees for coffee	Coffee~1250~EXPENSE~~~
+746	single	received rs 450 from Amazon for gym membership on credit card.	Amazon~450~INCOME~CARD~~Gym membership
+747	noisy	Deepak sent me 1800	Deepak~1800~INCOME~~~
+748	noisy	"so basically bonus hmm, credited 45,000"	Bonus~45000~INCOME~~~
+749	list_style	movie rs 600 and lunch 700 and parking Rs. 600	Movie~600~~~~;;Lunch~700~~~~;;Parking~600~~~~
+750	multi	"Alright, spent 100000 on rent at Apollo Pharmacy, plus paid ₹300 to Priya, also spent 75000 on electricity bill. Then spent 250 on groceries at Flipkart that's it."	Apollo Pharmacy~100000~EXPENSE~~~Rent;;Priya~300~EXPENSE~~~;;Electricity bill~75000~EXPENSE~~~;;Flipkart~250~EXPENSE~~~Groceries
+751	single	last Saturday bought medicines for 15000 by bank transfer.	Medicines~15000~EXPENSE~BANK TRANSFER~5~
+752	multi_elided	"transferred Rs. 9999 to Starbucks, 18,500 to Zomato, and 50k to Amit"	Starbucks~9999~EXPENSE~~~;;Zomato~18500~EXPENSE~~~;;Amit~50000~EXPENSE~~~
+753	single	interest credited 2300 rupees	Interest~2300~INCOME~~~
+754	single	got ₹1000 from neha last sunday	Neha~1000~INCOME~~4~
+755	noisy	"uh paid ₹300 hmm, to Ola for taxi fare on credit card."	Ola~300~EXPENSE~CARD~~Taxi fare
+756	single	paid 8000 rupees for coffee	Coffee~8000~EXPENSE~~~
+757	single	Bought shoes for 2000 last Tuesday	Shoes~2000~EXPENSE~~2~
+758	single	Paid eighty five thousand rupees for rent day before yesterday.	Rent~85000~EXPENSE~~2~
+759	single	Paid 40 to Manpreet using cash	Manpreet~40~EXPENSE~CASH~~
+760	single	Electricity Board 1500 using my credit card.	Electricity Board~1500~~CARD~~
+761	single	bought groceries for one thousand two hundred fifty on credit card	Groceries~1250~EXPENSE~CARD~~
+762	multi	I paid two thousand rupees to Swiggy for electricity bill. Also paid Rs. 500000 for birthday gift	Swiggy~2000~EXPENSE~~~Electricity bill;;Birthday gift~500000~EXPENSE~~~
+763	multi_elided	"paid five hundred rs to Amit, and Rs. 5000 to Electricity Board"	Amit~500~EXPENSE~~~;;Electricity Board~5000~EXPENSE~~~
+764	single	Airtel 120 on October 7th	Airtel~120~~~22~
+765	noisy	"Alright, paid Rs 75 to Apollo Pharmacy via IMPS on October 24th"	Apollo Pharmacy~75~EXPENSE~BANK TRANSFER~5~
+766	short_note	coffee four hundred and fifty rupees	Coffee~450~~~~
+767	multi_elided	"Received Rs 20 from Amit, eighty rs from Mom, and Rs 75000 from Sunita."	Amit~20~INCOME~~~;;Mom~80~INCOME~~~;;Sunita~75000~INCOME~~~
+768	multi_elided	received fifteen thousand from Sunita and 18500 rupees from Deepak	Sunita~15000~INCOME~~~;;Deepak~18500~INCOME~~~
+769	single	spent ₹75 on internet bill at zomato by bank transfer	Zomato~75~EXPENSE~BANK TRANSFER~~Internet bill
+770	multi	"paid Rs 120 for gym membership, Amit paid me 6,500 this morning."	Gym membership~120~EXPENSE~~~;;Amit~6500~INCOME~~~
+771	multi	"Spent Rs. 150000 on breakfast at Flipkart, paid 180 rupees to Jio. Then Blinkit 2500 rupees after that received 600 rupees from Rahul today."	Flipkart~150000~EXPENSE~~~Breakfast;;Jio~180~EXPENSE~~~;;Blinkit~2500~~~~;;Rahul~600~INCOME~~~
+772	single	Dominos seven thousand five hundred.	Dominos~7500~~~~
+773	short_note	Petrol 500.	Petrol~500~~~~
+774	single	sent fifty thousand to Electricity Board for groceries 3 days ago.	Electricity Board~50000~EXPENSE~~3~Groceries
+775	multi_elided	"Gave 50,000 to Ramesh and 40 to Flipkart"	Ramesh~50000~EXPENSE~~~;;Flipkart~40~EXPENSE~~~
+776	single	paid Rahul 150 for recharge yesterday	Rahul~150~EXPENSE~~1~Recharge
+777	noisy	i want to add that i day before yesterday spent ₹150 on books using net banking	Books~150~EXPENSE~BANK TRANSFER~2~
+778	negative	You.	
+779	single	Last night Vikram sent me six hundred on credit card	Vikram~600~INCOME~CARD~1~
+780	short_note	parking 1200 rupees on PhonePe.	Parking~1200~~UPI~~
+781	multi	"note down that I paid 30000 rupees for coffee, and then paid Apollo Pharmacy 1200 for books after that Amazon ₹75,000 all by bank transfer thanks"	Coffee~30000~EXPENSE~BANK TRANSFER~~;;Apollo Pharmacy~1200~EXPENSE~BANK TRANSFER~~Books;;Amazon~75000~~BANK TRANSFER~~
+782	multi	I want to add that I paid two thousand rupees for rent and got a refund of one thousand rupees from Amazon.	Rent~2000~EXPENSE~~~;;Amazon~1000~INCOME~~~
+783	multi	"please add Ola 45 and got a refund of 1000 rupees from Amazon, and then received 450 from Mom for gym membership on Monday"	Ola~45~~~3~;;Amazon~1000~INCOME~~3~;;Mom~450~INCOME~~3~Gym membership
+784	single	paid 200000 to Ramesh for birthday gift	Ramesh~200000~EXPENSE~~~Birthday gift
+785	multi_elided	"Sent 100000 to Suresh, and rs 1800 to Rahul."	Suresh~100000~EXPENSE~~~;;Rahul~1800~EXPENSE~~~
+786	multi	"uh on Friday Amit paid me 1,200. Next paid nine hundred and fifty rupees for coffee."	Amit~1200~INCOME~~6~;;Coffee~950~EXPENSE~~6~
+787	colloquial	paid 100 to Gurpreet.	Gurpreet~100~EXPENSE~~~
+788	multi	"so paid Rs. 3500 to Mom, and then gave 250000 to Priya thanks"	Mom~3500~EXPENSE~~~;;Priya~250000~EXPENSE~~~
+789	multi	"paid rs 85000 to Decathlon and paid Amazon 200,000 for movie tickets. got a refund of 45 from Amazon, also bonus credited Rs 3000."	Decathlon~85000~EXPENSE~~~;;Amazon~200000~EXPENSE~~~Movie tickets;;Amazon~45~INCOME~~~;;Bonus~3000~INCOME~~~
+790	noisy	"Add a transaction, bought medicines for 25,000"	Medicines~25000~EXPENSE~~~
+791	list_style	Auto fare Rs 45 and chai three hundred and petrol rs 800	Auto Fare~45~~~~;;Chai~300~~~~;;Petrol~800~~~~
+792	noisy	"Hey, sent 500000 to Reliance Fresh"	Reliance Fresh~500000~EXPENSE~~~
+793	noisy	"Alright, day before yesterday received Rs 500 from Infosys for recharge uhh, through Paytm."	Infosys~500~INCOME~UPI~2~Recharge
+794	colloquial	Paid zero fifty to Gurpreet.	Gurpreet~50~EXPENSE~~~
+795	noisy	"add a transaction, bonus credited ₹3000 by bank transfer on Monday."	Bonus~3000~INCOME~BANK TRANSFER~3~
+796	negative	Call Mom	
+797	multi	Spent forty five thousand rupees on rent. gave twenty five thousand rs to Ola. Then got fifty thousand rupees from Priya last Friday.	Rent~45000~EXPENSE~~6~;;Ola~25000~EXPENSE~~6~;;Priya~50000~INCOME~~6~
+798	noisy	note down that I received 1200 rupees from Priya using cash.	Priya~1200~INCOME~CASH~~
+799	colloquial	paid fifteen hundred to Suresh	Suresh~1500~EXPENSE~~~
+800	noisy	bonus credited 45 rupees	Bonus~45~INCOME~~~
+801	list_style	newspaper five hundred and groceries Rs. 99.	Newspaper~500~~~~;;Groceries~99~~~~
+802	noisy	"So basically paid 1,200 to Vikram through NEFT."	Vikram~1200~EXPENSE~BANK TRANSFER~~
+803	multi	paid 3500 to Starbucks. received salary of ₹1250 via IMPS	Starbucks~3500~EXPENSE~~~;;Salary~1250~INCOME~BANK TRANSFER~~
+804	list_style	Petrol 20 and parking 350 and newspaper sixty and groceries 80.	Petrol~20~~~~;;Parking~350~~~~;;Newspaper~60~~~~;;Groceries~80~~~~
+805	noisy	"Alright, on 27th October bought medicines for 7500"	Medicines~7500~EXPENSE~~2~
+806	single	i paid ₹6500 to uber for groceries	Uber~6500~EXPENSE~~~Groceries
+807	multi_elided	"Received 5,000 from Priya and thirty from Suresh"	Priya~5000~INCOME~~~;;Suresh~30~INCOME~~~
+808	single	Rahul sent me four thousand two hundred on PhonePe.	Rahul~4200~INCOME~UPI~~
+809	single	Sunita paid me twenty five thousand rs	Sunita~25000~INCOME~~~
+810	short_note	500 rupees groceries by card.	Groceries~500~~CARD~~
+811	short_note	100 movie	Movie~100~~~~
+812	negative	I need to buy milk.	
+813	multi_elided	"got 1,500 from Gurpreet, and 2000 from Ramesh."	Gurpreet~1500~INCOME~~~;;Ramesh~2000~INCOME~~~
+814	multi	Gave 150 to Big Bazaar. Next received 150000 from Amazon for school fees	Big Bazaar~150~EXPENSE~~~;;Amazon~150000~INCOME~~~School fees

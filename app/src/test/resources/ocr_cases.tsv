@@ -1,0 +1,335 @@
+0	paytm	"30@@Paytm||30@@Order Successful||90@@₹400||24@@Rupees Four Hundred Only||30@@To: Amit Kumar||24@@10 Sep 2026, 07:54 pm||24@@UPI Ref No: 694205522563"	Amit Kumar~400~EXPENSE~UPI~2026-09-10~Ref: 694205522563
+1	bill	44@@SUPER MART||24@@Bill No: 4064||24@@Date: 14/10/2026||24@@Milk  310.00||24@@Milk  150.00||24@@Rice 5kg  120.00||24@@Sugar  240.00||30@@Total 820.00||34@@Net Amount 820.00||24@@Card Payment Visa	~820~EXPENSE~CARD~2026-10-14~
+2	bill	44@@APOLLO PHARMACY||24@@Bill No: 5519||24@@Date: 13/08/2026||24@@Milk  150.00||24@@Atta  89.00||24@@Biscuits  120.00||30@@Total 359.00||34@@Net Amount 359.00||24@@Paid by Cash	~359~EXPENSE~CASH~2026-08-13~
+3	gpay	40@@To RAHUL SHARMA||100@@₹45||30@@Completed||24@@26/09/2026||24@@UPI transaction ID||26@@183066997676||24@@Google Pay	Rahul Sharma~45~EXPENSE~UPI~2026-09-26~
+4	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 2938||24@@Date: 19/10/2026||24@@Tea  310.00||24@@Milk  55.00||30@@Total 365.00||34@@Grand Total 365.00	~365~EXPENSE~~2026-10-19~
+5	noise_symbol	"40@@To Dominos Pizza||100@@€99||30@@Completed||24@@25 Jul 2026, 01:07 AM"	Dominos Pizza~99~EXPENSE~~2026-07-25~
+6	paytm	"30@@Paytm||30@@Money Received||90@@₹99||24@@Rupees Ninety Nine Only||30@@From: Big Bazaar||24@@13 Sep 2026, 05:59 am||24@@UPI Ref No: 142958727367"	Big Bazaar~99~INCOME~UPI~2026-09-13~Ref: 142958727367
+7	paytm	"30@@Paytm||30@@Money Received||90@@₹15,000||24@@Rupees Fifteen Thousand Only||30@@From: Amit Kumar||24@@10 Sep 2026, 08:20 pm||24@@UPI Ref No: 352654475230"	Amit Kumar~15000~INCOME~UPI~2026-09-10~Ref: 352654475230
+8	noise_symbol	"40@@To RAHUL SHARMA||100@@250||30@@Completed||24@@29 Jul 2026, 07:27 pm"	Rahul Sharma~250~EXPENSE~~2026-07-29~
+9	bill	44@@RELIANCE FRESH||24@@Bill No: 8051||24@@Date: 02/07/2026||24@@Tea  40.00||24@@Biscuits  55.00||30@@Total 95.00||34@@Grand Total 95.00||24@@Card Payment Visa	~95~EXPENSE~CARD~2026-07-02~
+10	negative	40@@Offers for you||24@@Scratch cards||24@@Invite friends and earn	
+11	bill	44@@SUPER MART||24@@Bill No: 3188||24@@Date: 07/10/2026||24@@Atta  240.00||24@@Soap  310.00||24@@Dal  40.00||24@@Tea  89.00||30@@Total 679.00||34@@Net Amount 679.00||24@@Paid via UPI	~679~EXPENSE~UPI~2026-10-07~
+12	noise_symbol	"40@@To Amit Kumar||100@@₹ 45,000||30@@Completed||24@@8 Sep 2026, 07:00 AM"	Amit Kumar~45000~EXPENSE~~2026-09-08~
+13	sms	"26@@A/c XX8217 debited Rs.7,500.00 on 21-07-2026 IMPS to Airtel Payments. Ref 017363016993. Balance Rs 6038.78"	~7500~EXPENSE~BANK TRANSFER~2026-07-21~Ref: 017363016993
+14	bill	44@@BIG BAZAAR||24@@Bill No: 8168||24@@Date: 13/07/2026||24@@Milk  55.00||24@@Tea  40.00||24@@Sugar  240.00||24@@Tea  89.00||30@@Total 424.00||34@@Grand Total 424.00	~424~EXPENSE~~2026-07-13~
+15	noise_symbol	"40@@To Vikram Singh Gill||100@@₹ 250||30@@Completed||24@@10 Oct 2026, 02:34 am"	Vikram Singh Gill~250~EXPENSE~~2026-10-10~
+16	gpay	40@@To Reliance Retail||100@@₹945||30@@Completed||24@@19/09/2026||24@@UPI transaction ID||26@@124720198603||24@@Google Pay	Reliance Retail~945~EXPENSE~UPI~2026-09-19~
+17	sms	26@@Your a/c XXXX2975 is credited with Rs 45.00 on 04/10/2026 by NEFT from Hostinger Pte Ltd. Avl bal Rs 807.64	~45~INCOME~BANK TRANSFER~2026-10-04~
+18	gpay	"40@@To MANPREET KAUR||100@@₹12,000||30@@Completed||24@@Aug 10, 2026||24@@UPI transaction ID||26@@183448235762"	Manpreet Kaur~12000~EXPENSE~UPI~2026-08-10~
+19	sms	"26@@Rs 7,500.00 credited to A/c||26@@XX2603 on 18-08-26 from||26@@hostinger@ybl UPI Ref||26@@453775002476. Bal Rs 77480.49"	~7500~INCOME~UPI~2026-08-18~Ref: 453775002476
+20	noise_symbol	"40@@To Sharma General Store||100@@%400||30@@Completed||24@@25 Sep 2026, 10:44 am"	Sharma General Store~400~EXPENSE~~2026-09-25~
+21	phonepe	"30@@Payment Successful||90@@₹250||36@@Paid to Apollo Pharmacy||24@@Oct 23, 2026 12:57 am||24@@Transaction ID T7967362479147492021||24@@PhonePe"	Apollo Pharmacy~250~EXPENSE~UPI~2026-10-23~
+22	gpay	"40@@From Vikram Singh Gill||100@@₹1,250||30@@Completed||24@@13/09/2026||24@@UPI transaction ID||26@@471954061358"	Vikram Singh Gill~1250~INCOME~UPI~2026-09-13~
+23	negative	40@@Rewards||24@@Scratch cards||24@@Invite friends and earn	
+24	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹45,000||24@@Rupees Forty Five Thousand Only||30@@To: BSES Rajdhani||24@@12 Aug 2026, 11:21 AM||24@@UPI Ref No: 884208783077"	BSES Rajdhani~45000~EXPENSE~UPI~2026-08-12~Ref: 884208783077
+25	gpay	"40@@To Zomato||100@@₹4,500||30@@Completed||24@@22 Sep 2026, 06:38 PM||24@@UPI transaction ID||26@@127116062307"	Zomato~4500~EXPENSE~UPI~2026-09-22~
+26	gpay	"40@@To PRIYA SINGH||100@@₹45||30@@Completed||24@@Oct 14, 2026||24@@UPI transaction ID||26@@255447214404"	Priya Singh~45~EXPENSE~UPI~2026-10-14~
+27	negative	40@@Welcome||24@@Scratch cards||24@@Invite friends and earn	
+28	bill	44@@SUPER MART||24@@Bill No: 8827||24@@Date: 18/09/2026||24@@Oil 1L  120.00||24@@Tea  55.00||24@@Atta  89.00||30@@Total 264.00||34@@Grand Total 264.00||24@@Card Payment Visa	~264~EXPENSE~CARD~2026-09-18~
+29	phonepe	"30@@Payment Successful||90@@₹99||36@@Paid to Dominos Pizza||24@@Sep 28, 2026 10:13 AM||24@@Transaction ID T6963295985765794246||24@@PhonePe"	Dominos Pizza~99~EXPENSE~UPI~2026-09-28~
+30	paytm	"30@@Paytm||30@@Order Successful||90@@₹1,051||24@@Rupees One Thousand Fifty One Only||30@@To: Sharma General Store||24@@11 Jul 2026, 05:23 AM||24@@UPI Ref No: 378158684284"	Sharma General Store~1051~EXPENSE~UPI~2026-07-11~Ref: 378158684284
+31	sms	"26@@Your a/c XXXX8022 is credited with Rs 15,000.00 on 03/07/2026 by NEFT from Indian Oil. Avl bal Rs 89882.74"	~15000~INCOME~BANK TRANSFER~2026-07-03~
+32	sms	"26@@INR 15,000.00 spent on HDFC Bank Credit Card XX6861 at GURPREET SINGH on 29-Jul-26. Avl limit INR 16157.00"	~15000~EXPENSE~CARD~2026-07-29~
+33	paytm	"30@@Paytm||30@@Order Successful||90@@₹2,622||24@@Rupees Two Thousand Six Hundred Twenty Two Only||30@@To: SURESH TRADERS||24@@9 Aug 2026, 07:55 PM||24@@UPI Ref No: 577192412111"	Suresh Traders~2622~EXPENSE~UPI~2026-08-09~Ref: 577192412111
+34	phonepe	"30@@Payment Received||90@@₹120||36@@Received from Vikram Singh Gill||24@@Oct 19, 2026 02:42 AM||24@@Transaction ID T3025678076916793415||24@@PhonePe"	Vikram Singh Gill~120~INCOME~UPI~2026-10-19~
+35	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 7132||24@@Date: 30/07/2026||24@@Dal  310.00||24@@Atta  40.00||24@@Atta  240.00||24@@Dal  55.00||30@@Total 645.00||34@@Grand Total 645.00	~645~EXPENSE~~2026-07-30~
+36	gpay	40@@To Vikram Singh Gill||100@@₹499||30@@Completed||24@@04/09/2026||24@@UPI transaction ID||26@@355029921489||24@@Paid via Google Pay	Vikram Singh Gill~499~EXPENSE~UPI~2026-09-04~
+37	phonepe	"30@@Payment Successful||90@@₹1,800||36@@Paid to Dominos Pizza||24@@Aug 17, 2026 01:18 pm||24@@Transaction ID T7089144316965733003||24@@PhonePe"	Dominos Pizza~1800~EXPENSE~UPI~2026-08-17~
+38	gpay	40@@From Zomato||100@@945||30@@Completed||24@@18/08/2026||24@@UPI transaction ID||26@@474452907845	Zomato~945~INCOME~UPI~2026-08-18~
+39	gpay	"40@@From Dominos Pizza||100@@₹45||30@@Completed||24@@5 Sep 2026, 02:28 AM||24@@UPI transaction ID||26@@412418762863"	Dominos Pizza~45~INCOME~UPI~2026-09-05~
+40	phonepe	"30@@Payment Successful||90@@₹650||36@@Paid to BSES Rajdhani||24@@Sep 1, 2026 09:15 AM||24@@Transaction ID T7220087082364089038||24@@PhonePe"	BSES Rajdhani~650~EXPENSE~UPI~2026-09-01~
+41	gpay	"40@@To Airtel Payments||100@@₹1,800||30@@Completed||24@@1 Oct 2026, 07:22 pm||24@@UPI transaction ID||26@@348853553097||24@@Google Pay"	Airtel Payments~1800~EXPENSE~UPI~2026-10-01~
+42	gpay	40@@From RAHUL SHARMA||100@@₹99||30@@Completed||24@@16/09/2026||24@@UPI transaction ID||26@@167011391247||24@@Google Pay	Rahul Sharma~99~INCOME~UPI~2026-09-16~
+43	phonepe	"30@@Payment Successful||90@@₹45||36@@Paid to Indian Oil||24@@Aug 29, 2026 04:21 AM||24@@Transaction ID T9496855336562246137||24@@PhonePe"	Indian Oil~45~EXPENSE~UPI~2026-08-29~
+44	bill	44@@BIG BAZAAR||24@@Bill No: 8489||24@@Date: 22/09/2026||24@@Rice 5kg  310.00||24@@Sugar  150.00||24@@Atta  55.00||24@@Tea  120.00||30@@Total 635.00||34@@Net Amount 635.00	~635~EXPENSE~~2026-09-22~
+45	negative	40@@Settings||24@@Scratch cards||24@@Invite friends and earn	
+46	phonepe	"30@@Payment Successful||90@@₹2,622||36@@Paid to Indian Oil||24@@Oct 20, 2026 11:57 PM||24@@Transaction ID T4745229543091364990||24@@PhonePe"	Indian Oil~2622~EXPENSE~UPI~2026-10-20~
+47	sms	"26@@A/c XX4820 debited Rs.12,000.00 on||26@@14-10-2026 IMPS to Zomato. Ref 953985641395.||26@@Balance Rs 28624.26"	~12000~EXPENSE~BANK TRANSFER~2026-10-14~Ref: 953985641395
+48	gpay	"40@@To Kuldip Kaur||100@@₹20||30@@Completed||24@@5 Aug 2026, 08:50 am||24@@UPI transaction ID||26@@734026078843||24@@Paid via Google Pay"	Kuldip Kaur~20~EXPENSE~UPI~2026-08-05~
+49	gpay	40@@To PRIYA SINGH||100@@₹120||30@@Completed||24@@28/07/2026||24@@UPI transaction ID||26@@101748814164||24@@Paid via Google Pay	Priya Singh~120~EXPENSE~UPI~2026-07-28~
+50	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹7,500||24@@Rupees Seven Thousand Five Hundred Only||30@@To: Sharma General Store||24@@26 Aug 2026, 11:02 PM||24@@UPI Ref No: 328795970264"	Sharma General Store~7500~EXPENSE~UPI~2026-08-26~Ref: 328795970264
+51	phonepe	"30@@Payment Successful||90@@₹7,500||36@@Paid to Swiggy||24@@Sep 13, 2026 10:18 PM||24@@Transaction ID T2988089275406841608||24@@PhonePe"	Swiggy~7500~EXPENSE~UPI~2026-09-13~
+52	paytm	"30@@Paytm||30@@Order Successful||90@@₹945||24@@Rupees Nine Hundred Forty Five Only||30@@To: Amit Kumar||24@@20 Jul 2026, 08:01 AM||24@@UPI Ref No: 133374323352"	Amit Kumar~945~EXPENSE~UPI~2026-07-20~Ref: 133374323352
+53	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹45,000||24@@Rupees Forty Five Thousand Only||30@@To: SURESH TRADERS||24@@15 Oct 2026, 11:48 pm||24@@UPI Ref No: 280954008561"	Suresh Traders~45000~EXPENSE~UPI~2026-10-15~Ref: 280954008561
+54	paytm	"30@@Paytm||30@@Money Received||90@@₹7,500||24@@Rupees Seven Thousand Five Hundred Only||30@@From: BSES Rajdhani||24@@13 Oct 2026, 01:58 am||24@@UPI Ref No: 776819497364"	BSES Rajdhani~7500~INCOME~UPI~2026-10-13~Ref: 776819497364
+55	noise_symbol	"40@@To Vikram Singh Gill||100@@%1,800||30@@Completed||24@@30 Sep 2026, 10:53 am"	Vikram Singh Gill~1800~EXPENSE~~2026-09-30~
+56	gpay	"40@@From PRIYA SINGH||100@@₹15,000||30@@Completed||24@@25 Jul 2026, 05:33 am||24@@UPI transaction ID||26@@569431589870||24@@Google Pay"	Priya Singh~15000~INCOME~UPI~2026-07-25~
+57	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹650||24@@Rupees Six Hundred Fifty Only||30@@To: Neha Verma||24@@15 Sep 2026, 03:43 AM||24@@UPI Ref No: 543585262735"	Neha Verma~650~EXPENSE~UPI~2026-09-15~Ref: 543585262735
+58	sms	"26@@A/c XX9047 debited Rs.12,000.00 on||26@@14-08-2026 IMPS to Gurpreet Singh. Ref||26@@082212443732. Balance Rs 56933.43"	~12000~EXPENSE~BANK TRANSFER~2026-08-14~Ref: 082212443732
+59	gpay	"40@@To Apollo Pharmacy||100@@1,800||30@@Completed||24@@26/10/2026||24@@UPI transaction ID||26@@224154990951"	Apollo Pharmacy~1800~EXPENSE~UPI~2026-10-26~
+60	phonepe	"30@@Payment Successful||90@@₹12,000||36@@Paid to SURESH TRADERS||24@@Sep 9, 2026 08:02 AM||24@@Transaction ID T3604947611615404181||24@@PhonePe"	Suresh Traders~12000~EXPENSE~UPI~2026-09-09~
+61	gpay	"40@@To SURESH TRADERS||100@@₹400||30@@Completed||24@@Oct 12, 2026||24@@UPI transaction ID||26@@726047834136"	Suresh Traders~400~EXPENSE~UPI~2026-10-12~
+62	gpay	"40@@From BSES Rajdhani||100@@₹945||30@@Completed||24@@19 Aug 2026, 04:10 am||24@@UPI transaction ID||26@@403297923207||24@@Google Pay"	BSES Rajdhani~945~INCOME~UPI~2026-08-19~
+63	bill	44@@RELIANCE FRESH||24@@Bill No: 3372||24@@Date: 17/09/2026||24@@Sugar  55.00||24@@Biscuits  240.00||24@@Biscuits  120.00||30@@Total 415.00||34@@Grand Total 415.00||24@@Paid by Cash	~415~EXPENSE~CASH~2026-09-17~
+64	phonepe	"30@@Payment Received||90@@₹120||36@@Received from BSES Rajdhani||24@@Jul 2, 2026 03:18 am||24@@Transaction ID T5599246323887397251||24@@PhonePe"	BSES Rajdhani~120~INCOME~UPI~2026-07-02~
+65	phonepe	"30@@Payment Successful||90@@₹945||36@@Paid to RAHUL SHARMA||24@@Aug 18, 2026 05:24 AM||24@@Transaction ID T7044905937089446187||24@@PhonePe"	Rahul Sharma~945~EXPENSE~UPI~2026-08-18~
+66	paytm	"30@@Paytm||30@@Order Successful||90@@₹2,300||24@@Rupees Two Thousand Three Hundred Only||30@@To: Dominos Pizza||24@@13 Aug 2026, 04:25 am||24@@UPI Ref No: 050136897163"	Dominos Pizza~2300~EXPENSE~UPI~2026-08-13~Ref: 050136897163
+67	sms	"26@@Rs 1,800.00 withdrawn from A/c XX7480 at ATM on 25/10/2026. Avl Bal Rs 56071.13"	~1800~EXPENSE~~2026-10-25~
+68	sms	"26@@A/c XX5321 debited Rs.1,051.00 on 07-10-2026 IMPS to Vikram Singh Gill. Ref 953520161241. Balance Rs 81212.54"	~1051~EXPENSE~BANK TRANSFER~2026-10-07~Ref: 953520161241
+69	sms	26@@Your a/c XXXX8501 is credited with Rs 250.00 on 29/08/2026 by NEFT from Airtel Payments. Avl bal Rs 74269.92	~250~INCOME~BANK TRANSFER~2026-08-29~
+70	gpay	"40@@To Airtel Payments||100@@₹7,500||30@@Completed||24@@16/08/2026||24@@UPI transaction ID||26@@026497883832||24@@Paid via Google Pay"	Airtel Payments~7500~EXPENSE~UPI~2026-08-16~
+71	gpay	"40@@To BSES Rajdhani||100@@₹15,000||30@@Completed||24@@08/08/2026||24@@UPI transaction ID||26@@306666025243||24@@Google Pay"	BSES Rajdhani~15000~EXPENSE~UPI~2026-08-08~
+72	paytm	"30@@Paytm||30@@Order Successful||90@@₹20||24@@Rupees Twenty Only||30@@To: SURESH TRADERS||24@@10 Oct 2026, 03:56 AM||24@@UPI Ref No: 134284640722"	Suresh Traders~20~EXPENSE~UPI~2026-10-10~Ref: 134284640722
+73	paytm	"30@@Paytm||30@@Order Successful||90@@₹45||24@@Rupees Forty Five Only||30@@To: Big Bazaar||24@@13 Aug 2026, 05:08 pm||24@@UPI Ref No: 941883991721"	Big Bazaar~45~EXPENSE~UPI~2026-08-13~Ref: 941883991721
+74	noise_symbol	"40@@To Hostinger Pte Ltd||100@@45,000||30@@Completed||24@@9 Aug 2026, 02:38 am"	Hostinger Pte Ltd~45000~EXPENSE~~2026-08-09~
+75	gpay	"40@@To Swiggy||100@@₹7,500||30@@Completed||24@@25 Aug 2026, 04:18 AM||24@@UPI transaction ID||26@@679808265908||24@@Paid via Google Pay"	Swiggy~7500~EXPENSE~UPI~2026-08-25~
+76	paytm	"30@@Paytm||30@@Order Successful||90@@₹99||24@@Rupees Ninety Nine Only||30@@To: Gurpreet Singh||24@@13 Aug 2026, 01:44 AM||24@@UPI Ref No: 832636672279"	Gurpreet Singh~99~EXPENSE~UPI~2026-08-13~Ref: 832636672279
+77	sms	"26@@Rs 15,000.00 withdrawn from A/c||26@@XX1230 at ATM on 30/07/2026. Avl||26@@Bal Rs 97070.88"	~15000~EXPENSE~~2026-07-30~
+78	noise_symbol	"40@@To Amit Kumar||100@@€45||30@@Completed||24@@19 Aug 2026, 01:03 am"	Amit Kumar~45~EXPENSE~~2026-08-19~
+79	phonepe	"30@@Payment Received||90@@₹2,622||36@@Received from Sharma General Store||24@@Sep 28, 2026 12:14 pm||24@@Transaction ID T7553670171492537510||24@@PhonePe"	Sharma General Store~2622~INCOME~UPI~2026-09-28~
+80	negative	40@@Rewards||24@@Scratch cards||24@@Invite friends and earn	
+81	noise_symbol	"40@@To Vikram Singh Gill||100@@₹ 250||30@@Completed||24@@25 Jul 2026, 12:38 PM"	Vikram Singh Gill~250~EXPENSE~~2026-07-25~
+82	phonepe	"30@@Payment Received||90@@₹1,250||36@@Received from Hostinger Pte Ltd||24@@Oct 17, 2026 06:43 am||24@@Transaction ID T2927836365638039114||24@@PhonePe"	Hostinger Pte Ltd~1250~INCOME~UPI~2026-10-17~
+83	sms	"26@@Rs 2,300.00 credited to A/c XX9186 on 24-07-26 from dominos@okhdfcbank UPI Ref 822392322169. Bal Rs 27845.78"	~2300~INCOME~UPI~2026-07-24~Ref: 822392322169
+84	negative	40@@Settings||24@@Scratch cards||24@@Invite friends and earn	
+85	negative	40@@Welcome||24@@Scratch cards||24@@Invite friends and earn	
+86	noise_symbol	"40@@To Neha Verma||100@@€1,051||30@@Completed||24@@5 Sep 2026, 02:52 am"	Neha Verma~1051~EXPENSE~~2026-09-05~
+87	negative	40@@Notifications||24@@Scratch cards||24@@Invite friends and earn	
+88	phonepe	"30@@Payment Successful||90@@₹1,800||36@@Paid to Hostinger Pte Ltd||24@@Aug 18, 2026 04:30 AM||24@@Transaction ID T1152238808717509552||24@@PhonePe"	Hostinger Pte Ltd~1800~EXPENSE~UPI~2026-08-18~
+89	gpay	"40@@To RAHUL SHARMA||100@@1,800||30@@Completed||24@@04/08/2026||24@@UPI transaction ID||26@@283956518531"	Rahul Sharma~1800~EXPENSE~UPI~2026-08-04~
+90	sms	26@@Rs 120.00 withdrawn from A/c||26@@XX5312 at ATM on 12/09/2026. Avl||26@@Bal Rs 84233.53	~120~EXPENSE~~2026-09-12~
+91	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 4891||24@@Date: 22/07/2026||24@@Atta  310.00||24@@Sugar  240.00||30@@Total 550.00||34@@Net Amount 550.00	~550~EXPENSE~~2026-07-22~
+92	gpay	"40@@To BSES Rajdhani||100@@300||30@@Completed||24@@Oct 11, 2026||24@@UPI transaction ID||26@@581070970096"	BSES Rajdhani~300~EXPENSE~UPI~2026-10-11~
+93	negative	40@@Notifications||24@@Scratch cards||24@@Invite friends and earn	
+94	noise_symbol	"40@@To Kuldip Kaur||100@@%1,800||30@@Completed||24@@2 Sep 2026, 08:14 PM"	Kuldip Kaur~1800~EXPENSE~~2026-09-02~
+95	phonepe	"30@@Payment Received||90@@₹45||36@@Received from BSES Rajdhani||24@@Sep 29, 2026 08:52 AM||24@@Transaction ID T3438102920650793594||24@@PhonePe"	BSES Rajdhani~45~INCOME~UPI~2026-09-29~
+96	noise_symbol	"40@@To Hostinger Pte Ltd||100@@₹ 7,500||30@@Completed||24@@24 Aug 2026, 05:58 am"	Hostinger Pte Ltd~7500~EXPENSE~~2026-08-24~
+97	bill	44@@BIG BAZAAR||24@@Bill No: 2610||24@@Date: 01/08/2026||24@@Soap  89.00||24@@Tea  120.00||30@@Total 209.00||34@@Net Amount 209.00||24@@Paid by Cash	~209~EXPENSE~CASH~2026-08-01~
+98	paytm	"30@@Paytm||30@@Order Successful||90@@₹45||24@@Rupees Forty Five Only||30@@To: Hostinger Pte Ltd||24@@6 Jul 2026, 03:58 pm||24@@UPI Ref No: 601486110548"	Hostinger Pte Ltd~45~EXPENSE~UPI~2026-07-06~Ref: 601486110548
+99	gpay	"40@@To Hostinger Pte Ltd||100@@99||30@@Completed||24@@22 Jul 2026, 05:26 AM||24@@UPI transaction ID||26@@199866367893||24@@Paid via Google Pay"	Hostinger Pte Ltd~99~EXPENSE~UPI~2026-07-22~
+100	paytm	"30@@Paytm||30@@Money Received||90@@₹99||24@@Rupees Ninety Nine Only||30@@From: SURESH TRADERS||24@@6 Jul 2026, 01:46 PM||24@@UPI Ref No: 765639533144"	Suresh Traders~99~INCOME~UPI~2026-07-06~Ref: 765639533144
+101	sms	26@@Rs 120.00 credited to A/c XX1196 on||26@@05-08-26 from neha@oksbi UPI Ref||26@@199032347969. Bal Rs 23974.79	~120~INCOME~UPI~2026-08-05~Ref: 199032347969
+102	sms	26@@Rs 650.00 withdrawn from A/c XX7634 at ATM||26@@on 17/07/2026. Avl Bal Rs 76595.98	~650~EXPENSE~~2026-07-17~
+103	negative	40@@Offers for you||24@@Scratch cards||24@@Invite friends and earn	
+104	bill	44@@SUPER MART||24@@Bill No: 1289||24@@Date: 04/07/2026||24@@Dal  89.00||24@@Biscuits  310.00||30@@Total 399.00||34@@Grand Total 399.00||24@@Card Payment Visa	~399~EXPENSE~CARD~2026-07-04~
+105	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 8838||24@@Date: 27/09/2026||24@@Atta  120.00||24@@Rice 5kg  40.00||24@@Milk  150.00||24@@Tea  40.00||30@@Total 350.00||34@@Net Amount 350.00	~350~EXPENSE~~2026-09-27~
+106	negative	40@@Notifications||24@@Scratch cards||24@@Invite friends and earn	
+107	noise_symbol	"40@@To Gurpreet Singh||100@@₹ 2,300||30@@Completed||24@@15 Aug 2026, 07:59 pm"	Gurpreet Singh~2300~EXPENSE~~2026-08-15~
+108	paytm	"30@@Paytm||30@@Order Successful||90@@₹300||24@@Rupees Three Hundred Only||30@@To: Dominos Pizza||24@@2 Jul 2026, 04:40 pm||24@@UPI Ref No: 804271659582"	Dominos Pizza~300~EXPENSE~UPI~2026-07-02~Ref: 804271659582
+109	phonepe	"30@@Payment Successful||90@@₹120||36@@Paid to Airtel Payments||24@@Jul 7, 2026 06:40 am||24@@Transaction ID T8228863643149083299||24@@PhonePe"	Airtel Payments~120~EXPENSE~UPI~2026-07-07~
+110	negative	40@@Settings||24@@Scratch cards||24@@Invite friends and earn	
+111	gpay	"40@@To Kuldip Kaur||100@@₹15,000||30@@Completed||24@@Sep 12, 2026||24@@UPI transaction ID||26@@133552713687||24@@Paid via Google Pay"	Kuldip Kaur~15000~EXPENSE~UPI~2026-09-12~
+112	phonepe	"30@@Payment Successful||90@@₹120||36@@Paid to Dominos Pizza||24@@Jul 5, 2026 12:37 AM||24@@Transaction ID T8122366287726065631||24@@PhonePe"	Dominos Pizza~120~EXPENSE~UPI~2026-07-05~
+113	bill	44@@SUPER MART||24@@Bill No: 6081||24@@Date: 19/09/2026||24@@Tea  120.00||24@@Sugar  89.00||24@@Biscuits  40.00||24@@Soap  150.00||30@@Total 399.00||34@@Grand Total 399.00||24@@Paid by Cash	~399~EXPENSE~CASH~2026-09-19~
+114	gpay	"40@@To Zomato||100@@₹2,622||30@@Completed||24@@Oct 23, 2026||24@@UPI transaction ID||26@@071322836166||24@@Google Pay"	Zomato~2622~EXPENSE~UPI~2026-10-23~
+115	paytm	"30@@Paytm||30@@Money Received||90@@₹1,250||24@@Rupees One Thousand Two Hundred Fifty Only||30@@From: Reliance Retail||24@@4 Sep 2026, 06:39 am||24@@UPI Ref No: 843142421312"	Reliance Retail~1250~INCOME~UPI~2026-09-04~Ref: 843142421312
+116	paytm	"30@@Paytm||30@@Money Received||90@@₹499||24@@Rupees Four Hundred Ninety Nine Only||30@@From: Sharma General Store||24@@19 Sep 2026, 05:52 AM||24@@UPI Ref No: 283612984601"	Sharma General Store~499~INCOME~UPI~2026-09-19~Ref: 283612984601
+117	bill	44@@BIG BAZAAR||24@@Bill No: 2702||24@@Date: 03/07/2026||24@@Oil 1L  240.00||24@@Dal  240.00||24@@Atta  40.00||24@@Dal  89.00||30@@Total 609.00||34@@Grand Total 609.00||24@@Paid via UPI	~609~EXPENSE~UPI~2026-07-03~
+118	negative	40@@Notifications||24@@Scratch cards||24@@Invite friends and earn	
+119	paytm	"30@@Paytm||30@@Order Successful||90@@₹15,000||24@@Rupees Fifteen Thousand Only||30@@To: Reliance Retail||24@@22 Sep 2026, 06:21 am||24@@UPI Ref No: 396229749675"	Reliance Retail~15000~EXPENSE~UPI~2026-09-22~Ref: 396229749675
+120	bill	44@@SUPER MART||24@@Bill No: 1431||24@@Date: 04/07/2026||24@@Oil 1L  120.00||24@@Rice 5kg  55.00||24@@Soap  40.00||24@@Sugar  89.00||30@@Total 304.00||34@@Net Amount 304.00||24@@Paid via UPI	~304~EXPENSE~UPI~2026-07-04~
+121	sms	26@@Rs.650.00 debited from A/c XX1201 on 28-08-26 to VPA sharma@okhdfcbank (UPI Ref No 903084293317). Avl Bal Rs 39785.18	~650~EXPENSE~UPI~2026-08-28~Ref: 903084293317
+122	sms	26@@INR 945.00 spent on HDFC Bank Credit||26@@Card XX2815 at PRIYA SINGH on||26@@12-Sep-26. Avl limit INR 71428.00	~945~EXPENSE~CARD~2026-09-12~
+123	sms	26@@Rs 20.00 withdrawn from A/c XX7789 at ATM on 25/08/2026. Avl Bal Rs 73676.18	~20~EXPENSE~~2026-08-25~
+124	sms	26@@Rs 250.00 credited to A/c XX7495 on 22-08-26 from indian@ybl UPI Ref 280174364259. Bal Rs 47964.42	~250~INCOME~UPI~2026-08-22~Ref: 280174364259
+125	phonepe	"30@@Payment Received||90@@₹12,000||36@@Received from Amit Kumar||24@@Jul 22, 2026 10:02 pm||24@@Transaction ID T6652137586984835486||24@@PhonePe"	Amit Kumar~12000~INCOME~UPI~2026-07-22~
+126	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹300||24@@Rupees Three Hundred Only||30@@To: Kuldip Kaur||24@@7 Aug 2026, 07:45 am||24@@UPI Ref No: 596263989074"	Kuldip Kaur~300~EXPENSE~UPI~2026-08-07~Ref: 596263989074
+127	gpay	"40@@To Reliance Retail||100@@₹4,500||30@@Completed||24@@Jul 13, 2026||24@@UPI transaction ID||26@@926126520642"	Reliance Retail~4500~EXPENSE~UPI~2026-07-13~
+128	noise_symbol	"40@@To Sharma General Store||100@@€99||30@@Completed||24@@25 Jul 2026, 01:53 PM"	Sharma General Store~99~EXPENSE~~2026-07-25~
+129	bill	44@@APOLLO PHARMACY||24@@Bill No: 5853||24@@Date: 22/09/2026||24@@Soap  120.00||24@@Rice 5kg  89.00||24@@Atta  120.00||24@@Dal  55.00||30@@Total 384.00||34@@Net Amount 384.00||24@@Paid via UPI	~384~EXPENSE~UPI~2026-09-22~
+130	sms	26@@Rs 300.00 withdrawn from A/c||26@@XX6166 at ATM on 15/09/2026. Avl||26@@Bal Rs 66956.20	~300~EXPENSE~~2026-09-15~
+131	sms	26@@Rs 20.00 credited to A/c XX9116 on 13-10-26||26@@from swiggy@okhdfcbank UPI Ref 198607021562.||26@@Bal Rs 1966.16	~20~INCOME~UPI~2026-10-13~Ref: 198607021562
+132	sms	26@@Rs.45.00 debited from A/c XX2057 on 07-09-26||26@@to VPA swiggy@upi (UPI Ref No 379464845997).||26@@Avl Bal Rs 18665.24	~45~EXPENSE~UPI~2026-09-07~Ref: 379464845997
+133	noise_symbol	"40@@To RAHUL SHARMA||100@@₹ 4,500||30@@Completed||24@@25 Oct 2026, 03:15 PM"	Rahul Sharma~4500~EXPENSE~~2026-10-25~
+134	paytm	"30@@Paytm||30@@Order Successful||90@@₹400||24@@Rupees Four Hundred Only||30@@To: Neha Verma||24@@8 Jul 2026, 03:09 PM||24@@UPI Ref No: 967049730308"	Neha Verma~400~EXPENSE~UPI~2026-07-08~Ref: 967049730308
+135	gpay	"40@@From Neha Verma||100@@120||30@@Completed||24@@31 Aug 2026, 12:58 pm||24@@UPI transaction ID||26@@774810997999"	Neha Verma~120~INCOME~UPI~2026-08-31~
+136	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹499||24@@Rupees Four Hundred Ninety Nine Only||30@@To: Vikram Singh Gill||24@@27 Sep 2026, 11:25 am||24@@UPI Ref No: 275669245185"	Vikram Singh Gill~499~EXPENSE~UPI~2026-09-27~Ref: 275669245185
+137	phonepe	"30@@Payment Successful||90@@₹499||36@@Paid to Zomato||24@@Aug 31, 2026 04:06 AM||24@@Transaction ID T2125372264521225917||24@@PhonePe"	Zomato~499~EXPENSE~UPI~2026-08-31~
+138	gpay	"40@@To BSES Rajdhani||100@@₹1,800||30@@Completed||24@@Oct 16, 2026||24@@UPI transaction ID||26@@371732321749"	BSES Rajdhani~1800~EXPENSE~UPI~2026-10-16~
+139	phonepe	"30@@Payment Successful||90@@₹1,800||36@@Paid to Swiggy||24@@Jul 11, 2026 03:47 PM||24@@Transaction ID T2200617255004406189||24@@PhonePe"	Swiggy~1800~EXPENSE~UPI~2026-07-11~
+140	gpay	"40@@From Airtel Payments||100@@99||30@@Completed||24@@Oct 21, 2026||24@@UPI transaction ID||26@@896184856275"	Airtel Payments~99~INCOME~UPI~2026-10-21~
+141	gpay	"40@@From Gurpreet Singh||100@@₹4,500||30@@Completed||24@@Oct 13, 2026||24@@UPI transaction ID||26@@547320309319||24@@Google Pay"	Gurpreet Singh~4500~INCOME~UPI~2026-10-13~
+142	sms	26@@Rs 120.00 withdrawn from A/c||26@@XX7390 at ATM on 01/08/2026. Avl||26@@Bal Rs 97388.34	~120~EXPENSE~~2026-08-01~
+143	paytm	"30@@Paytm||30@@Money Received||90@@₹650||24@@Rupees Six Hundred Fifty Only||30@@From: Gurpreet Singh||24@@14 Oct 2026, 08:11 pm||24@@UPI Ref No: 118245407373"	Gurpreet Singh~650~INCOME~UPI~2026-10-14~Ref: 118245407373
+144	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹99||24@@Rupees Ninety Nine Only||30@@To: RAHUL SHARMA||24@@23 Oct 2026, 04:24 AM||24@@UPI Ref No: 678489566041"	Rahul Sharma~99~EXPENSE~UPI~2026-10-23~Ref: 678489566041
+145	gpay	"40@@To Apollo Pharmacy||100@@₹12,000||30@@Completed||24@@06/08/2026||24@@UPI transaction ID||26@@855176123198"	Apollo Pharmacy~12000~EXPENSE~UPI~2026-08-06~
+146	gpay	"40@@To PRIYA SINGH||100@@₹1,800||30@@Completed||24@@23 Sep 2026, 06:41 AM||24@@UPI transaction ID||26@@916920615977||24@@Paid via Google Pay"	Priya Singh~1800~EXPENSE~UPI~2026-09-23~
+147	gpay	"40@@To Sharma General Store||100@@2,300||30@@Completed||24@@22 Sep 2026, 09:51 am||24@@UPI transaction ID||26@@742278758269"	Sharma General Store~2300~EXPENSE~UPI~2026-09-22~
+148	paytm	"30@@Paytm||30@@Money Received||90@@₹45||24@@Rupees Forty Five Only||30@@From: Hostinger Pte Ltd||24@@7 Oct 2026, 09:47 am||24@@UPI Ref No: 977763557610"	Hostinger Pte Ltd~45~INCOME~UPI~2026-10-07~Ref: 977763557610
+149	gpay	40@@To Zomato||100@@₹99||30@@Completed||24@@09/07/2026||24@@UPI transaction ID||26@@728414243070	Zomato~99~EXPENSE~UPI~2026-07-09~
+150	gpay	"40@@To RAHUL SHARMA||100@@₹1,250||30@@Completed||24@@Oct 26, 2026||24@@UPI transaction ID||26@@768103370781||24@@Paid via Google Pay"	Rahul Sharma~1250~EXPENSE~UPI~2026-10-26~
+151	sms	"26@@Rs 15,000.00 withdrawn from A/c XX5861 at ATM on 23/09/2026. Avl Bal Rs 44672.19"	~15000~EXPENSE~~2026-09-23~
+152	bill	44@@APOLLO PHARMACY||24@@Bill No: 6187||24@@Date: 13/07/2026||24@@Biscuits  40.00||24@@Soap  150.00||24@@Biscuits  150.00||30@@Total 340.00||34@@Grand Total 340.00||24@@Paid via UPI	~340~EXPENSE~UPI~2026-07-13~
+153	sms	26@@Rs 99.00 withdrawn from A/c XX8911 at ATM on 22/09/2026. Avl Bal Rs 56826.17	~99~EXPENSE~~2026-09-22~
+154	phonepe	"30@@Payment Received||90@@₹45||36@@Received from Big Bazaar||24@@Aug 24, 2026 05:09 PM||24@@Transaction ID T5086421053883671954||24@@PhonePe"	Big Bazaar~45~INCOME~UPI~2026-08-24~
+155	noise_symbol	"40@@To Zomato||100@@%1,051||30@@Completed||24@@9 Oct 2026, 11:08 PM"	Zomato~1051~EXPENSE~~2026-10-09~
+156	bill	44@@SUPER MART||24@@Bill No: 5391||24@@Date: 26/08/2026||24@@Sugar  310.00||24@@Dal  150.00||30@@Total 460.00||34@@Net Amount 460.00||24@@Paid by Cash	~460~EXPENSE~CASH~2026-08-26~
+157	noise_symbol	"40@@To Sharma General Store||100@@%120||30@@Completed||24@@7 Aug 2026, 12:16 AM"	Sharma General Store~120~EXPENSE~~2026-08-07~
+158	phonepe	"30@@Payment Successful||90@@₹4,500||36@@Paid to BSES Rajdhani||24@@Aug 12, 2026 08:35 pm||24@@Transaction ID T2789145082436239061||24@@PhonePe"	BSES Rajdhani~4500~EXPENSE~UPI~2026-08-12~
+159	gpay	40@@To Zomato||100@@₹650||30@@Completed||24@@31/07/2026||24@@UPI transaction ID||26@@813059977894||24@@Paid via Google Pay	Zomato~650~EXPENSE~UPI~2026-07-31~
+160	phonepe	"30@@Payment Received||90@@₹650||36@@Received from Sharma General Store||24@@Sep 1, 2026 09:26 pm||24@@Transaction ID T6607941703199053705||24@@PhonePe"	Sharma General Store~650~INCOME~UPI~2026-09-01~
+161	gpay	40@@To Swiggy||100@@₹300||30@@Completed||24@@20/10/2026||24@@UPI transaction ID||26@@023307750674||24@@Google Pay	Swiggy~300~EXPENSE~UPI~2026-10-20~
+162	gpay	"40@@From Sharma General Store||100@@₹12,000||30@@Completed||24@@02/09/2026||24@@UPI transaction ID||26@@392408062370"	Sharma General Store~12000~INCOME~UPI~2026-09-02~
+163	bill	44@@SUPER MART||24@@Bill No: 3783||24@@Date: 17/10/2026||24@@Biscuits  55.00||24@@Soap  89.00||24@@Oil 1L  55.00||24@@Soap  120.00||30@@Total 319.00||34@@Net Amount 319.00||24@@Paid via UPI	~319~EXPENSE~UPI~2026-10-17~
+164	sms	"26@@A/c XX1471 debited Rs.1,051.00 on 09-10-2026 IMPS to Kuldip Kaur. Ref 190916041494. Balance Rs 33923.53"	~1051~EXPENSE~BANK TRANSFER~2026-10-09~Ref: 190916041494
+165	sms	26@@A/c XX6160 debited Rs.250.00 on 27-10-2026||26@@IMPS to Reliance Retail. Ref 849595557836.||26@@Balance Rs 95282.89	~250~EXPENSE~BANK TRANSFER~2026-10-27~Ref: 849595557836
+166	sms	"26@@Rs.12,000.00 debited from A/c XX3712 on||26@@22-09-26 to VPA neha@paytm (UPI Ref No||26@@064010024057). Avl Bal Rs 68442.96"	~12000~EXPENSE~UPI~2026-09-22~Ref: 064010024057
+167	negative	40@@Rewards||24@@Scratch cards||24@@Invite friends and earn	
+168	phonepe	"30@@Payment Successful||90@@₹99||36@@Paid to Kuldip Kaur||24@@Jul 21, 2026 11:50 am||24@@Transaction ID T5978022266653491362||24@@PhonePe"	Kuldip Kaur~99~EXPENSE~UPI~2026-07-21~
+169	phonepe	"30@@Payment Successful||90@@₹2,300||36@@Paid to Indian Oil||24@@Oct 1, 2026 02:50 pm||24@@Transaction ID T3901493572316929026||24@@PhonePe"	Indian Oil~2300~EXPENSE~UPI~2026-10-01~
+170	gpay	"40@@To Apollo Pharmacy||100@@250||30@@Completed||24@@6 Aug 2026, 09:20 am||24@@UPI transaction ID||26@@007246469758||24@@Paid via Google Pay"	Apollo Pharmacy~250~EXPENSE~UPI~2026-08-06~
+171	sms	"26@@Rs 2,300.00 credited to A/c||26@@XX5055 on 14-10-26 from||26@@swiggy@upi UPI Ref 937580324322.||26@@Bal Rs 14701.36"	~2300~INCOME~UPI~2026-10-14~Ref: 937580324322
+172	noise_symbol	"40@@To SURESH TRADERS||100@@€400||30@@Completed||24@@27 Oct 2026, 06:27 PM"	Suresh Traders~400~EXPENSE~~2026-10-27~
+173	gpay	"40@@To Big Bazaar||100@@₹1,051||30@@Completed||24@@23 Sep 2026, 09:50 AM||24@@UPI transaction ID||26@@621682752174"	Big Bazaar~1051~EXPENSE~UPI~2026-09-23~
+174	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹945||24@@Rupees Nine Hundred Forty Five Only||30@@To: Swiggy||24@@29 Aug 2026, 08:56 PM||24@@UPI Ref No: 341119196915"	Swiggy~945~EXPENSE~UPI~2026-08-29~Ref: 341119196915
+175	sms	"26@@Rs 7,500.00 withdrawn from A/c||26@@XX3042 at ATM on 27/07/2026. Avl||26@@Bal Rs 45306.83"	~7500~EXPENSE~~2026-07-27~
+176	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 5704||24@@Date: 26/07/2026||24@@Soap  89.00||24@@Biscuits  240.00||24@@Sugar  310.00||24@@Soap  55.00||30@@Total 694.00||34@@Grand Total 694.00||24@@Paid via UPI	~694~EXPENSE~UPI~2026-07-26~
+177	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹499||24@@Rupees Four Hundred Ninety Nine Only||30@@To: Sharma General Store||24@@3 Oct 2026, 12:49 AM||24@@UPI Ref No: 239997782339"	Sharma General Store~499~EXPENSE~UPI~2026-10-03~Ref: 239997782339
+178	phonepe	"30@@Payment Received||90@@₹250||36@@Received from SURESH TRADERS||24@@Jul 23, 2026 10:39 PM||24@@Transaction ID T6588924884189062518||24@@PhonePe"	Suresh Traders~250~INCOME~UPI~2026-07-23~
+179	sms	"26@@A/c XX5549 debited Rs.7,500.00 on 25-08-2026||26@@IMPS to Apollo Pharmacy. Ref 282394379575.||26@@Balance Rs 75241.78"	~7500~EXPENSE~BANK TRANSFER~2026-08-25~Ref: 282394379575
+180	bill	44@@APOLLO PHARMACY||24@@Bill No: 6019||24@@Date: 09/07/2026||24@@Dal  240.00||24@@Biscuits  89.00||24@@Rice 5kg  89.00||24@@Sugar  89.00||30@@Total 507.00||34@@Grand Total 507.00||24@@Paid by Cash	~507~EXPENSE~CASH~2026-07-09~
+181	bill	44@@APOLLO PHARMACY||24@@Bill No: 1573||24@@Date: 29/09/2026||24@@Rice 5kg  150.00||24@@Oil 1L  40.00||30@@Total 190.00||34@@Net Amount 190.00||24@@Card Payment Visa	~190~EXPENSE~CARD~2026-09-29~
+182	gpay	"40@@From Amit Kumar||100@@₹2,300||30@@Completed||24@@02/10/2026||24@@UPI transaction ID||26@@262358124074||24@@Paid via Google Pay"	Amit Kumar~2300~INCOME~UPI~2026-10-02~
+183	phonepe	"30@@Payment Received||90@@₹12,000||36@@Received from Vikram Singh Gill||24@@Aug 8, 2026 04:10 PM||24@@Transaction ID T7587349913527072680||24@@PhonePe"	Vikram Singh Gill~12000~INCOME~UPI~2026-08-08~
+184	phonepe	"30@@Payment Successful||90@@₹1,051||36@@Paid to PRIYA SINGH||24@@Aug 27, 2026 10:23 PM||24@@Transaction ID T7667872947026839025||24@@PhonePe"	Priya Singh~1051~EXPENSE~UPI~2026-08-27~
+185	phonepe	"30@@Payment Received||90@@₹2,622||36@@Received from Reliance Retail||24@@Oct 16, 2026 01:43 PM||24@@Transaction ID T4026193594791543775||24@@PhonePe"	Reliance Retail~2622~INCOME~UPI~2026-10-16~
+186	bill	44@@BIG BAZAAR||24@@Bill No: 5924||24@@Date: 12/10/2026||24@@Tea  55.00||24@@Oil 1L  240.00||24@@Tea  89.00||30@@Total 384.00||34@@Net Amount 384.00||24@@Paid via UPI	~384~EXPENSE~UPI~2026-10-12~
+187	phonepe	"30@@Payment Successful||90@@₹499||36@@Paid to Dominos Pizza||24@@Sep 2, 2026 08:14 AM||24@@Transaction ID T5576998254373283992||24@@PhonePe"	Dominos Pizza~499~EXPENSE~UPI~2026-09-02~
+188	gpay	40@@To PRIYA SINGH||100@@₹400||30@@Completed||24@@31/07/2026||24@@UPI transaction ID||26@@185123600604||24@@Paid via Google Pay	Priya Singh~400~EXPENSE~UPI~2026-07-31~
+189	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹945||24@@Rupees Nine Hundred Forty Five Only||30@@To: Kuldip Kaur||24@@9 Aug 2026, 06:20 pm||24@@UPI Ref No: 418840211742"	Kuldip Kaur~945~EXPENSE~UPI~2026-08-09~Ref: 418840211742
+190	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹300||24@@Rupees Three Hundred Only||30@@To: Gurpreet Singh||24@@31 Jul 2026, 01:49 AM||24@@UPI Ref No: 467732680225"	Gurpreet Singh~300~EXPENSE~UPI~2026-07-31~Ref: 467732680225
+191	sms	"26@@Your a/c XXXX1096 is credited||26@@with Rs 15,000.00 on 02/08/2026||26@@by NEFT from Sharma General||26@@Store. Avl bal Rs 95108.97"	~15000~INCOME~BANK TRANSFER~2026-08-02~
+192	paytm	"30@@Paytm||30@@Money Received||90@@₹650||24@@Rupees Six Hundred Fifty Only||30@@From: Zomato||24@@8 Aug 2026, 12:57 AM||24@@UPI Ref No: 600456351907"	Zomato~650~INCOME~UPI~2026-08-08~Ref: 600456351907
+193	bill	44@@APOLLO PHARMACY||24@@Bill No: 4442||24@@Date: 18/09/2026||24@@Milk  89.00||24@@Milk  150.00||30@@Total 239.00||34@@Net Amount 239.00||24@@Paid via UPI	~239~EXPENSE~UPI~2026-09-18~
+194	bill	44@@APOLLO PHARMACY||24@@Bill No: 1095||24@@Date: 05/07/2026||24@@Sugar  89.00||24@@Tea  40.00||24@@Soap  240.00||30@@Total 369.00||34@@Grand Total 369.00||24@@Paid via UPI	~369~EXPENSE~UPI~2026-07-05~
+195	gpay	40@@To Gurpreet Singh||100@@₹20||30@@Completed||24@@14/10/2026||24@@UPI transaction ID||26@@899263591510	Gurpreet Singh~20~EXPENSE~UPI~2026-10-14~
+196	bill	44@@SUPER MART||24@@Bill No: 5244||24@@Date: 19/10/2026||24@@Atta  150.00||24@@Milk  310.00||30@@Total 460.00||34@@Net Amount 460.00	~460~EXPENSE~~2026-10-19~
+197	paytm	"30@@Paytm||30@@Money Received||90@@₹400||24@@Rupees Four Hundred Only||30@@From: MANPREET KAUR||24@@1 Sep 2026, 11:54 pm||24@@UPI Ref No: 556154611111"	Manpreet Kaur~400~INCOME~UPI~2026-09-01~Ref: 556154611111
+198	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 9861||24@@Date: 24/07/2026||24@@Oil 1L  150.00||24@@Sugar  240.00||24@@Tea  40.00||24@@Atta  150.00||30@@Total 580.00||34@@Net Amount 580.00||24@@Paid via UPI	~580~EXPENSE~UPI~2026-07-24~
+199	phonepe	"30@@Payment Successful||90@@₹945||36@@Paid to Swiggy||24@@Oct 24, 2026 07:15 PM||24@@Transaction ID T7078100974961705978||24@@PhonePe"	Swiggy~945~EXPENSE~UPI~2026-10-24~
+200	noise_symbol	"40@@To Hostinger Pte Ltd||100@@99||30@@Completed||24@@5 Jul 2026, 04:32 PM"	Hostinger Pte Ltd~99~EXPENSE~~2026-07-05~
+201	phonepe	"30@@Payment Successful||90@@₹1,250||36@@Paid to Indian Oil||24@@Oct 5, 2026 11:25 AM||24@@Transaction ID T1087601730990334454||24@@PhonePe"	Indian Oil~1250~EXPENSE~UPI~2026-10-05~
+202	bill	44@@RELIANCE FRESH||24@@Bill No: 7024||24@@Date: 05/08/2026||24@@Oil 1L  120.00||24@@Milk  120.00||24@@Biscuits  40.00||24@@Oil 1L  89.00||30@@Total 369.00||34@@Grand Total 369.00||24@@Paid via UPI	~369~EXPENSE~UPI~2026-08-05~
+203	bill	44@@RELIANCE FRESH||24@@Bill No: 6443||24@@Date: 05/10/2026||24@@Milk  150.00||24@@Biscuits  310.00||24@@Atta  40.00||30@@Total 500.00||34@@Net Amount 500.00||24@@Card Payment Visa	~500~EXPENSE~CARD~2026-10-05~
+204	gpay	40@@To Amit Kumar||100@@₹945||30@@Completed||24@@18/07/2026||24@@UPI transaction ID||26@@065084771159	Amit Kumar~945~EXPENSE~UPI~2026-07-18~
+205	phonepe	"30@@Payment Successful||90@@₹250||36@@Paid to RAHUL SHARMA||24@@Aug 27, 2026 03:07 am||24@@Transaction ID T7445669153028057424||24@@PhonePe"	Rahul Sharma~250~EXPENSE~UPI~2026-08-27~
+206	sms	26@@A/c XX1409 debited Rs.250.00 on 14-07-2026 IMPS to MANPREET KAUR. Ref 822815823939. Balance Rs 20649.70	~250~EXPENSE~BANK TRANSFER~2026-07-14~Ref: 822815823939
+207	paytm	"30@@Paytm||30@@Money Received||90@@₹499||24@@Rupees Four Hundred Ninety Nine Only||30@@From: Dominos Pizza||24@@23 Jul 2026, 01:42 AM||24@@UPI Ref No: 767167453702"	Dominos Pizza~499~INCOME~UPI~2026-07-23~Ref: 767167453702
+208	phonepe	"30@@Payment Successful||90@@₹945||36@@Paid to Kuldip Kaur||24@@Jul 2, 2026 11:55 am||24@@Transaction ID T8051860271981071859||24@@PhonePe"	Kuldip Kaur~945~EXPENSE~UPI~2026-07-02~
+209	sms	26@@INR 300.00 spent on HDFC Bank Credit Card XX2847 at ZOMATO on 20-Aug-26. Avl limit INR 55556.00	~300~EXPENSE~CARD~2026-08-20~
+210	noise_symbol	"40@@To Apollo Pharmacy||100@@€7,500||30@@Completed||24@@3 Sep 2026, 01:59 am"	Apollo Pharmacy~7500~EXPENSE~~2026-09-03~
+211	phonepe	"30@@Payment Successful||90@@₹120||36@@Paid to PRIYA SINGH||24@@Jul 27, 2026 06:54 am||24@@Transaction ID T3957806117642643665||24@@PhonePe"	Priya Singh~120~EXPENSE~UPI~2026-07-27~
+212	noise_symbol	"40@@To Big Bazaar||100@@₹ 15,000||30@@Completed||24@@30 Sep 2026, 08:54 PM"	Big Bazaar~15000~EXPENSE~~2026-09-30~
+213	gpay	"40@@To RAHUL SHARMA||100@@₹45,000||30@@Completed||24@@Oct 27, 2026||24@@UPI transaction ID||26@@614255324881||24@@Paid via Google Pay"	Rahul Sharma~45000~EXPENSE~UPI~2026-10-27~
+214	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 5756||24@@Date: 03/10/2026||24@@Tea  310.00||24@@Dal  89.00||24@@Atta  120.00||30@@Total 519.00||34@@Grand Total 519.00||24@@Card Payment Visa	~519~EXPENSE~CARD~2026-10-03~
+215	noise_symbol	"40@@To Vikram Singh Gill||100@@%1,250||30@@Completed||24@@14 Jul 2026, 09:19 PM"	Vikram Singh Gill~1250~EXPENSE~~2026-07-14~
+216	paytm	"30@@Paytm||30@@Money Received||90@@₹15,000||24@@Rupees Fifteen Thousand Only||30@@From: Swiggy||24@@30 Sep 2026, 05:31 PM||24@@UPI Ref No: 529920373005"	Swiggy~15000~INCOME~UPI~2026-09-30~Ref: 529920373005
+217	bill	44@@APOLLO PHARMACY||24@@Bill No: 1873||24@@Date: 15/10/2026||24@@Dal  89.00||24@@Oil 1L  89.00||24@@Atta  55.00||24@@Oil 1L  120.00||30@@Total 353.00||34@@Net Amount 353.00||24@@Paid via UPI	~353~EXPENSE~UPI~2026-10-15~
+218	gpay	40@@To Zomato||100@@₹945||30@@Completed||24@@07/07/2026||24@@UPI transaction ID||26@@656804290720||24@@Google Pay	Zomato~945~EXPENSE~UPI~2026-07-07~
+219	phonepe	"30@@Payment Successful||90@@₹2,300||36@@Paid to Airtel Payments||24@@Sep 21, 2026 12:32 PM||24@@Transaction ID T5870079528783457452||24@@PhonePe"	Airtel Payments~2300~EXPENSE~UPI~2026-09-21~
+220	gpay	"40@@From RAHUL SHARMA||100@@₹945||30@@Completed||24@@23 Sep 2026, 02:57 am||24@@UPI transaction ID||26@@310145998378"	Rahul Sharma~945~INCOME~UPI~2026-09-23~
+221	sms	"26@@Rs.15,000.00 debited from A/c XX7683 on||26@@15-10-26 to VPA suresh@upi (UPI Ref No||26@@763228499707). Avl Bal Rs 53354.22"	~15000~EXPENSE~UPI~2026-10-15~Ref: 763228499707
+222	sms	"26@@A/c XX4663 debited Rs.15,000.00 on 21-09-2026 IMPS to Amit Kumar. Ref 162046776927. Balance Rs 19960.33"	~15000~EXPENSE~BANK TRANSFER~2026-09-21~Ref: 162046776927
+223	phonepe	"30@@Payment Received||90@@₹99||36@@Received from Hostinger Pte Ltd||24@@Sep 2, 2026 01:21 PM||24@@Transaction ID T2101211021549415988||24@@PhonePe"	Hostinger Pte Ltd~99~INCOME~UPI~2026-09-02~
+224	phonepe	"30@@Payment Received||90@@₹7,500||36@@Received from Vikram Singh Gill||24@@Oct 17, 2026 08:26 pm||24@@Transaction ID T9141648847510850995||24@@PhonePe"	Vikram Singh Gill~7500~INCOME~UPI~2026-10-17~
+225	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹250||24@@Rupees Two Hundred Fifty Only||30@@To: Hostinger Pte Ltd||24@@2 Oct 2026, 01:11 am||24@@UPI Ref No: 075285602447"	Hostinger Pte Ltd~250~EXPENSE~UPI~2026-10-02~Ref: 075285602447
+226	sms	26@@INR 300.00 spent on HDFC Bank Credit Card||26@@XX8250 at HOSTINGER PTE LTD on 30-Jul-26.||26@@Avl limit INR 18495.00	~300~EXPENSE~CARD~2026-07-30~
+227	phonepe	"30@@Payment Successful||90@@₹12,000||36@@Paid to Kuldip Kaur||24@@Aug 3, 2026 08:33 am||24@@Transaction ID T6235360716344099654||24@@PhonePe"	Kuldip Kaur~12000~EXPENSE~UPI~2026-08-03~
+228	phonepe	"30@@Payment Successful||90@@₹499||36@@Paid to Airtel Payments||24@@Aug 9, 2026 10:11 PM||24@@Transaction ID T1729239534751441411||24@@PhonePe"	Airtel Payments~499~EXPENSE~UPI~2026-08-09~
+229	gpay	"40@@To Neha Verma||100@@2,622||30@@Completed||24@@21 Jul 2026, 01:35 AM||24@@UPI transaction ID||26@@309640707620"	Neha Verma~2622~EXPENSE~UPI~2026-07-21~
+230	bill	44@@SUPER MART||24@@Bill No: 4934||24@@Date: 26/09/2026||24@@Tea  120.00||24@@Soap  120.00||30@@Total 240.00||34@@Grand Total 240.00||24@@Paid via UPI	~240~EXPENSE~UPI~2026-09-26~
+231	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 7012||24@@Date: 04/07/2026||24@@Rice 5kg  120.00||24@@Rice 5kg  55.00||24@@Oil 1L  150.00||24@@Milk  120.00||30@@Total 445.00||34@@Grand Total 445.00||24@@Card Payment Visa	~445~EXPENSE~CARD~2026-07-04~
+232	sms	"26@@Rs.15,000.00 debited from A/c XX1957 on 08-09-26 to VPA kuldip@upi (UPI Ref No 413061685881). Avl Bal Rs 89945.62"	~15000~EXPENSE~UPI~2026-09-08~Ref: 413061685881
+233	bill	44@@SUPER MART||24@@Bill No: 9418||24@@Date: 09/10/2026||24@@Dal  150.00||24@@Oil 1L  150.00||30@@Total 300.00||34@@Grand Total 300.00	~300~EXPENSE~~2026-10-09~
+234	bill	44@@RELIANCE FRESH||24@@Bill No: 9014||24@@Date: 17/10/2026||24@@Rice 5kg  55.00||24@@Dal  120.00||30@@Total 175.00||34@@Grand Total 175.00	~175~EXPENSE~~2026-10-17~
+235	bill	44@@RELIANCE FRESH||24@@Bill No: 9200||24@@Date: 11/07/2026||24@@Sugar  310.00||24@@Soap  150.00||30@@Total 460.00||34@@Grand Total 460.00||24@@Paid via UPI	~460~EXPENSE~UPI~2026-07-11~
+236	sms	"26@@A/c XX5044 debited Rs.1,051.00 on 10-08-2026 IMPS to Amit Kumar. Ref 004526595518. Balance Rs 45685.30"	~1051~EXPENSE~BANK TRANSFER~2026-08-10~Ref: 004526595518
+237	gpay	"40@@From Apollo Pharmacy||100@@15,000||30@@Completed||24@@13/09/2026||24@@UPI transaction ID||26@@669857229697||24@@Google Pay"	Apollo Pharmacy~15000~INCOME~UPI~2026-09-13~
+238	phonepe	"30@@Payment Successful||90@@₹945||36@@Paid to Kuldip Kaur||24@@Aug 10, 2026 05:51 PM||24@@Transaction ID T3110111855955096458||24@@PhonePe"	Kuldip Kaur~945~EXPENSE~UPI~2026-08-10~
+239	paytm	"30@@Paytm||30@@Money Received||90@@₹499||24@@Rupees Four Hundred Ninety Nine Only||30@@From: Airtel Payments||24@@6 Jul 2026, 06:42 AM||24@@UPI Ref No: 792725717417"	Airtel Payments~499~INCOME~UPI~2026-07-06~Ref: 792725717417
+240	bill	44@@BIG BAZAAR||24@@Bill No: 4513||24@@Date: 25/08/2026||24@@Rice 5kg  55.00||24@@Soap  150.00||24@@Atta  55.00||30@@Total 260.00||34@@Net Amount 260.00||24@@Card Payment Visa	~260~EXPENSE~CARD~2026-08-25~
+241	phonepe	"30@@Payment Received||90@@₹15,000||36@@Received from Vikram Singh Gill||24@@Oct 25, 2026 05:06 AM||24@@Transaction ID T6114451801064892029||24@@PhonePe"	Vikram Singh Gill~15000~INCOME~UPI~2026-10-25~
+242	gpay	"40@@To Dominos Pizza||100@@₹2,622||30@@Completed||24@@30 Aug 2026, 11:03 pm||24@@UPI transaction ID||26@@270287790126||24@@Paid via Google Pay"	Dominos Pizza~2622~EXPENSE~UPI~2026-08-30~
+243	phonepe	"30@@Payment Successful||90@@₹650||36@@Paid to SURESH TRADERS||24@@Aug 10, 2026 09:29 am||24@@Transaction ID T6659046860128742425||24@@PhonePe"	Suresh Traders~650~EXPENSE~UPI~2026-08-10~
+244	gpay	"40@@From SURESH TRADERS||100@@₹4,500||30@@Completed||24@@Oct 11, 2026||24@@UPI transaction ID||26@@653459566254"	Suresh Traders~4500~INCOME~UPI~2026-10-11~
+245	gpay	"40@@From Amit Kumar||100@@₹300||30@@Completed||24@@26 Sep 2026, 12:11 pm||24@@UPI transaction ID||26@@056086569070"	Amit Kumar~300~INCOME~UPI~2026-09-26~
+246	negative	40@@Offers for you||24@@Scratch cards||24@@Invite friends and earn	
+247	sms	26@@Rs 945.00 credited to A/c XX1279 on 27-07-26 from suresh@ybl UPI Ref 880311627736. Bal Rs 95921.94	~945~INCOME~UPI~2026-07-27~Ref: 880311627736
+248	paytm	"30@@Paytm||30@@Money Received||90@@₹12,000||24@@Rupees Twelve Thousand Only||30@@From: Vikram Singh Gill||24@@30 Sep 2026, 10:17 PM||24@@UPI Ref No: 868202947704"	Vikram Singh Gill~12000~INCOME~UPI~2026-09-30~Ref: 868202947704
+249	gpay	"40@@From BSES Rajdhani||100@@499||30@@Completed||24@@13 Jul 2026, 08:47 AM||24@@UPI transaction ID||26@@103211525919"	BSES Rajdhani~499~INCOME~UPI~2026-07-13~
+250	bill	44@@APOLLO PHARMACY||24@@Bill No: 6206||24@@Date: 04/07/2026||24@@Sugar  40.00||24@@Sugar  55.00||24@@Tea  89.00||30@@Total 184.00||34@@Net Amount 184.00||24@@Card Payment Visa	~184~EXPENSE~CARD~2026-07-04~
+251	sms	26@@Rs 400.00 credited to A/c XX6835 on 24-08-26||26@@from swiggy@upi UPI Ref 717729689682. Bal Rs||26@@71592.38	~400~INCOME~UPI~2026-08-24~Ref: 717729689682
+252	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 6563||24@@Date: 22/10/2026||24@@Rice 5kg  40.00||24@@Soap  55.00||24@@Biscuits  120.00||24@@Milk  55.00||30@@Total 270.00||34@@Net Amount 270.00||24@@Card Payment Visa	~270~EXPENSE~CARD~2026-10-22~
+253	sms	"26@@Your a/c XXXX5801 is credited with Rs 1,051.00 on 10/08/2026 by NEFT from Reliance Retail. Avl bal Rs 52562.85"	~1051~INCOME~BANK TRANSFER~2026-08-10~
+254	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹2,300||24@@Rupees Two Thousand Three Hundred Only||30@@To: RAHUL SHARMA||24@@3 Aug 2026, 10:56 AM||24@@UPI Ref No: 835743377414"	Rahul Sharma~2300~EXPENSE~UPI~2026-08-03~Ref: 835743377414
+255	sms	"26@@Rs.1,250.00 debited from A/c XX5259 on||26@@07-07-26 to VPA bses@paytm (UPI Ref No||26@@419773909620). Avl Bal Rs 39469.19"	~1250~EXPENSE~UPI~2026-07-07~Ref: 419773909620
+256	negative	40@@Rewards||24@@Scratch cards||24@@Invite friends and earn	
+257	bill	44@@APOLLO PHARMACY||24@@Bill No: 8275||24@@Date: 07/10/2026||24@@Soap  150.00||24@@Biscuits  120.00||24@@Soap  55.00||30@@Total 325.00||34@@Grand Total 325.00||24@@Paid by Cash	~325~EXPENSE~CASH~2026-10-07~
+258	gpay	"40@@To PRIYA SINGH||100@@300||30@@Completed||24@@11 Oct 2026, 09:56 pm||24@@UPI transaction ID||26@@722003322453"	Priya Singh~300~EXPENSE~UPI~2026-10-11~
+259	phonepe	"30@@Payment Successful||90@@₹499||36@@Paid to Big Bazaar||24@@Jul 13, 2026 04:54 am||24@@Transaction ID T5333580882955881173||24@@PhonePe"	Big Bazaar~499~EXPENSE~UPI~2026-07-13~
+260	phonepe	"30@@Payment Successful||90@@₹7,500||36@@Paid to Indian Oil||24@@Sep 16, 2026 07:39 pm||24@@Transaction ID T4392392250349398022||24@@PhonePe"	Indian Oil~7500~EXPENSE~UPI~2026-09-16~
+261	phonepe	"30@@Payment Successful||90@@₹1,051||36@@Paid to BSES Rajdhani||24@@Sep 14, 2026 01:12 PM||24@@Transaction ID T1116520259139465242||24@@PhonePe"	BSES Rajdhani~1051~EXPENSE~UPI~2026-09-14~
+262	negative	40@@Welcome||24@@Scratch cards||24@@Invite friends and earn	
+263	phonepe	"30@@Payment Successful||90@@₹45,000||36@@Paid to Swiggy||24@@Sep 4, 2026 06:56 am||24@@Transaction ID T5049745000340533533||24@@PhonePe"	Swiggy~45000~EXPENSE~UPI~2026-09-04~
+264	sms	26@@Your a/c XXXX5625 is credited with Rs 400.00 on 10/07/2026 by NEFT from BSES Rajdhani. Avl bal Rs 40405.74	~400~INCOME~BANK TRANSFER~2026-07-10~
+265	sms	26@@A/c XX2462 debited Rs.499.00 on||26@@05-07-2026 IMPS to Kuldip Kaur. Ref||26@@719530860354. Balance Rs 59911.11	~499~EXPENSE~BANK TRANSFER~2026-07-05~Ref: 719530860354
+266	gpay	40@@To MANPREET KAUR||100@@₹499||30@@Completed||24@@14/10/2026||24@@UPI transaction ID||26@@714652281731||24@@Google Pay	Manpreet Kaur~499~EXPENSE~UPI~2026-10-14~
+267	phonepe	"30@@Payment Successful||90@@₹250||36@@Paid to RAHUL SHARMA||24@@Aug 14, 2026 01:36 AM||24@@Transaction ID T9393736389499455328||24@@PhonePe"	Rahul Sharma~250~EXPENSE~UPI~2026-08-14~
+268	noise_symbol	"40@@To PRIYA SINGH||100@@7,500||30@@Completed||24@@16 Aug 2026, 05:32 AM"	Priya Singh~7500~EXPENSE~~2026-08-16~
+269	negative	40@@Welcome||24@@Scratch cards||24@@Invite friends and earn	
+270	bill	44@@APOLLO PHARMACY||24@@Bill No: 3034||24@@Date: 31/07/2026||24@@Rice 5kg  89.00||24@@Biscuits  310.00||24@@Rice 5kg  55.00||30@@Total 454.00||34@@Grand Total 454.00||24@@Paid via UPI	~454~EXPENSE~UPI~2026-07-31~
+271	phonepe	"30@@Payment Successful||90@@₹400||36@@Paid to Indian Oil||24@@Jul 29, 2026 05:05 AM||24@@Transaction ID T8625824339684929740||24@@PhonePe"	Indian Oil~400~EXPENSE~UPI~2026-07-29~
+272	paytm	"30@@Paytm||30@@Money Received||90@@₹400||24@@Rupees Four Hundred Only||30@@From: Swiggy||24@@10 Aug 2026, 09:44 pm||24@@UPI Ref No: 990274217521"	Swiggy~400~INCOME~UPI~2026-08-10~Ref: 990274217521
+273	gpay	"40@@From Kuldip Kaur||100@@₹1,800||30@@Completed||24@@24/07/2026||24@@UPI transaction ID||26@@357789136018||24@@Paid via Google Pay"	Kuldip Kaur~1800~INCOME~UPI~2026-07-24~
+274	paytm	"30@@Paytm||30@@Money Received||90@@₹2,300||24@@Rupees Two Thousand Three Hundred Only||30@@From: Amit Kumar||24@@4 Aug 2026, 09:27 pm||24@@UPI Ref No: 020368923531"	Amit Kumar~2300~INCOME~UPI~2026-08-04~Ref: 020368923531
+275	phonepe	"30@@Payment Received||90@@₹499||36@@Received from Reliance Retail||24@@Sep 22, 2026 06:48 pm||24@@Transaction ID T9433518797727670163||24@@PhonePe"	Reliance Retail~499~INCOME~UPI~2026-09-22~
+276	paytm	"30@@Paytm||30@@Order Successful||90@@₹4,500||24@@Rupees Four Thousand Five Hundred Only||30@@To: PRIYA SINGH||24@@1 Sep 2026, 01:34 pm||24@@UPI Ref No: 529809109511"	Priya Singh~4500~EXPENSE~UPI~2026-09-01~Ref: 529809109511
+277	gpay	40@@From Big Bazaar||100@@945||30@@Completed||24@@12/08/2026||24@@UPI transaction ID||26@@891024485948	Big Bazaar~945~INCOME~UPI~2026-08-12~
+278	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 9071||24@@Date: 08/07/2026||24@@Sugar  240.00||24@@Atta  40.00||24@@Dal  55.00||24@@Atta  150.00||30@@Total 485.00||34@@Grand Total 485.00	~485~EXPENSE~~2026-07-08~
+279	sms	"26@@INR 2,300.00 spent on HDFC Bank||26@@Credit Card XX9781 at SURESH||26@@TRADERS on 17-Sep-26. Avl limit||26@@INR 64812.00"	~2300~EXPENSE~CARD~2026-09-17~
+280	phonepe	"30@@Payment Successful||90@@₹20||36@@Paid to Big Bazaar||24@@Oct 23, 2026 05:17 AM||24@@Transaction ID T9566079177762354788||24@@PhonePe"	Big Bazaar~20~EXPENSE~UPI~2026-10-23~
+281	bill	44@@RELIANCE FRESH||24@@Bill No: 3695||24@@Date: 30/09/2026||24@@Oil 1L  40.00||24@@Milk  150.00||24@@Tea  240.00||30@@Total 430.00||34@@Grand Total 430.00	~430~EXPENSE~~2026-09-30~
+282	negative	40@@Offers for you||24@@Scratch cards||24@@Invite friends and earn	
+283	sms	26@@Rs 650.00 withdrawn from A/c XX2540 at ATM on 29/07/2026. Avl Bal Rs 49199.33	~650~EXPENSE~~2026-07-29~
+284	sms	"26@@A/c XX8298 debited Rs.2,622.00 on 15-10-2026||26@@IMPS to Sharma General Store. Ref||26@@417611154401. Balance Rs 83186.22"	~2622~EXPENSE~BANK TRANSFER~2026-10-15~Ref: 417611154401
+285	sms	26@@Your a/c XXXX7028 is credited||26@@with Rs 499.00 on 29/09/2026 by||26@@NEFT from Big Bazaar. Avl bal Rs||26@@24729.43	~499~INCOME~BANK TRANSFER~2026-09-29~
+286	sms	"26@@Your a/c XXXX8761 is credited with Rs 15,000.00 on 25/10/2026 by NEFT from Big Bazaar. Avl bal Rs 84297.16"	~15000~INCOME~BANK TRANSFER~2026-10-25~
+287	gpay	"40@@To Indian Oil||100@@1,250||30@@Completed||24@@Aug 7, 2026||24@@UPI transaction ID||26@@652755828235||24@@Paid via Google Pay"	Indian Oil~1250~EXPENSE~UPI~2026-08-07~
+288	gpay	"40@@From PRIYA SINGH||100@@₹120||30@@Completed||24@@Aug 20, 2026||24@@UPI transaction ID||26@@291390785769||24@@Paid via Google Pay"	Priya Singh~120~INCOME~UPI~2026-08-20~
+289	sms	26@@A/c XX6158 debited Rs.499.00 on||26@@08-07-2026 IMPS to Dominos||26@@Pizza. Ref 874041620231. Balance||26@@Rs 4358.26	~499~EXPENSE~BANK TRANSFER~2026-07-08~Ref: 874041620231
+290	sms	26@@Your a/c XXXX9524 is credited with Rs 99.00||26@@on 27/07/2026 by NEFT from SURESH TRADERS.||26@@Avl bal Rs 15308.96	~99~INCOME~BANK TRANSFER~2026-07-27~
+291	phonepe	"30@@Payment Successful||90@@₹7,500||36@@Paid to Big Bazaar||24@@Jul 12, 2026 01:49 AM||24@@Transaction ID T3981237021333367232||24@@PhonePe"	Big Bazaar~7500~EXPENSE~UPI~2026-07-12~
+292	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹45||24@@Rupees Forty Five Only||30@@To: Swiggy||24@@14 Oct 2026, 10:46 PM||24@@UPI Ref No: 137140198399"	Swiggy~45~EXPENSE~UPI~2026-10-14~Ref: 137140198399
+293	phonepe	"30@@Payment Successful||90@@₹945||36@@Paid to Zomato||24@@Sep 5, 2026 03:00 PM||24@@Transaction ID T1998149105046280286||24@@PhonePe"	Zomato~945~EXPENSE~UPI~2026-09-05~
+294	bill	44@@SUPER MART||24@@Bill No: 7428||24@@Date: 23/10/2026||24@@Biscuits  55.00||24@@Atta  240.00||24@@Rice 5kg  55.00||24@@Atta  40.00||30@@Total 390.00||34@@Net Amount 390.00	~390~EXPENSE~~2026-10-23~
+295	sms	26@@Rs.400.00 debited from A/c XX9761 on||26@@27-10-26 to VPA suresh@upi (UPI Ref No||26@@795408542902). Avl Bal Rs 42346.52	~400~EXPENSE~UPI~2026-10-27~Ref: 795408542902
+296	phonepe	"30@@Payment Successful||90@@₹2,300||36@@Paid to Big Bazaar||24@@Aug 28, 2026 08:30 PM||24@@Transaction ID T2623982066056241805||24@@PhonePe"	Big Bazaar~2300~EXPENSE~UPI~2026-08-28~
+297	paytm	"30@@Paytm||30@@Order Successful||90@@₹45,000||24@@Rupees Forty Five Thousand Only||30@@To: Airtel Payments||24@@11 Jul 2026, 10:13 pm||24@@UPI Ref No: 365101375435"	Airtel Payments~45000~EXPENSE~UPI~2026-07-11~Ref: 365101375435
+298	paytm	"30@@Paytm||30@@Order Successful||90@@₹650||24@@Rupees Six Hundred Fifty Only||30@@To: Apollo Pharmacy||24@@18 Aug 2026, 05:13 am||24@@UPI Ref No: 108854511285"	Apollo Pharmacy~650~EXPENSE~UPI~2026-08-18~Ref: 108854511285
+299	phonepe	"30@@Payment Successful||90@@₹99||36@@Paid to Sharma General Store||24@@Sep 20, 2026 07:06 pm||24@@Transaction ID T3691599776308578648||24@@PhonePe"	Sharma General Store~99~EXPENSE~UPI~2026-09-20~
+300	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹1,250||24@@Rupees One Thousand Two Hundred Fifty Only||30@@To: MANPREET KAUR||24@@10 Jul 2026, 04:27 am||24@@UPI Ref No: 166807747148"	Manpreet Kaur~1250~EXPENSE~UPI~2026-07-10~Ref: 166807747148
+301	phonepe	"30@@Payment Successful||90@@₹20||36@@Paid to Airtel Payments||24@@Oct 10, 2026 04:20 AM||24@@Transaction ID T9525650197624302617||24@@PhonePe"	Airtel Payments~20~EXPENSE~UPI~2026-10-10~
+302	bill	44@@SHARMA GENERAL STORE||24@@Bill No: 4697||24@@Date: 16/07/2026||24@@Sugar  240.00||24@@Sugar  310.00||24@@Oil 1L  89.00||24@@Biscuits  89.00||30@@Total 728.00||34@@Net Amount 728.00||24@@Card Payment Visa	~728~EXPENSE~CARD~2026-07-16~
+303	phonepe	"30@@Payment Successful||90@@₹499||36@@Paid to BSES Rajdhani||24@@Aug 27, 2026 01:37 AM||24@@Transaction ID T7865666149482595248||24@@PhonePe"	BSES Rajdhani~499~EXPENSE~UPI~2026-08-27~
+304	gpay	"40@@To SURESH TRADERS||100@@₹45||30@@Completed||24@@Jul 15, 2026||24@@UPI transaction ID||26@@251965242082"	Suresh Traders~45~EXPENSE~UPI~2026-07-15~
+305	phonepe	"30@@Payment Successful||90@@₹1,051||36@@Paid to Indian Oil||24@@Sep 6, 2026 02:25 pm||24@@Transaction ID T3824713727320524349||24@@PhonePe"	Indian Oil~1051~EXPENSE~UPI~2026-09-06~
+306	noise_symbol	"40@@To Reliance Retail||100@@€945||30@@Completed||24@@25 Oct 2026, 01:59 PM"	Reliance Retail~945~EXPENSE~~2026-10-25~
+307	gpay	"40@@To Indian Oil||100@@45,000||30@@Completed||24@@26 Jul 2026, 02:36 pm||24@@UPI transaction ID||26@@807302157368||24@@Paid via Google Pay"	Indian Oil~45000~EXPENSE~UPI~2026-07-26~
+308	paytm	"30@@Paytm||30@@Order Successful||90@@₹1,250||24@@Rupees One Thousand Two Hundred Fifty Only||30@@To: BSES Rajdhani||24@@14 Aug 2026, 04:11 AM||24@@UPI Ref No: 863718897356"	BSES Rajdhani~1250~EXPENSE~UPI~2026-08-14~Ref: 863718897356
+309	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹250||24@@Rupees Two Hundred Fifty Only||30@@To: MANPREET KAUR||24@@6 Aug 2026, 04:36 AM||24@@UPI Ref No: 494616467631"	Manpreet Kaur~250~EXPENSE~UPI~2026-08-06~Ref: 494616467631
+310	gpay	"40@@To Swiggy||100@@₹2,622||30@@Completed||24@@9 Oct 2026, 09:41 PM||24@@UPI transaction ID||26@@459371251679"	Swiggy~2622~EXPENSE~UPI~2026-10-09~
+311	sms	"26@@Rs 1,800.00 credited to A/c||26@@XX2144 on 30-08-26 from||26@@manpreet@ybl UPI Ref||26@@859328033848. Bal Rs 6290.48"	~1800~INCOME~UPI~2026-08-30~Ref: 859328033848
+312	sms	26@@Rs.99.00 debited from A/c XX2189 on 07-10-26 to VPA priya@oksbi (UPI Ref No 625421211238). Avl Bal Rs 49262.65	~99~EXPENSE~UPI~2026-10-07~Ref: 625421211238
+313	gpay	"40@@To Sharma General Store||100@@₹1,051||30@@Completed||24@@10/09/2026||24@@UPI transaction ID||26@@374766299447||24@@Paid via Google Pay"	Sharma General Store~1051~EXPENSE~UPI~2026-09-10~
+314	gpay	"40@@To Amit Kumar||100@@12,000||30@@Completed||24@@5 Sep 2026, 02:44 AM||24@@UPI transaction ID||26@@691933505646||24@@Paid via Google Pay"	Amit Kumar~12000~EXPENSE~UPI~2026-09-05~
+315	gpay	"40@@To PRIYA SINGH||100@@4,500||30@@Completed||24@@29 Aug 2026, 04:11 PM||24@@UPI transaction ID||26@@307600467400"	Priya Singh~4500~EXPENSE~UPI~2026-08-29~
+316	gpay	"40@@To Kuldip Kaur||100@@₹99||30@@Completed||24@@Aug 25, 2026||24@@UPI transaction ID||26@@367751808602"	Kuldip Kaur~99~EXPENSE~UPI~2026-08-25~
+317	sms	26@@Rs.45.00 debited from A/c XX1510 on 12-09-26 to VPA amit@okhdfcbank (UPI Ref No 105212247330). Avl Bal Rs 61042.42	~45~EXPENSE~UPI~2026-09-12~Ref: 105212247330
+318	gpay	"40@@To PRIYA SINGH||100@@₹1,051||30@@Completed||24@@19/09/2026||24@@UPI transaction ID||26@@475401880010"	Priya Singh~1051~EXPENSE~UPI~2026-09-19~
+319	noise_symbol	"40@@To Reliance Retail||100@@₹ 499||30@@Completed||24@@28 Sep 2026, 07:02 am"	Reliance Retail~499~EXPENSE~~2026-09-28~
+320	bill	44@@SUPER MART||24@@Bill No: 7324||24@@Date: 09/07/2026||24@@Dal  310.00||24@@Tea  40.00||24@@Sugar  89.00||24@@Soap  89.00||30@@Total 528.00||34@@Grand Total 528.00	~528~EXPENSE~~2026-07-09~
+321	sms	"26@@Rs 4,500.00 withdrawn from A/c XX6031 at ATM on 16/08/2026. Avl Bal Rs 23331.54"	~4500~EXPENSE~~2026-08-16~
+322	sms	"26@@Your a/c XXXX5461 is credited with Rs 15,000.00 on 04/10/2026 by NEFT from Dominos Pizza. Avl bal Rs 17801.94"	~15000~INCOME~BANK TRANSFER~2026-10-04~
+323	sms	26@@INR 45.00 spent on HDFC Bank Credit Card XX7676 at AMIT KUMAR on 13-Sep-26. Avl limit INR 54703.00	~45~EXPENSE~CARD~2026-09-13~
+324	paytm	"30@@Paytm||30@@Order Successful||90@@₹45,000||24@@Rupees Forty Five Thousand Only||30@@To: Dominos Pizza||24@@19 Oct 2026, 10:17 PM||24@@UPI Ref No: 548055523686"	Dominos Pizza~45000~EXPENSE~UPI~2026-10-19~Ref: 548055523686
+325	negative	40@@Notifications||24@@Scratch cards||24@@Invite friends and earn	
+326	gpay	"40@@From PRIYA SINGH||100@@₹1,051||30@@Completed||24@@27/08/2026||24@@UPI transaction ID||26@@401753562471||24@@Paid via Google Pay"	Priya Singh~1051~INCOME~UPI~2026-08-27~
+327	bill	44@@SUPER MART||24@@Bill No: 9242||24@@Date: 28/10/2026||24@@Biscuits  120.00||24@@Tea  89.00||24@@Atta  55.00||30@@Total 264.00||34@@Net Amount 264.00	~264~EXPENSE~~2026-10-28~
+328	phonepe	"30@@Payment Successful||90@@₹99||36@@Paid to PRIYA SINGH||24@@Sep 21, 2026 11:14 am||24@@Transaction ID T4984020327940655882||24@@PhonePe"	Priya Singh~99~EXPENSE~UPI~2026-09-21~
+329	bill	44@@BIG BAZAAR||24@@Bill No: 1616||24@@Date: 29/08/2026||24@@Rice 5kg  40.00||24@@Dal  310.00||30@@Total 350.00||34@@Grand Total 350.00	~350~EXPENSE~~2026-08-29~
+330	sms	"26@@A/c XX8298 debited Rs.45,000.00 on 20-10-2026 IMPS to Hostinger Pte Ltd. Ref 344365761999. Balance Rs 80093.13"	~45000~EXPENSE~BANK TRANSFER~2026-10-20~Ref: 344365761999
+331	paytm	"30@@Paytm||30@@Paid Successfully||90@@₹120||24@@Rupees One Hundred Twenty Only||30@@To: Sharma General Store||24@@28 Sep 2026, 02:39 PM||24@@UPI Ref No: 896837885320"	Sharma General Store~120~EXPENSE~UPI~2026-09-28~Ref: 896837885320
+332	gpay	"40@@To Apollo Pharmacy||100@@₹120||30@@Completed||24@@20 Oct 2026, 02:29 PM||24@@UPI transaction ID||26@@566114120186"	Apollo Pharmacy~120~EXPENSE~UPI~2026-10-20~
+333	phonepe	"30@@Payment Received||90@@₹2,622||36@@Received from BSES Rajdhani||24@@Aug 30, 2026 08:20 am||24@@Transaction ID T4371008261026836117||24@@PhonePe"	BSES Rajdhani~2622~INCOME~UPI~2026-08-30~
+334	gpay	"40@@To Vikram Singh Gill||100@@₹1,250||30@@Completed||24@@Sep 25, 2026||24@@UPI transaction ID||26@@111511492086"	Vikram Singh Gill~1250~EXPENSE~UPI~2026-09-25~
