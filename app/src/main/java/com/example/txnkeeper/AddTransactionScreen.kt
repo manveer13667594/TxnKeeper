@@ -54,6 +54,8 @@ import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuPickerField
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuDatePicker
+import com.manu.manudesignsystem.components.ManuTimePicker
+import java.util.Calendar
 
 /**
  * The values of the "Add transaction" form. They live outside the screen so the receipt scanner
@@ -150,6 +152,7 @@ fun AddTransactionScreen(
     var payMenuOpen by remember { mutableStateOf(false) }
     var accountMenuOpen by remember { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
+    var timePickerOpen by remember { mutableStateOf(false) }
     // The account that will be used: the chosen one, or the first if none is chosen (or it was deleted)
     val account = accounts.firstOrNull { it.id == form.accountId } ?: accounts.firstOrNull()
 
@@ -169,164 +172,175 @@ fun AddTransactionScreen(
             )
         }
     ) { _ ->
-      Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            form.notice?.let {
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                form.notice?.let {
+                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
 
-            ManuCard(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    ManuTextField(
-                        value = form.title,
-                        onValueChange = { form.title = it },
-                        placeholder = { Text("Transaction title") }
-                    )
+                ManuCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        ManuTextField(
+                            value = form.title,
+                            onValueChange = { form.title = it },
+                            placeholder = { Text("Transaction title") }
+                        )
 
-                    ManuTextField(
-                        value = form.amount,
-                        onValueChange = { form.amount = it },
-                        placeholder = { Text("Amount") },
-                        leadingContent = {
-                            Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                    )
+                        ManuTextField(
+                            value = form.amount,
+                            onValueChange = { form.amount = it },
+                            placeholder = { Text("Amount") },
+                            leadingContent = {
+                                Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        )
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                        ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
-                        ManuChip(label = "Income", selected = form.type == "INCOME", onClick = { form.type = "INCOME" })
-                    }
+                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                            ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
+                            ManuChip(label = "Income", selected = form.type == "INCOME", onClick = { form.type = "INCOME" })
+                        }
 
-                    // Account (only when there is a choice)
-                    if (accounts.size > 1) {
+                        // Account (only when there is a choice)
+                        if (accounts.size > 1) {
+                            Box {
+                                ManuPickerField(
+                                    value = account?.name ?: "",
+                                    leadingIcon = AppIcons.Wallet,
+                                    trailingIcon = Icons.Default.KeyboardArrowDown,
+                                    onClick = { accountMenuOpen = true }
+                                )
+                                ManuDropdownMenu(
+                                    expanded = accountMenuOpen,
+                                    onDismissRequest = { accountMenuOpen = false },
+                                    items = accounts.map { a ->
+                                        ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
+                                    }
+                                )
+                            }
+                        }
+
+                        // Payment method
                         Box {
                             ManuPickerField(
-                                value = account?.name ?: "",
+                                value = form.payment,
                                 leadingIcon = AppIcons.Wallet,
                                 trailingIcon = Icons.Default.KeyboardArrowDown,
-                                onClick = { accountMenuOpen = true }
+                                onClick = { payMenuOpen = true }
                             )
                             ManuDropdownMenu(
-                                expanded = accountMenuOpen,
-                                onDismissRequest = { accountMenuOpen = false },
-                                items = accounts.map { a ->
-                                    ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
+                                expanded = payMenuOpen,
+                                onDismissRequest = { payMenuOpen = false },
+                                items = PAYMENT_METHODS.map { method ->
+                                    ManuMenuItem(label = method, onClick = { form.payment = method })
                                 }
                             )
                         }
-                    }
 
-                    // Payment method
-                    Box {
+                        // Date
                         ManuPickerField(
-                            value = form.payment,
-                            leadingIcon = AppIcons.Wallet,
+                            value = formatDateLong(form.dateTime),
+                            leadingIcon = Icons.Default.DateRange,
                             trailingIcon = Icons.Default.KeyboardArrowDown,
-                            onClick = { payMenuOpen = true }
-                        )
-                        ManuDropdownMenu(
-                            expanded = payMenuOpen,
-                            onDismissRequest = { payMenuOpen = false },
-                            items = PAYMENT_METHODS.map { method ->
-                                ManuMenuItem(label = method, onClick = { form.payment = method })
+                            onClick = {
+                                focusManager.clearFocus()
+                                datePickerOpen = true
                             }
                         )
-                    }
 
-                    // Date
-                    ManuPickerField(
-                        value = formatDateLong(form.dateTime),
-                        leadingIcon = Icons.Default.DateRange,
-                        trailingIcon = Icons.Default.KeyboardArrowDown,
-                        onClick = {
-                            focusManager.clearFocus()
-                            datePickerOpen = true
-                        }
-                    )
+                        // Time
+                        ManuPickerField(
+                            value = formatTime(form.dateTime),
+                            leadingIcon = AppIcons.Schedule,
+                            trailingIcon = Icons.Default.KeyboardArrowDown,
+                            onClick = {
+                                focusManager.clearFocus()
+                                timePickerOpen = true
+                            }
+                        )
 
-                    ManuTextField(
-                        value = form.description,
-                        onValueChange = { form.description = it },
-                        placeholder = { Text("Description (optional)") },
-                        singleLine = false
-                    )
+                        ManuTextField(
+                            value = form.description,
+                            onValueChange = { form.description = it },
+                            placeholder = { Text("Description (optional)") },
+                            singleLine = false
+                        )
 
-                    // Both buttons save; "Save & next" stays here for another entry
-                    fun submit(stay: Boolean) {
-                        val value = form.amount.replace(",", "").trim().toDoubleOrNull()
-                        if (form.title.isBlank() || value == null || value <= 0) {
-                            error = "Enter a valid title and amount."
-                        } else {
-                            error = null
-                            focusManager.clearFocus()
-                            onSubmit(
-                                TransactionEntity(
-                                    title = form.title.trim(),
-                                    amount = value,
-                                    type = form.type,
-                                    paymentMethod = form.payment,
-                                    dateTime = form.dateTime,
-                                    description = form.description.trim(),
-                                    accountId = account?.id ?: 1L
-                                ),
-                                stay
-                            )
+                        // Both buttons save; "Save & next" stays here for another entry
+                        fun submit(stay: Boolean) {
+                            val value = form.amount.replace(",", "").trim().toDoubleOrNull()
+                            if (form.title.isBlank() || value == null || value <= 0) {
+                                error = "Enter a valid title and amount."
+                            } else {
+                                error = null
+                                focusManager.clearFocus()
+                                onSubmit(
+                                    TransactionEntity(
+                                        title = form.title.trim(),
+                                        amount = value,
+                                        type = form.type,
+                                        paymentMethod = form.payment,
+                                        dateTime = form.dateTime,
+                                        description = form.description.trim(),
+                                        accountId = account?.id ?: 1L
+                                    ),
+                                    stay
+                                )
+                            }
                         }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                        ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
-                            Text("Save & exit", maxLines = 1)
+                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                            ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
+                                Text("Save & exit", maxLines = 1)
+                            }
+                            ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
+                                Text("Save & next", maxLines = 1)
+                            }
                         }
-                        ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
-                            Text("Save & next", maxLines = 1)
-                        }
-                    }
 
-                    error?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                        error?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                        }
                     }
                 }
+
+                // Room at the bottom so the floating buttons never cover the Save button
+                Spacer(Modifier.height(150.dp))
             }
 
-            // Room at the bottom so the floating buttons never cover the Save button
-            Spacer(Modifier.height(150.dp))
-        }
-
-        // Floating buttons: mic (speak a transaction) and camera (scan a receipt).
-        // Hidden while the keyboard is open so they don't cover what you are typing.
-        val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-        // ...and while scrolling down, so they never sit on top of fields or buttons
-        var fabsVisible by remember { mutableStateOf(true) }
-        FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
-        AnimatedVisibility(
-            visible = !keyboardOpen && fabsVisible,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier.align(Alignment.BottomEnd)
-        ) {
-            Column(
-                modifier = Modifier.padding(end = 20.dp, bottom = 16.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Floating buttons: mic (speak a transaction) and camera (scan a receipt).
+            // Hidden while the keyboard is open so they don't cover what you are typing.
+            val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+            // ...and while scrolling down, so they never sit on top of fields or buttons
+            var fabsVisible by remember { mutableStateOf(true) }
+            FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
+            AnimatedVisibility(
+                visible = !keyboardOpen && fabsVisible,
+                enter = fadeIn() + scaleIn(),
+                exit = fadeOut() + scaleOut(),
+                modifier = Modifier.align(Alignment.BottomEnd)
             ) {
-                VoiceFab(form)
-                ManuFab(onClick = {
-                    focusManager.clearFocus()
-                    onScan()
-                }) { Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt") }
+                Column(
+                    modifier = Modifier.padding(end = 20.dp, bottom = 16.dp),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    VoiceFab(form)
+                    ManuFab(onClick = {
+                        focusManager.clearFocus()
+                        onScan()
+                    }) { Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt") }
+                }
             }
         }
-      }
     }
 
     ManuDatePicker(
@@ -337,5 +351,13 @@ fun AddTransactionScreen(
             // Chosen day, keeping the current time of day
             form.dateTime = onDayAtTimeOf(pickerToLocalDay(it), form.dateTime)
         }
+    )
+
+    ManuTimePicker(
+        expanded = timePickerOpen,
+        onDismissRequest = { timePickerOpen = false },
+        initialHour = Calendar.getInstance().apply { timeInMillis = form.dateTime }.get(Calendar.HOUR_OF_DAY),
+        initialMinute = Calendar.getInstance().apply { timeInMillis = form.dateTime }.get(Calendar.MINUTE),
+        onTimeSelected = { hour, minute -> form.dateTime = withClockTime(form.dateTime, hour, minute) }
     )
 }

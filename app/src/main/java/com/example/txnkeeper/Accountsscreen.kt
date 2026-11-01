@@ -53,8 +53,8 @@ private const val MAX_ACCOUNT_NAME = 30
 /**
  * Full-screen page that lists the accounts with their balances, and lets you add, edit and delete them.
  *
- * Deleting an account that has transactions asks where to move them first, so no transaction is
- * ever lost or left without an account. The last account can't be deleted.
+ * Deleting an account also deletes all of its transactions (after a clear confirmation that says
+ * how many). The last account can't be deleted.
  */
 @Composable
 fun AccountsScreen(
@@ -62,8 +62,8 @@ fun AccountsScreen(
     onClose: () -> Unit,
     onAdd: (AccountEntity) -> Unit,
     onUpdate: (AccountEntity) -> Unit,
-    /** [moveToId] is the account that receives the transactions, or null when there are none to move. */
-    onDelete: (accountId: Long, moveToId: Long?) -> Unit,
+    /** Deletes the account together with all of its transactions. */
+    onDelete: (accountId: Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var editing by remember { mutableStateOf<AccountSummary?>(null) }
@@ -157,9 +157,8 @@ fun AccountsScreen(
     deleting?.let { account ->
         DeleteAccountDialog(
             account = account,
-            others = accounts.filter { it.id != account.id },
-            onConfirm = { moveToId ->
-                onDelete(account.id, moveToId)
+            onConfirm = {
+                onDelete(account.id)
                 deleting = null
             },
             onDismiss = { deleting = null }
@@ -275,47 +274,29 @@ private fun AccountDialog(
     }
 }
 
-/** Asks before deleting; if the account has transactions, also where to move them. */
+/** Asks before deleting. The account's transactions are deleted with it, so the count is shown. */
 @Composable
 private fun DeleteAccountDialog(
     account: AccountSummary,
-    others: List<AccountSummary>,
-    onConfirm: (moveToId: Long?) -> Unit,
+    onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val hasTransactions = account.txnCount > 0
-    var target by remember { mutableStateOf(others.firstOrNull()) }
-    var menuOpen by remember { mutableStateOf(false) }
 
     ManuDialog(
         visible = true,
         title = "Delete \"${account.name}\"?",
-        confirmText = if (hasTransactions) "Move and delete" else "Delete",
-        onConfirm = { onConfirm(if (hasTransactions) target?.id else null) },
+        confirmText = if (hasTransactions) "Delete all" else "Delete",
+        onConfirm = onConfirm,
         onDismiss = onDismiss,
         destructive = true
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (hasTransactions) {
                 Text(
-                    "This account has ${account.txnCount} " +
-                            (if (account.txnCount == 1) "transaction" else "transactions") +
-                            ". They will not be deleted. Move them to:"
+                    "This will also permanently delete its ${account.txnCount} " +
+                            (if (account.txnCount == 1) "transaction" else "transactions") + "."
                 )
-                Box {
-                    ManuPickerField(
-                        value = target?.name ?: "",
-                        trailingIcon = Icons.Default.KeyboardArrowDown,
-                        onClick = { menuOpen = true }
-                    )
-                    ManuDropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                        items = others.map { other ->
-                            ManuMenuItem(label = other.name, onClick = { target = other })
-                        }
-                    )
-                }
             } else {
                 Text("This account has no transactions.")
             }

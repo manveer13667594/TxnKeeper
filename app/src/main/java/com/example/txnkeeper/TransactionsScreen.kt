@@ -112,6 +112,7 @@ fun TransactionsScreen(
     accountId: Long?,                       // null = all accounts
     onAccountChange: (Long?) -> Unit,
     onManageAccounts: () -> Unit,
+    onOpenSettings: () -> Unit,
     onScan: () -> Unit,
     /** true = the floating + button should show, false = hide it (scrolling down the list). */
     onScrollDirection: (Boolean) -> Unit = {},
@@ -206,7 +207,7 @@ fun TransactionsScreen(
                 IconButton(onClick = {
                     focusManager.clearFocus()
                     onScan() }
-                    )
+                )
                 {
                     Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
                 }
@@ -223,7 +224,7 @@ fun TransactionsScreen(
                     )
                 }
                 // Three-dot menu (the actions are added later)
-               Box {
+                Box {
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
                     }
@@ -231,10 +232,16 @@ fun TransactionsScreen(
                         expanded = menuOpen,
                         onDismissRequest = { menuOpen = false },
                         items = listOf(
-                            ManuMenuItem(label = "Accounts", onClick = { comingSoon(context, "Accounts") }),
-                            ManuMenuItem(label = "Filters", onClick = { comingSoon(context, "Filters") }),
+                            ManuMenuItem(label = "Accounts", onClick = onManageAccounts),
+                            ManuMenuItem(
+                                label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    filterSheetOpen = true
+                                }
+                            ),
                             ManuMenuItem(label = "Import / Export data", onClick = { comingSoon(context, "Import / Export") }),
-                            ManuMenuItem(label = "Settings", onClick = { comingSoon(context, "Settings") }),
+                            ManuMenuItem(label = "Settings", onClick = onOpenSettings),
                             ManuMenuItem(label = "Help", onClick = { comingSoon(context, "Help") }),
                             ManuMenuItem(label = "About", onClick = { comingSoon(context, "About") }),
                             ManuMenuItem(label = "Remove ads", onClick = { comingSoon(context, "Remove ads") }),

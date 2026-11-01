@@ -79,6 +79,10 @@ interface TransactionDao {
     @Query("UPDATE transactions SET accountId = :toId WHERE accountId = :fromId")
     suspend fun moveTransactions(fromId: Long, toId: Long)
 
+    /** Deletes every transaction of one account (used when the account itself is deleted). */
+    @Query("DELETE FROM transactions WHERE accountId = :accountId")
+    suspend fun deleteTransactionsOfAccount(accountId: Long)
+
     /** Every account with balance = opening balance + income - expense. */
     @Query(
         """

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,12 +18,14 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,6 +59,10 @@ import androidx.compose.ui.unit.dp
 import com.manu.manudesignsystem.components.ManuSnackbar
 import com.manu.manudesignsystem.components.ManuSnackbarType
 
+// Scrims behind the navigation bar (same values the Android templates use)
+private val LightScrim = android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
+private val DarkScrim = android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b)
+
 class MainActivity : ComponentActivity() {
     // Image shared into the app from the gallery / a payment app
     private var sharedUri by mutableStateOf<Uri?>(null)
@@ -64,9 +71,30 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleShareIntent(intent)
+        val settings = AppSettings(this)
         setContent {
-            ManuDesignSystemTheme {
+            // Light / dark comes from Settings; "System default" follows the phone
+            val darkTheme = when (settings.themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            // Keep the status bar and navigation bar icons readable in the chosen theme
+            DisposableEffect(darkTheme) {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(
+                        android.graphics.Color.TRANSPARENT,
+                        android.graphics.Color.TRANSPARENT
+                    ) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(LightScrim, DarkScrim) { darkTheme }
+                )
+                onDispose {}
+            }
+
+            ManuDesignSystemTheme(darkTheme = darkTheme) {
                 TxnkeeperApp(
+                    settings = settings,
                     sharedImageUri = sharedUri,
                     onSharedImageHandled = { sharedUri = null }
                 )
@@ -97,10 +125,12 @@ class MainActivity : ComponentActivity() {
  * The app has one home screen (the transactions list). On top of it, when needed:
  *   - the "Add transaction" page (the + button, or after scanning a receipt)
  *   - the camera (the camera icon, or swipe from left to right)
+ *   - the Accounts and Settings pages (from the three-dot menu)
  */
 @PreviewScreenSizes
 @Composable
 fun TxnkeeperApp(
+    settings: AppSettings = rememberAppSettings(),
     sharedImageUri: Uri? = null,
     onSharedImageHandled: () -> Unit = {}
 ) {
@@ -114,6 +144,7 @@ fun TxnkeeperApp(
     // Which account the list shows: null = all accounts
     var accountFilter by rememberSaveable { mutableStateOf<Long?>(null) }
     var showAccounts by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
 
     // Safety net: there is always at least one account (the database adds it, this covers odd cases)
     LaunchedEffect(Unit) {
@@ -159,6 +190,7 @@ fun TxnkeeperApp(
         showAdd = false
     }
     BackHandler(enabled = showAccounts) { showAccounts = false }
+    BackHandler(enabled = showSettings) { showSettings = false }
 
     AppBackground {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -187,6 +219,7 @@ fun TxnkeeperApp(
                         accountId = accountFilter,
                         onAccountChange = { accountFilter = it },
                         onManageAccounts = { showAccounts = true },
+                        onOpenSettings = { showSettings = true },
                         onScan = { openCamera() },
                         onScrollDirection = { fabVisible = it }
                     )
@@ -254,15 +287,27 @@ fun TxnkeeperApp(
                     onClose = { showAccounts = false },
                     onAdd = { scope.launch { dao.insertAccount(it) } },
                     onUpdate = { scope.launch { dao.updateAccount(it) } },
-                    onDelete = { id, moveToId ->
+                    onDelete = { id ->
                         scope.launch {
-                            // Move first, then delete, as one step: either both happen or neither
+                            // Delete the transactions, then the account, as one step: either both happen or neither
                             database.withTransaction {
-                                if (moveToId != null) dao.moveTransactions(id, moveToId)
+                                dao.deleteTransactionsOfAccount(id)
                                 dao.deleteAccount(id)
                             }
                         }
                     }
+                )
+            }
+
+            // ---------------- Settings page slides in from the right over the list
+            AnimatedVisibility(
+                visible = showSettings,
+                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+            ) {
+                SettingsScreen(
+                    settings = settings,
+                    onClose = { showSettings = false }
                 )
             }
 
