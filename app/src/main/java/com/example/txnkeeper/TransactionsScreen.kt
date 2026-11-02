@@ -111,7 +111,6 @@ fun TransactionsScreen(
     accounts: List<AccountSummary>,
     accountId: Long?,                       // null = all accounts
     onAccountChange: (Long?) -> Unit,
-    onManageAccounts: () -> Unit,
     onOpenSettings: () -> Unit,
     onScan: () -> Unit,
     /** true = the floating + button should show, false = hide it (scrolling down the list). */
@@ -232,7 +231,6 @@ fun TransactionsScreen(
                         expanded = menuOpen,
                         onDismissRequest = { menuOpen = false },
                         items = listOf(
-                            ManuMenuItem(label = "Accounts", onClick = onManageAccounts),
                             ManuMenuItem(
                                 label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
                                 onClick = {
@@ -240,7 +238,6 @@ fun TransactionsScreen(
                                     filterSheetOpen = true
                                 }
                             ),
-                            ManuMenuItem(label = "Import / Export data", onClick = { comingSoon(context, "Import / Export") }),
                             ManuMenuItem(label = "Settings", onClick = onOpenSettings),
                             ManuMenuItem(label = "Help", onClick = { comingSoon(context, "Help") }),
                             ManuMenuItem(label = "About", onClick = { comingSoon(context, "About") }),
@@ -264,17 +261,11 @@ fun TransactionsScreen(
             )
         }
 
-        // ---- Accounts: All | Main account | PNB ... | Manage
+        // ---- Accounts: All | Main account | PNB ...  (only when there is more than one account)
         AccountChips(
             accounts = accounts,
             selectedId = accountId,
-            onSelect = onAccountChange,
-            onManage = onManageAccounts,
-            filterCount = filters.activeCount,
-            onFilters = {
-                focusManager.clearFocus()
-                filterSheetOpen = true
-            }
+            onSelect = onAccountChange
         )
 
         // ---- Period stepper: ‹ October 2026 › (only when a period filter is on)
@@ -431,16 +422,18 @@ private fun TotalsCard(totals: TransactionTotals, balance: Double, balanceLabel:
     }
 }
 
-/** Row of chips under the title: All, one per account, and "Accounts" to open the manage screen. */
+/**
+ * Row of chips under the title: All, then one per account. With a single account there is
+ * nothing to switch between, so nothing is shown. Filters and account management live in the
+ * three-dot menu and in Settings.
+ */
 @Composable
 private fun AccountChips(
     accounts: List<AccountSummary>,
     selectedId: Long?,
-    onSelect: (Long?) -> Unit,
-    onManage: () -> Unit,
-    filterCount: Int,
-    onFilters: () -> Unit
+    onSelect: (Long?) -> Unit
 ) {
+    if (accounts.size <= 1) return
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -448,23 +441,14 @@ private fun AccountChips(
             .padding(bottom = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
     ) {
-        // With a single account there is nothing to switch between
-        if (accounts.size > 1) {
-            ManuChip(label = "All", selected = selectedId == null, onClick = { onSelect(null) })
-            accounts.forEach { account ->
-                ManuChip(
-                    label = account.name,
-                    selected = selectedId == account.id,
-                    onClick = { onSelect(account.id) }
-                )
-            }
+        ManuChip(label = "All", selected = selectedId == null, onClick = { onSelect(null) })
+        accounts.forEach { account ->
+            ManuChip(
+                label = account.name,
+                selected = selectedId == account.id,
+                onClick = { onSelect(account.id) }
+            )
         }
-        ManuChip(
-            label = if (filterCount > 0) "Filters · $filterCount" else "Filters",
-            selected = filterCount > 0,
-            onClick = onFilters
-        )
-        ManuChip(label = "Accounts", onClick = onManage)
     }
 }
 

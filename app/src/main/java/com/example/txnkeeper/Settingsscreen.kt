@@ -18,20 +18,24 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.txnkeeper.data.local.AppDatabase
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
+import com.manu.manudesignsystem.components.ManuOutlineButton
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 
 /**
  * Full-screen Settings page (opened from the three-dot menu on the home screen).
- * Each group of settings is a [SettingsSection]; add new sections below "Appearance".
+ * Each group of settings is a [SettingsSection]; add new sections below "Data".
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
+    database: AppDatabase,
+    onManageAccounts: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -57,6 +61,12 @@ fun SettingsScreen(
             SettingsSection(title = "Appearance") {
                 Text("Theme", style = MaterialTheme.typography.titleMedium)
 
+                Text(
+                    text = "System default follows your phone's light / dark setting.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
                     verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
@@ -69,15 +79,25 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
 
+            SettingsSection(title = "Accounts") {
                 Text(
-                    text = "System default follows your phone's light / dark setting.",
+                    text = "Add, edit or delete accounts. The account chips on the home screen show up once you have more than one.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                ManuOutlineButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onManageAccounts
+                ) { Text("Manage accounts") }
             }
 
-            // More sections (notifications, data, ...) go here later.
+            SettingsSection(title = "Data") {
+                DataTransferControls(database = database)
+            }
+
+            // More sections (notifications, ...) go here later.
         }
     }
 }

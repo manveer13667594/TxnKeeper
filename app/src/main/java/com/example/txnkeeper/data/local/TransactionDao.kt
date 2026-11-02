@@ -32,6 +32,26 @@ interface TransactionDao {
     @Insert
     suspend fun insert(transaction: TransactionEntity)
 
+    /** Adds many transactions in one go (used by CSV import, inside a database transaction). */
+    @Insert
+    suspend fun insertAll(transactions: List<TransactionEntity>)
+
+    /** Every transaction once (not observed), newest first. Used by CSV / PDF export and import. */
+    @Query("SELECT * FROM transactions ORDER BY dateTime DESC, id DESC")
+    suspend fun getAllOnce(): List<TransactionEntity>
+
+    /** Transactions between two moments (both included), newest first. Used by "export a date range". */
+    @Query("SELECT * FROM transactions WHERE dateTime BETWEEN :from AND :to ORDER BY dateTime DESC, id DESC")
+    suspend fun getBetweenOnce(from: Long, to: Long): List<TransactionEntity>
+
+    /** The newest [count] transactions. Used by "export the latest N". */
+    @Query("SELECT * FROM transactions ORDER BY dateTime DESC, id DESC LIMIT :count")
+    suspend fun getLatestOnce(count: Int): List<TransactionEntity>
+
+    /** Every account once (not observed). Used by export (names) and import (matching names). */
+    @Query("SELECT * FROM accounts ORDER BY id")
+    suspend fun getAccountsOnce(): List<AccountEntity>
+
     @Update
     suspend fun update(transaction: TransactionEntity)
 

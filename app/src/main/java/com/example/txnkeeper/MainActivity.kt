@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
  * The app has one home screen (the transactions list). On top of it, when needed:
  *   - the "Add transaction" page (the + button, or after scanning a receipt)
  *   - the camera (the camera icon, or swipe from left to right)
- *   - the Accounts and Settings pages (from the three-dot menu)
+ *   - the Settings page (from the three-dot menu), and the Accounts page (from Settings)
  */
 @PreviewScreenSizes
 @Composable
@@ -189,8 +189,9 @@ fun TxnkeeperApp(
         focusManager.clearFocus()
         showAdd = false
     }
-    BackHandler(enabled = showAccounts) { showAccounts = false }
     BackHandler(enabled = showSettings) { showSettings = false }
+    // Declared after Settings, so Back closes Accounts first when it was opened from Settings
+    BackHandler(enabled = showAccounts) { showAccounts = false }
 
     AppBackground {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -218,7 +219,6 @@ fun TxnkeeperApp(
                         accounts = accounts,
                         accountId = accountFilter,
                         onAccountChange = { accountFilter = it },
-                        onManageAccounts = { showAccounts = true },
                         onOpenSettings = { showSettings = true },
                         onScan = { openCamera() },
                         onScrollDirection = { fabVisible = it }
@@ -276,7 +276,21 @@ fun TxnkeeperApp(
                 )
             }
 
-            // ---------------- Accounts page slides in from the right over the list
+            // ---------------- Settings page slides in from the right over the list
+            AnimatedVisibility(
+                visible = showSettings,
+                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+            ) {
+                SettingsScreen(
+                    settings = settings,
+                    database = database,
+                    onManageAccounts = { showAccounts = true },
+                    onClose = { showSettings = false }
+                )
+            }
+
+            // ---------------- Accounts page slides in from the right (over Settings, which opens it)
             AnimatedVisibility(
                 visible = showAccounts,
                 enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
@@ -296,18 +310,6 @@ fun TxnkeeperApp(
                             }
                         }
                     }
-                )
-            }
-
-            // ---------------- Settings page slides in from the right over the list
-            AnimatedVisibility(
-                visible = showSettings,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
-                SettingsScreen(
-                    settings = settings,
-                    onClose = { showSettings = false }
                 )
             }
 
