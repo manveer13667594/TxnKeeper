@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.txnkeeper"
+    namespace = "com.manu.txnkeeper"
     compileSdk {
         version = release(37) {
             minorApiLevel = 1
@@ -13,7 +13,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.txnkeeper"
+        applicationId = "com.manu.txnkeeper"
         minSdk = 29
         targetSdk = 36
         versionCode = 1
@@ -25,7 +25,7 @@ android {
     buildTypes {
         release {
             optimization {
-                enable = false
+                enable = true
             }
         }
     }
