@@ -1,16 +1,11 @@
 package com.manu.txnkeeper
 
 import android.Manifest
-import android.content.ContentUris
 import android.content.ContentValues
-import android.content.Context
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
-import android.util.Size
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,7 +17,6 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -40,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -54,23 +49,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Locale
 import com.manu.manudesignsystem.components.ManuButton
 
 /**
- * Full-screen camera: preview, shutter (bottom-center), latest gallery photo (bottom-right),
- * lens flip (bottom-left). Photos are saved to Pictures/TxnKeeper and reported via onPhotoSaved.
+ * Full-screen camera: preview, shutter (bottom-center), "Gallery" button (bottom-right, opens the
+ * system photo picker, no storage permission needed), lens flip (bottom-left).
+ * Photos are saved to Pictures/TxnKeeper and reported via onPhotoSaved.
  * Swipe right-to-left, the back arrow or the system back closes it.
  */
 @Composable
@@ -86,44 +79,23 @@ fun CameraScreen(
 
     BackHandler(onBack = onClose)
 
-    val galleryPermission =
-        if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES
-        else Manifest.permission.READ_EXTERNAL_STORAGE
-
     fun isGranted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) ==
                 PackageManager.PERMISSION_GRANTED
 
     var hasCamera by remember { mutableStateOf(isGranted(Manifest.permission.CAMERA)) }
-    var hasGallery by remember { mutableStateOf(isGranted(galleryPermission)) }
-    var photoCounter by remember { mutableStateOf(0) }
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         hasCamera = result[Manifest.permission.CAMERA] ?: hasCamera
-        hasGallery = result[galleryPermission] ?: hasGallery
     }
 
-    // Ask once when the camera opens
+    // Ask once when the camera opens (the camera is the only permission the app needs here;
+    // picking from the gallery uses the system photo picker, which needs none)
     LaunchedEffect(Unit) {
-        val needed = buildList {
-            if (!hasCamera) add(Manifest.permission.CAMERA)
-            if (!hasGallery) add(galleryPermission)
-        }
-        if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
-    }
-
-    // Latest photo from the gallery (refreshes after each capture)
-    var latestUri by remember { mutableStateOf<Uri?>(null) }
-    var thumbnail by remember { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(hasGallery, photoCounter) {
-        if (hasGallery) {
-            val latest = withContext(Dispatchers.IO) { loadLatestImage(context) }
-            latestUri = latest?.first
-            thumbnail = latest?.second
-        }
+        if (!hasCamera) permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
     }
 
     // CameraX
@@ -191,7 +163,6 @@ fun CameraScreen(
                         onPhotoSaved(it)
                         onImageReady(it)
                     }
-                    photoCounter++
                 }
 
                 override fun onError(exception: ImageCaptureException) {
@@ -249,7 +220,7 @@ fun CameraScreen(
             )
         }
 
-        // Bottom controls: flip | shutter | latest photo
+        // Bottom controls: flip | shutter | gallery
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -288,63 +259,41 @@ fun CameraScreen(
                 )
             }
 
+            // Gallery: opens the system photo picker so the user can choose a receipt / screenshot
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Box(
+                Column(
                     modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .border(2.dp, Color.White, RoundedCornerShape(10.dp))
-                        .background(Color.White.copy(alpha = 0.15f))
+                        .clip(RoundedCornerShape(12.dp))
                         .clickable {
                             pickerLauncher.launch(
                                 PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                             )
                         }
+                        .padding(8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    thumbnail?.let { bmp ->
-                        Image(
-                            bitmap = bmp.asImageBitmap(),
-                            contentDescription = "Latest photo",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(2.dp, Color.White, RoundedCornerShape(10.dp))
+                            .background(Color.White.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = null, // the "Gallery" label below describes it
+                            tint = Color.White
                         )
                     }
+                    Text(
+                        "Gallery",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
         }
-    }
-}
-
-/** Newest image in the device gallery, with a small thumbnail. Call off the main thread. */
-private fun loadLatestImage(context: Context): Pair<Uri, Bitmap>? {
-    return try {
-        val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        context.contentResolver.query(
-            collection,
-            arrayOf(MediaStore.Images.Media._ID),
-            null,
-            null,
-            "${MediaStore.Images.Media.DATE_ADDED} DESC"
-        )?.use { cursor ->
-            if (!cursor.moveToFirst()) {
-                null
-            } else {
-                val uri = ContentUris.withAppendedId(collection, cursor.getLong(0))
-                val bitmap = if (Build.VERSION.SDK_INT >= 29) {
-                    context.contentResolver.loadThumbnail(uri, Size(256, 256), null)
-                } else {
-                    context.contentResolver.openInputStream(uri)?.use {
-                        BitmapFactory.decodeStream(
-                            it,
-                            null,
-                            BitmapFactory.Options().apply { inSampleSize = 8 }
-                        )
-                    }
-                }
-                bitmap?.let { uri to it }
-            }
-        }
-    } catch (e: Exception) {
-        null
     }
 }
