@@ -358,7 +358,7 @@ fun TransactionsScreen(
             original = txn,
             accounts = accounts,
             onSave = { updated ->
-                scope.launch { dao.update(updated) }
+                scope.launch { safeWrite(context, "save the changes") { dao.update(updated) } }
                 editing = null
             },
             onDismiss = { editing = null }
@@ -376,7 +376,7 @@ fun TransactionsScreen(
             confirmText = "Delete",
             dismissText = "Cancel",
             onConfirm = {
-                scope.launch { dao.delete(txn) }
+                scope.launch { safeWrite(context, "delete the transaction") { dao.delete(txn) } }
                 deleting = null
             },
             onDismiss = { deleting = null }

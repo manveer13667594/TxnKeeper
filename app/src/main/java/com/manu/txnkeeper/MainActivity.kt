@@ -22,7 +22,6 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -36,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import androidx.room.withTransaction
 import com.manu.txnkeeper.data.local.AccountEntity
@@ -144,7 +142,9 @@ fun TxnkeeperApp(
 
     // Safety net: there is always at least one account (the database adds it, this covers odd cases)
     LaunchedEffect(Unit) {
-        if (dao.accountCount() == 0) dao.insertAccount(AccountEntity(name = DEFAULT_ACCOUNT_NAME))
+        safeWrite(context, null) {
+            if (dao.accountCount() == 0) dao.insertAccount(AccountEntity(name = DEFAULT_ACCOUNT_NAME))
+        }
     }
     // The chosen account was deleted: go back to "all accounts"
     LaunchedEffect(accounts) {
@@ -254,7 +254,8 @@ fun TxnkeeperApp(
                     onScan = { openCamera() },
                     onSubmit = { entity, stay ->
                         scope.launch {
-                            dao.insert(entity)
+                            // If saving fails the form stays open with everything the user typed
+                            if (!safeWrite(context, "save the transaction") { dao.insert(entity) }) return@launch
                             if (stay) {
                                 // Save & next: the next spoken entry, or an empty form
                                 if (!form.nextFromBatch()) {
@@ -295,14 +296,16 @@ fun TxnkeeperApp(
                 AccountsScreen(
                     accounts = accounts,
                     onClose = { showAccounts = false },
-                    onAdd = { scope.launch { dao.insertAccount(it) } },
-                    onUpdate = { scope.launch { dao.updateAccount(it) } },
+                    onAdd = { scope.launch { safeWrite(context, "add the account") { dao.insertAccount(it) } } },
+                    onUpdate = { scope.launch { safeWrite(context, "save the account") { dao.updateAccount(it) } } },
                     onDelete = { id ->
                         scope.launch {
                             // Delete the transactions, then the account, as one step: either both happen or neither
-                            database.withTransaction {
-                                dao.deleteTransactionsOfAccount(id)
-                                dao.deleteAccount(id)
+                            safeWrite(context, "delete the account") {
+                                database.withTransaction {
+                                    dao.deleteTransactionsOfAccount(id)
+                                    dao.deleteAccount(id)
+                                }
                             }
                         }
                     }
@@ -336,30 +339,4 @@ fun TxnkeeperApp(
             showAdd = true
         }
     )
-}
-
-// Template leftovers kept as they were
-enum class AppDestinations(
-    val label: String,
-    val icon: Int,
-) {
-    HOME("Home", R.drawable.ic_home),
-    FAVORITES("Favorites", R.drawable.ic_favorite),
-    PROFILE("Profile", R.drawable.ic_account_box),
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    ManuDesignSystemTheme {
-        Greeting("Android")
-    }
 }

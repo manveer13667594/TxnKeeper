@@ -1,0 +1,5 @@
+# Rules every app that uses this library gets automatically.
+# The C++ code (whisperkit_jni.cpp) finds these classes and methods by their exact names, so R8
+# must not rename or remove them. Without these lines, voice works in debug but crashes in release.
+-keep class io.whisperkit.internal.NativeWhisper { *; }
+-keep interface io.whisperkit.internal.NativeCallback { *; }

@@ -16,16 +16,16 @@ class TxnCsvTest {
 
     private fun row(
         title: String = "Chai",
-        amount: Double = 20.0,
+        amountPaise: Long = 2000L,
         type: String = "EXPENSE",
         description: String = "",
         account: String = "Main account"
-    ) = TxnRow(millis("2026-11-02 12:15:00"), title, amount, type, "UPI", account, description)
+    ) = TxnRow(millis("2026-11-02 12:15:00"), title, amountPaise, type, "UPI", account, description)
 
     @Test fun roundTrip_keepsEveryField_includingCommasQuotesAndNewlines() {
         val rows = listOf(
             row(),
-            row(title = "Dal, rice \"thali\"", amount = 1250.5, type = "INCOME", description = "line one\nline two, with comma"),
+            row(title = "Dal, rice \"thali\"", amountPaise = 125050L, type = "INCOME", description = "line one\nline two, with comma"),
             row(title = "₹ symbol ok", account = "HDFC; savings")
         )
         val back = TxnCsv.read(TxnCsv.write(rows))
@@ -45,7 +45,7 @@ class TxnCsvTest {
     @Test fun read_acceptsIndianDates_semicolons_andReorderedColumns() {
         val csv = "Amount;Type;Title;Date\n1,25,000;credit;Salary;02/11/2026 09:30\n"
         val r = TxnCsv.read(csv).rows.single()
-        assertEquals(125000.0, r.amount, 0.0)
+        assertEquals(12_500_000L, r.amountPaise)
         assertEquals("INCOME", r.type)
         assertEquals(millis("2026-11-02 09:30:00"), r.dateTime)
         assertEquals("CASH", r.paymentMethod)   // column missing -> CASH
@@ -75,11 +75,11 @@ class TxnCsvTest {
     }
 
     @Test fun amount_decimalCommaIsNotMistakenForThousands() {
-        assertEquals(12.5, TxnCsv.parseAmount("12,50")!!, 0.0)
-        assertEquals(1250.0, TxnCsv.parseAmount("1,250")!!, 0.0)
-        assertEquals(1250.5, TxnCsv.parseAmount("₹1,250.50")!!, 0.0)
-        assertNull(TxnCsv.parseAmount("1.250,50"))   // ambiguous: rejected instead of guessed
-        assertNull(TxnCsv.parseAmount("NaN"))
+        assertEquals(1250L, TxnCsv.parseAmountPaise("12,50"))
+        assertEquals(125000L, TxnCsv.parseAmountPaise("1,250"))
+        assertEquals(125050L, TxnCsv.parseAmountPaise("₹1,250.50"))
+        assertNull(TxnCsv.parseAmountPaise("1.250,50"))   // ambiguous: rejected instead of guessed
+        assertNull(TxnCsv.parseAmountPaise("NaN"))
     }
 
     @Test fun date_needsTheWholeTextToMatch_andASaneYear() {
