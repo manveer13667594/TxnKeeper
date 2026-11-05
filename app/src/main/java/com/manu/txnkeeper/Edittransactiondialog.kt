@@ -38,7 +38,7 @@ fun EditTransactionDialog(
     accounts: List<AccountSummary> = emptyList()      // the account picker only shows with 2 or more
 ) {
     var title by remember { mutableStateOf(original.title) }
-    var amountText by remember { mutableStateOf(formatAmount(original.amount)) }
+    var amountText by remember { mutableStateOf(formatAmountPaise(original.amountPaise)) }
     var type by remember { mutableStateOf(original.type) }
     var payment by remember { mutableStateOf(original.paymentMethod) }
     var dateTime by remember { mutableStateOf(original.dateTime) }
@@ -56,14 +56,14 @@ fun EditTransactionDialog(
         title = "Edit transaction",
         confirmText = "Save",
         onConfirm = {
-            val value = amountText.toDoubleOrNull()
+            val value = parsePaise(amountText)
             if (title.isBlank() || value == null || value <= 0) {
                 error = "Enter a valid title and amount."
             } else {
                 onSave(
                     original.copy(
                         title = title.trim(),
-                        amount = value,
+                        amountPaise = value,
                         type = type,
                         paymentMethod = payment,
                         dateTime = dateTime,

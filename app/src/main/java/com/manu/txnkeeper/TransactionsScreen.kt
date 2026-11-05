@@ -72,7 +72,7 @@ import com.manu.manudesignsystem.components.ManuDialogBox
 /** How many rows are loaded at a time. More are loaded as you scroll near the end. */
 private const val PAGE_SIZE = 50
 
-private val NoTotals = TransactionTotals(0.0, 0.0, 0)
+private val NoTotals = TransactionTotals(0L, 0L, 0)
 
 /** One day of transactions: a heading ("Today", "Yesterday", "12 Oct") and one list card. */
 private class DayGroup(val dayStart: Long, val label: String, val txns: List<TransactionEntity>) {
@@ -183,7 +183,7 @@ fun TransactionsScreen(
 
     // Balance of the chosen account, or of all accounts together
     val selectedAccount = accounts.firstOrNull { it.id == accountId }
-    val balance = selectedAccount?.balance ?: accounts.sumOf { it.balance }
+    val balance = selectedAccount?.balancePaise ?: accounts.sumOf { it.balancePaise }
     val balanceLabel = when {
         selectedAccount != null -> "Balance · ${selectedAccount.name}"
         accounts.size > 1 -> "Balance · all accounts"
@@ -370,7 +370,7 @@ fun TransactionsScreen(
             visible = true,
             title = "Delete this transaction?",
             message = "${txn.title}\n" +
-                    "${if (txn.type == "INCOME") "+" else "−"}${formatMoney(txn.amount)} " +
+                    "${if (txn.type == "INCOME") "+" else "−"}${formatMoney(txn.amountPaise)} " +
                     "on ${formatDateLong(txn.dateTime)}\n\n" +
                     "This can't be undone.",
             confirmText = "Delete",
@@ -391,8 +391,8 @@ private fun comingSoon(context: android.content.Context, what: String) {
 }
 
 @Composable
-private fun TotalsCard(totals: TransactionTotals, balance: Double, balanceLabel: String) {
-    val net = totals.income - totals.expense
+private fun TotalsCard(totals: TransactionTotals, balance: Long, balanceLabel: String) {
+    val net = totals.incomePaise - totals.expensePaise
     ManuCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
             Text(
@@ -408,8 +408,8 @@ private fun TotalsCard(totals: TransactionTotals, balance: Double, balanceLabel:
                 maxLines = 1
             )
             Row(modifier = Modifier.padding(top = 10.dp)) {
-                TotalCell("Income", formatMoney(totals.income), IncomeColor, Alignment.Start)
-                TotalCell("Expense", formatMoney(totals.expense), ExpenseColor, Alignment.CenterHorizontally)
+                TotalCell("Income", formatMoney(totals.incomePaise), IncomeColor, Alignment.Start)
+                TotalCell("Expense", formatMoney(totals.expensePaise), ExpenseColor, Alignment.CenterHorizontally)
                 TotalCell(
                     "Net",
                     formatSignedMoney(net),
@@ -516,7 +516,7 @@ private fun transactionItem(
     return ManuListItemData(
         title = txn.title,
         description = buildString {
-            append(sign).append(formatMoney(txn.amount))
+            append(sign).append(formatMoney(txn.amountPaise))
             append(" • ").append(txn.paymentMethod)
             if (accountName != null) append(" • ").append(accountName)
         },

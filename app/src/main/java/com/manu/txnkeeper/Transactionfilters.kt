@@ -162,8 +162,8 @@ fun TransactionDao.observeTotals(q: TxnQuery): Flow<TransactionTotals> {
     val where = TxnSql.where(q)
     return rawTotals(
         SimpleSQLiteQuery(
-            "SELECT COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amount END), 0.0) AS income, " +
-                    "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amount END), 0.0) AS expense, " +
+            "SELECT COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amountPaise END), 0) AS incomePaise, " +
+                    "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amountPaise END), 0) AS expensePaise, " +
                     "COUNT(*) AS count FROM transactions WHERE ${where.sql}",
             where.args.toTypedArray()
         )

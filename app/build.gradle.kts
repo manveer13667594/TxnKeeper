@@ -37,6 +37,9 @@ android {
         compose = true
     }
 }
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
 
 dependencies {
 //    implementation(platform(libs.androidx.compose.bom))

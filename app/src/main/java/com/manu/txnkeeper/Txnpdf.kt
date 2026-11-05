@@ -67,8 +67,8 @@ object TxnPdf {
         val footerPaint = text(8f, MUTED, right = true)
         val rulePaint = Paint().apply { color = RULE; strokeWidth = 0.6f }
 
-        val income = rows.filter { it.type == "INCOME" }.sumOf { it.amount }
-        val expense = rows.filter { it.type == "EXPENSE" }.sumOf { it.amount }
+        val income = rows.filter { it.type == "INCOME" }.sumOf { it.amountPaise }
+        val expense = rows.filter { it.type == "EXPENSE" }.sumOf { it.amountPaise }
 
         val doc = PdfDocument()
         var page: PdfDocument.Page? = null
@@ -143,7 +143,7 @@ object TxnPdf {
                 c.drawText(fit(r.accountName, mutedCell, 75f), X_ACCOUNT, base, mutedCell)
                 c.drawText(fit(r.paymentMethod, mutedCell, 80f), X_METHOD, base, mutedCell)
                 c.drawText(
-                    formatSignedMoney(if (isIncome) r.amount else -r.amount),
+                    formatSignedMoney(if (isIncome) r.amountPaise else -r.amountPaise),
                     RIGHT_EDGE, base, if (isIncome) incomeRight else expenseRight
                 )
                 c.drawLine(MARGIN, y + ROW_H, RIGHT_EDGE, y + ROW_H, rulePaint)

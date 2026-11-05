@@ -12,7 +12,7 @@ import java.util.Locale
 data class TxnRow(
     val dateTime: Long,
     val title: String,
-    val amount: Double,
+    val amountPaise: Long,       // whole paise: 1250 = 12.50
     val type: String,            // "INCOME" or "EXPENSE"
     val paymentMethod: String,   // one of PAYMENT_METHODS
     val accountName: String,
@@ -67,7 +67,7 @@ object TxnCsv {
             val cells = listOf(
                 dateFormat.format(Date(r.dateTime)),
                 guard(r.title),
-                formatAmount(r.amount),
+                formatAmountPaise(r.amountPaise),
                 r.type,
                 r.paymentMethod,
                 guard(r.accountName),
@@ -133,8 +133,8 @@ object TxnCsv {
                 errors += CsvRowError(rowNumber, "Title is empty")
                 continue
             }
-            val amount = parseAmount(cell("amount"))
-            if (amount == null || amount <= 0.0) {
+            val amountPaise = parseAmountPaise(cell("amount"))
+            if (amountPaise == null || amountPaise <= 0L) {
                 errors += CsvRowError(rowNumber, "Amount \"${cell("amount")}\" is not a number above 0")
                 continue
             }
@@ -146,7 +146,7 @@ object TxnCsv {
             rows += TxnRow(
                 dateTime = dateTime,
                 title = title,
-                amount = amount,
+                amountPaise = amountPaise,
                 type = type,
                 paymentMethod = parsePayment(cell("payment")),
                 accountName = unguard(cell("account")),
@@ -181,7 +181,8 @@ object TxnCsv {
         return null
     }
 
-    internal fun parseAmount(text: String): Double? {
+    /** The amount cell as whole paise, or null if it is not a clear number. */
+    internal fun parseAmountPaise(text: String): Long? {
         var s = text.replace("₹", "").replace(" ", "").replace(" ", "")
         if (s.isEmpty()) return null
         s = when {
@@ -189,8 +190,7 @@ object TxnCsv {
             s.count { it == ',' } == 1 && '.' !in s -> s.replace(',', '.')          // 12,50 (decimal comma)
             else -> s                                                               // anything else must parse as is
         }
-        val value = s.toDoubleOrNull() ?: return null
-        return if (value.isFinite()) value else null
+        return parsePaise(s)
     }
 
     internal fun parseType(text: String): String? =

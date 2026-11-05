@@ -277,7 +277,7 @@ fun AddTransactionScreen(
 
                         // Both buttons save; "Save & next" stays here for another entry
                         fun submit(stay: Boolean) {
-                            val value = form.amount.replace(",", "").trim().toDoubleOrNull()
+                            val value = parsePaise(form.amount.replace(",", "").trim())
                             if (form.title.isBlank() || value == null || value <= 0) {
                                 error = "Enter a valid title and amount."
                             } else {
@@ -286,7 +286,7 @@ fun AddTransactionScreen(
                                 onSubmit(
                                     TransactionEntity(
                                         title = form.title.trim(),
-                                        amount = value,
+                                        amountPaise = value,
                                         type = form.type,
                                         paymentMethod = form.payment,
                                         dateTime = form.dateTime,

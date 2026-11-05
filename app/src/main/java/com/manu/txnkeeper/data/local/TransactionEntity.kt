@@ -10,7 +10,7 @@ data class TransactionEntity(
     val id: Int = 0,
 
     val title: String,
-    val amount: Double,
+    val amountPaise: Long,   // whole paise: 1250 = Rs 12.50 (see Money.kt)
     val type: String,
     val dateTime: Long = System.currentTimeMillis(),
     val paymentMethod: String = "CASH",

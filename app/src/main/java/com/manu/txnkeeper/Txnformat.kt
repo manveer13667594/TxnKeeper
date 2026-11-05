@@ -17,32 +17,33 @@ private val IndianLocale = Locale("en", "IN")
 fun formatAmount(value: Double): String =
     BigDecimal.valueOf(value).stripTrailingZeros().toPlainString()
 
+/** The same for an amount stored in paise: 94550 -> "945.5", 100 -> "1". */
+fun formatAmountPaise(paise: Long): String =
+    BigDecimal.valueOf(paise, 2).stripTrailingZeros().toPlainString()
+
+// The functions below take WHOLE PAISE (1250 = ₹12.50), the way amounts are stored.
+
 /** Display money with Indian grouping: ₹1,25,000 or ₹1,250.50 (paise only when present). */
-fun formatMoney(value: Double): String {
-    val rounded = Math.round(value * 100) / 100.0
-    val whole = rounded % 1.0 == 0.0
+fun formatMoney(paise: Long): String {
+    val whole = paise % 100L == 0L
     val nf = NumberFormat.getNumberInstance(IndianLocale).apply {
         minimumFractionDigits = if (whole) 0 else 2
         maximumFractionDigits = if (whole) 0 else 2
     }
-    return "₹" + nf.format(rounded)
+    return "₹" + nf.format(BigDecimal.valueOf(paise, 2))
 }
 
 /** ₹1,250 or −₹300: for balances, which have no "+" sign. */
-fun formatBalance(value: Double): String {
-    val rounded = Math.round(value * 100) / 100.0
-    return if (rounded < 0) "−" + formatMoney(abs(rounded)) else formatMoney(rounded)
-}
+fun formatBalance(paise: Long): String =
+    if (paise < 0) "−" + formatMoney(abs(paise)) else formatMoney(paise)
 
 /** +₹300 / −₹300 (zero has no sign). */
-fun formatSignedMoney(value: Double): String {
-    val rounded = Math.round(value * 100) / 100.0
-    return when {
-        rounded == 0.0 -> formatMoney(0.0)
-        rounded < 0 -> "−" + formatMoney(abs(rounded))
-        else -> "+" + formatMoney(rounded)
+fun formatSignedMoney(paise: Long): String =
+    when {
+        paise == 0L -> formatMoney(0L)
+        paise < 0 -> "−" + formatMoney(abs(paise))
+        else -> "+" + formatMoney(paise)
     }
-}
 
 // ------------------------------------------------------------------ dates
 

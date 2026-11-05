@@ -100,7 +100,7 @@ fun AccountsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = formatBalance(accounts.sumOf { it.balance }),
+                        text = formatBalance(accounts.sumOf { it.balancePaise }),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
@@ -172,7 +172,7 @@ private fun AccountCard(
     ManuCard(contentPadding = PaddingValues(0.dp), modifier = Modifier.fillMaxWidth()) {
         ManuListItem(
             title = account.name,
-            description = formatBalance(account.balance),
+            description = formatBalance(account.balancePaise),
             time = account.type + " • " +
                     if (account.txnCount == 1) "1 transaction" else "${account.txnCount} transactions",
             leadingContent = {
@@ -214,7 +214,7 @@ private fun AccountDialog(
     var name by remember { mutableStateOf(initial?.name ?: "") }
     var type by remember { mutableStateOf(initial?.type ?: ACCOUNT_TYPES.first()) }
     var openingText by remember {
-        mutableStateOf(initial?.openingBalance?.takeIf { it != 0.0 }?.let { formatAmount(it) } ?: "")
+        mutableStateOf(initial?.openingBalancePaise?.takeIf { it != 0L }?.let { formatAmountPaise(it) } ?: "")
     }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -224,7 +224,7 @@ private fun AccountDialog(
         confirmText = "Save",
         onConfirm = {
             val clean = name.trim()
-            val opening = if (openingText.isBlank()) 0.0 else openingText.replace(",", "").trim().toDoubleOrNull()
+            val opening = if (openingText.isBlank()) 0L else parsePaise(openingText.replace(",", "").trim())
             when {
                 clean.isEmpty() -> error = "Give the account a name."
                 clean.lowercase() in takenNames -> error = "You already have an account with this name."
@@ -234,7 +234,7 @@ private fun AccountDialog(
                         id = initial?.id ?: 0,
                         name = clean,
                         type = type,
-                        openingBalance = opening
+                        openingBalancePaise = opening
                     )
                 )
             }

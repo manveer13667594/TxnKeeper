@@ -11,8 +11,8 @@ import kotlinx.coroutines.flow.Flow
 
 /** Sums for whatever the current filters match (computed by SQL, not from the loaded rows). */
 data class TransactionTotals(
-    val income: Double,
-    val expense: Double,
+    val incomePaise: Long,
+    val expensePaise: Long,
     val count: Int
 )
 
@@ -21,8 +21,8 @@ data class AccountSummary(
     val id: Long,
     val name: String,
     val type: String,
-    val openingBalance: Double,
-    val balance: Double,
+    val openingBalancePaise: Long,
+    val balancePaise: Long,
     val txnCount: Int
 )
 
@@ -103,12 +103,12 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE accountId = :accountId")
     suspend fun deleteTransactionsOfAccount(accountId: Long)
 
-    /** Every account with balance = opening balance + income - expense. */
+    /** Every account with balance = opening balance + income - expense (all in paise). */
     @Query(
         """
-        SELECT a.id AS id, a.name AS name, a.type AS type, a.openingBalance AS openingBalance,
-               a.openingBalance + COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amount
-                                                    WHEN t.type = 'EXPENSE' THEN -t.amount END), 0.0) AS balance,
+        SELECT a.id AS id, a.name AS name, a.type AS type, a.openingBalancePaise AS openingBalancePaise,
+               a.openingBalancePaise + COALESCE(SUM(CASE WHEN t.type = 'INCOME' THEN t.amountPaise
+                                                    WHEN t.type = 'EXPENSE' THEN -t.amountPaise END), 0) AS balancePaise,
                COUNT(t.id) AS txnCount
         FROM accounts a
         LEFT JOIN transactions t ON t.accountId = a.id

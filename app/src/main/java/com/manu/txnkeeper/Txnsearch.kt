@@ -51,8 +51,8 @@ object TxnSql {
         val args = mutableListOf<Any>()
         q.txType?.let { parts += "type = ?"; args.add(it) }
         q.payMethod?.let { parts += "paymentMethod = ?"; args.add(it) }
-        q.minAmount?.let { parts += "amount >= ?"; args.add(it) }
-        q.maxAmount?.let { parts += "amount <= ?"; args.add(it) }
+        q.minAmount?.let { parts += "amountPaise >= ?"; args.add(it.toPaise()) }
+        q.maxAmount?.let { parts += "amountPaise <= ?"; args.add(it.toPaise()) }
         q.dateFrom?.let { parts += "dateTime >= ?"; args.add(it) }
         q.dateTo?.let { parts += "dateTime <= ?"; args.add(it) }
         q.accountId?.let { parts += "accountId = ?"; args.add(it) }
@@ -179,10 +179,11 @@ object TxnSearch {
             val whole = m.groupValues[1].replace(",", "")
             val decimals = m.groupValues[2]
             val typed = whole + decimals
-            val options = mutableListOf(
-                SqlPart("amount = ?", listOf(typed.toDouble())),
-                SqlPart("CAST(amount AS TEXT) LIKE ?", listOf("$typed%"))
-            )
+            val options = mutableListOf<SqlPart>()
+            // The exact amount (stored in paise), and "starts with" on the rupee text, e.g. 599.50
+            parsePaise(typed)?.let { options += SqlPart("amountPaise = ?", listOf(it)) }
+            // The brackets around (amountPaise / 100) matter: in SQLite || binds tighter than /
+            options += SqlPart("((amountPaise / 100) || '.' || printf('%02d', amountPaise % 100)) LIKE ?", listOf("$typed%"))
             if (decimals.isEmpty() && yearRe.matches(whole)) options += SqlPart("${local.year} = ${whole.toInt()}", emptyList())
             // Long numbers can be a reference or phone number, which live in the description
             if (whole.length >= 6) options += text(whole)
@@ -195,7 +196,7 @@ object TxnSearch {
     // ------------------------------------------------------------ pieces
 
     private fun compare(op: String, number: String): SqlPart =
-        SqlPart("amount $op ?", listOf(number.replace(",", "").toDouble()))
+        SqlPart("amountPaise $op ?", listOf(parsePaise(number.replace(",", "")) ?: MAX_PAISE))
 
     /** 3pm, 3:24pm, 3:24 (any 3 o'clock) or 15:30. Null if it isn't a valid time. */
     private fun clock(w: String, local: Local): SqlPart? {

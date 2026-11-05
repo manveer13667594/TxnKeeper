@@ -161,7 +161,7 @@ fun OcrResultDialog(
                 duplicate?.let { d ->
                     Text(
                         text = "Possible duplicate: you already saved \"${d.title}\" " +
-                                "(${formatMoney(d.amount)}, ${formatDateLong(d.dateTime)}) " +
+                                "(${formatMoney(d.amountPaise)}, ${formatDateLong(d.dateTime)}) " +
                                 "with the same reference number.",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,

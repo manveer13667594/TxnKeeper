@@ -100,7 +100,7 @@ object DataTransfer {
             TxnRow(
                 dateTime = it.dateTime,
                 title = it.title,
-                amount = it.amount,
+                amountPaise = it.amountPaise,
                 type = it.type,
                 paymentMethod = it.paymentMethod,
                 accountName = accountNames[it.accountId].orEmpty(),
@@ -137,7 +137,7 @@ object DataTransfer {
             // How many of each transaction the app already has
             val existing = HashMap<String, Int>()
             dao.getAllOnce().forEach {
-                existing.merge(dupKey(it.accountId, it.dateTime, it.amount, it.type, it.title), 1, Int::plus)
+                existing.merge(dupKey(it.accountId, it.dateTime, it.amountPaise, it.type, it.title), 1, Int::plus)
             }
 
             val toInsert = ArrayList<TransactionEntity>()
@@ -153,7 +153,7 @@ object DataTransfer {
                     }
                 }
 
-                val key = dupKey(accountId, row.dateTime, row.amount, row.type, row.title)
+                val key = dupKey(accountId, row.dateTime, row.amountPaise, row.type, row.title)
                 val alreadyThere = existing[key] ?: 0
                 if (alreadyThere > 0) {
                     existing[key] = alreadyThere - 1
@@ -161,7 +161,7 @@ object DataTransfer {
                 } else {
                     toInsert += TransactionEntity(
                         title = row.title,
-                        amount = row.amount,
+                        amountPaise = row.amountPaise,
                         type = row.type,
                         dateTime = row.dateTime,
                         paymentMethod = row.paymentMethod,
@@ -182,6 +182,6 @@ object DataTransfer {
     }
 
     // The CSV keeps time to the second and the amount to the paisa, so compare only that much.
-    private fun dupKey(accountId: Long, dateTime: Long, amount: Double, type: String, title: String): String =
-        "$accountId|${dateTime / 1000}|${Math.round(amount * 100)}|$type|${title.trim().lowercase()}"
+    private fun dupKey(accountId: Long, dateTime: Long, amountPaise: Long, type: String, title: String): String =
+        "$accountId|${dateTime / 1000}|$amountPaise|$type|${title.trim().lowercase()}"
 }
