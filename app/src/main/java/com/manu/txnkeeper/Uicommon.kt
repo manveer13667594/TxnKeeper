@@ -20,6 +20,16 @@ object AppIcons {
         icon("FilterList", "M10,18h4v-2h-4v2zM3,6v2h18V6H3zM6,13h12v-2H6v2z")
     }
 
+    /** Three sliders with round knobs: the filter button on the home screen. */
+    val Sliders: ImageVector by lazy {
+        icon(
+            "Sliders",
+            "M4,5h16a1,1 0 0 1 0,2H4a1,1 0 0 1 0,-2z M8,3.5a2.5,2.5 0 1 1 0,5a2.5,2.5 0 1 1 0,-5z " +
+                    "M4,11h16a1,1 0 0 1 0,2H4a1,1 0 0 1 0,-2z M16,9.5a2.5,2.5 0 1 1 0,5a2.5,2.5 0 1 1 0,-5z " +
+                    "M4,17h16a1,1 0 0 1 0,2H4a1,1 0 0 1 0,-2z M8,15.5a2.5,2.5 0 1 1 0,5a2.5,2.5 0 1 1 0,-5z"
+        )
+    }
+
     val CameraAlt: ImageVector by lazy {
         icon(
             "CameraAlt",

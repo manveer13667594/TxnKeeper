@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.manu.manudesignsystem.components.ManuButton
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
@@ -142,7 +143,7 @@ fun SettingsScreen(
                         }
                     }
                 }
-                ManuOutlineButton(
+                ManuButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { addingMethod = true }
                 ) { Text("Add payment method") }
@@ -157,11 +158,22 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "Help & About") {
+                Text(
+                    text = "Quick answers on adding transactions, scanning receipts, voice entry, accounts, " +
+                            "filters, and importing or exporting your data.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
                 ManuOutlineButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onOpenHelp
                 ) { Text("Help") }
-                ManuOutlineButton(
+                Text(
+                    text = "See the app version, what TxnKeeper is for, and read the privacy policy.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                ManuButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onOpenAbout
                 ) { Text("About") }

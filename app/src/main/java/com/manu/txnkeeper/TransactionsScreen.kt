@@ -216,20 +216,22 @@ fun TransactionsScreen(
         ManuTopBar(
             title = "TxnKeeper",
             actions = {
-                // Filter icon with the number of filters on. Only shown while filters are applied,
-                // so it is easy to see that the list is filtered. Tap it to change them.
-                if (filters.activeCount > 0) {
-                    IconButton(onClick = {
-                        focusManager.clearFocus()
-                        filterSheetOpen = true
-                    }) {
+                // Filter icon, always shown next to the camera. Tap it to open the filters.
+                // While filters are on, it turns to the accent colour and shows how many.
+                IconButton(onClick = {
+                    focusManager.clearFocus()
+                    filterSheetOpen = true
+                }) {
+                    if (filters.activeCount > 0) {
                         BadgedBox(badge = { Badge { Text("${filters.activeCount}") } }) {
                             Icon(
-                                AppIcons.FilterList,
+                                AppIcons.Sliders,
                                 contentDescription = "Filters applied: ${filters.activeCount}",
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
+                    } else {
+                        Icon(AppIcons.Sliders, contentDescription = "Filters")
                     }
                 }
                 IconButton(onClick = {

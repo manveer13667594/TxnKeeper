@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.manu.manudesignsystem.components.ManuButton
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDateRangePicker
@@ -196,7 +197,7 @@ fun DataTransferControls(database: AppDatabase) {
             )
         }
 
-        ManuOutlineButton(
+        ManuButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = { exportClicked { csvExport.launch(fileName("csv")) } }
         ) { Text("Export to CSV") }

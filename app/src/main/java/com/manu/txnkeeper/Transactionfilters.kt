@@ -3,6 +3,8 @@ package com.manu.txnkeeper
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -50,7 +52,7 @@ enum class PeriodKind { ALL, DAY, WEEK, MONTH, YEAR, CUSTOM }
 data class TxnFilters(
     val newestFirst: Boolean = true,
     val type: String? = null,            // "INCOME" / "EXPENSE" / null = all
-    val payment: String? = null,         // one of PAYMENT_METHODS / null = all
+    val payment: String? = null,         // a payment method name / null = all
     val minAmount: Double? = null,
     val maxAmount: Double? = null,
     val period: PeriodKind = PeriodKind.ALL,
@@ -239,6 +241,7 @@ private fun SectionLabel(text: String) {
 }
 
 /** The single place for sort, period, type, payment and amount. Changes apply immediately. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FilterSheet(
     filters: TxnFilters,
@@ -318,12 +321,15 @@ fun FilterSheet(
 
             // ---- Payment method
             SectionLabel("Payment")
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            // The chips wrap onto more lines when there are many, so none are hidden off-screen.
+            // A method that is selected but not in the list (e.g. no transaction uses it any more)
+            // is still shown, so the filter can be seen and switched off.
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OptionChip("All", filters.payment == null) { onChange(filters.copy(payment = null)) }
-                paymentMethods.forEach { method ->
+                (paymentMethods + listOfNotNull(filters.payment)).distinct().forEach { method ->
                     OptionChip(method, filters.payment == method) {
                         onChange(filters.copy(payment = method))
                     }
