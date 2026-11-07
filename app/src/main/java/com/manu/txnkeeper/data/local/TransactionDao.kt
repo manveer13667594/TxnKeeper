@@ -116,6 +116,14 @@ interface TransactionDao {
     @Query("DELETE FROM transactions WHERE accountId = :accountId")
     suspend fun deleteTransactionsOfAccount(accountId: Long)
 
+    /** Deletes every transaction in the app (Settings > Delete data > All data). */
+    @Query("DELETE FROM transactions")
+    suspend fun deleteAllTransactions()
+
+    /** Deletes every account except one (the one kept and reset when all data is deleted). */
+    @Query("DELETE FROM accounts WHERE id != :keepId")
+    suspend fun deleteAccountsExcept(keepId: Long)
+
     /** Every account with balance = opening balance + income - expense (all in paise). */
     @Query(
         """

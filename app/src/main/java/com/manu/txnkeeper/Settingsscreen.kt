@@ -152,6 +152,10 @@ fun SettingsScreen(
                 DataTransferControls(database = database)
             }
 
+            SettingsSection(title = "Delete data") {
+                DeleteDataControls(settings = settings, database = database)
+            }
+
             SettingsSection(title = "Help & About") {
                 ManuOutlineButton(
                     modifier = Modifier.fillMaxWidth(),

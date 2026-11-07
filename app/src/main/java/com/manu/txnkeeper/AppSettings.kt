@@ -58,6 +58,12 @@ class AppSettings(context: Context) {
         savePaymentMethods(paymentMethods - name)
     }
 
+    /** Puts the list back to the four built-in methods (part of "delete all data"). */
+    fun resetPaymentMethods() {
+        paymentMethods = PAYMENT_METHODS
+        prefs.edit().remove(KEY_PAYMENT_METHODS).apply()
+    }
+
     private fun savePaymentMethods(list: List<String>) {
         paymentMethods = list
         // An empty list is saved as an empty text, which is different from "never changed"
