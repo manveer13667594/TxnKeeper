@@ -29,6 +29,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,6 +44,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.TransactionEntity
 import com.manu.manudesignsystem.components.ManuButton
@@ -144,6 +146,10 @@ class TxnFormState {
 fun AddTransactionScreen(
     form: TxnFormState,
     accounts: List<AccountSummary>,
+    /** Where the payment methods come from (and where a new one is saved). */
+    settings: AppSettings,
+    /** Saves a new account; calls the second function with its id once it exists. */
+    onAddAccount: (AccountEntity, (Long) -> Unit) -> Unit,
     onClose: () -> Unit,
     /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
     onSubmit: (TransactionEntity, stay: Boolean) -> Unit,
@@ -157,8 +163,19 @@ fun AddTransactionScreen(
     var accountMenuOpen by remember { mutableStateOf(false) }
     var datePickerOpen by remember { mutableStateOf(false) }
     var timePickerOpen by remember { mutableStateOf(false) }
-    // The account that will be used: the chosen one, or the first if none is chosen (or it was deleted)
+    var addAccountOpen by remember { mutableStateOf(false) }
+    var addPaymentOpen by remember { mutableStateOf(false) }
+    // The account that will be used: the chosen one, or the first if none is chosen (or it was deleted).
+    // The list is ordered oldest first, so the first one is the main account.
     val account = accounts.firstOrNull { it.id == form.accountId } ?: accounts.firstOrNull()
+
+    // The payment methods you have set up in Settings
+    val methods = settings.paymentMethods
+    // If the chosen method is not in the list (it was removed, or a scan or recording found one
+    // you removed), use the first one in the list, or none when the list is empty
+    LaunchedEffect(form.payment, methods) {
+        if (form.payment !in methods) form.payment = methods.firstOrNull() ?: ""
+    }
 
     // ManuScaffold already insets for the status bar, navigation bar and keyboard
     ManuScaffold(
@@ -213,69 +230,67 @@ fun AddTransactionScreen(
                             ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
                             ManuChip(label = "Income", selected = form.type == "INCOME", onClick = { form.type = "INCOME" })
                         }
-                  Column(
-                      modifier = Modifier.width(220.dp),
-                      verticalArrangement = Arrangement.spacedBy(16.dp)
+                        Column(
+                            modifier = Modifier.width(220.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
 
-                  ) {
-                      // Account (only when there is a choice)
-                      if (accounts.size > 1) {
-                          Box {
-                              ManuPickerField(
-                                  value = account?.name ?: "",
-                                  leadingIcon = AppIcons.Wallet,
-                                  trailingIcon = Icons.Default.KeyboardArrowDown,
-                                  onClick = { accountMenuOpen = true }
-                              )
-                              ManuDropdownMenu(
-                                  expanded = accountMenuOpen,
-                                  onDismissRequest = { accountMenuOpen = false },
-                                  items = accounts.map { a ->
-                                      ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
-                                  }
-                              )
-                          }
-                      }
+                        ) {
+                            // Account: always shown, so a new one can be added from here
+                            Box {
+                                ManuPickerField(
+                                    value = account?.name ?: "",
+                                    leadingIcon = AppIcons.Wallet,
+                                    trailingIcon = Icons.Default.KeyboardArrowDown,
+                                    onClick = { accountMenuOpen = true }
+                                )
+                                ManuDropdownMenu(
+                                    expanded = accountMenuOpen,
+                                    onDismissRequest = { accountMenuOpen = false },
+                                    items = accounts.map { a ->
+                                        ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
+                                    } + ManuMenuItem(label = "+ New account", onClick = { addAccountOpen = true })
+                                )
+                            }
 
-                      // Payment method
-                      Box {
-                          ManuPickerField(
-                              value = form.payment,
-                              leadingIcon = AppIcons.Wallet,
-                              trailingIcon = Icons.Default.KeyboardArrowDown,
-                              onClick = { payMenuOpen = true }
-                          )
-                          ManuDropdownMenu(
-                              expanded = payMenuOpen,
-                              onDismissRequest = { payMenuOpen = false },
-                              items = PAYMENT_METHODS.map { method ->
-                                  ManuMenuItem(label = method, onClick = { form.payment = method })
-                              }
-                          )
-                      }
+                            // Payment method: your list from Settings, plus "+ Add new" at the end
+                            Box {
+                                ManuPickerField(
+                                    value = form.payment.ifBlank { "Add payment method" },
+                                    leadingIcon = AppIcons.Wallet,
+                                    trailingIcon = Icons.Default.KeyboardArrowDown,
+                                    onClick = { payMenuOpen = true }
+                                )
+                                ManuDropdownMenu(
+                                    expanded = payMenuOpen,
+                                    onDismissRequest = { payMenuOpen = false },
+                                    items = methods.map { method ->
+                                        ManuMenuItem(label = method, onClick = { form.payment = method })
+                                    } + ManuMenuItem(label = "+ Add new", onClick = { addPaymentOpen = true })
+                                )
+                            }
 
-                      // Date
-                      ManuPickerField(
-                          value = formatDateLong(form.dateTime),
-                          leadingIcon = Icons.Default.DateRange,
-                          trailingIcon = Icons.Default.KeyboardArrowDown,
-                          onClick = {
-                              focusManager.clearFocus()
-                              datePickerOpen = true
-                          }
-                      )
+                            // Date
+                            ManuPickerField(
+                                value = formatDateLong(form.dateTime),
+                                leadingIcon = Icons.Default.DateRange,
+                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    datePickerOpen = true
+                                }
+                            )
 
-                      // Time
-                      ManuPickerField(
-                          value = formatTime(form.dateTime),
-                          leadingIcon = AppIcons.Schedule,
-                          trailingIcon = Icons.Default.KeyboardArrowDown,
-                          onClick = {
-                              focusManager.clearFocus()
-                              timePickerOpen = true
-                          }
-                      )
-                  }
+                            // Time
+                            ManuPickerField(
+                                value = formatTime(form.dateTime),
+                                leadingIcon = AppIcons.Schedule,
+                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    timePickerOpen = true
+                                }
+                            )
+                        }
 
                         ManuTextField(
                             value = form.description,
@@ -350,6 +365,32 @@ fun AddTransactionScreen(
                 }
             }
         }
+    }
+
+    // "+ New account": name and optional opening balance; the new account is selected right away
+    if (addAccountOpen) {
+        AccountDialog(
+            initial = null,
+            takenNames = accounts.map { it.name.trim().lowercase() }.toSet(),
+            onSave = { newAccount ->
+                onAddAccount(newAccount) { id -> form.accountId = id }
+                addAccountOpen = false
+            },
+            onDismiss = { addAccountOpen = false }
+        )
+    }
+
+    // "+ Add new" payment method: saved to the list and selected right away
+    if (addPaymentOpen) {
+        AddPaymentMethodDialog(
+            existing = methods,
+            onAdd = { name ->
+                settings.addPaymentMethod(name)
+                form.payment = name
+                addPaymentOpen = false
+            },
+            onDismiss = { addPaymentOpen = false }
+        )
     }
 
     ManuDatePicker(

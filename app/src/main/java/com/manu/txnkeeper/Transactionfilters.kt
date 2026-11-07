@@ -243,7 +243,9 @@ private fun SectionLabel(text: String) {
 fun FilterSheet(
     filters: TxnFilters,
     onChange: (TxnFilters) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    /** The payment methods to offer as chips (your list plus any that transactions still use). */
+    paymentMethods: List<String>
 ) {
     var rangeDialogOpen by remember { mutableStateOf(false) }
     var minText by remember { mutableStateOf(filters.minAmount?.let { formatAmount(it) } ?: "") }
@@ -321,7 +323,7 @@ fun FilterSheet(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 OptionChip("All", filters.payment == null) { onChange(filters.copy(payment = null)) }
-                PAYMENT_METHODS.forEach { method ->
+                paymentMethods.forEach { method ->
                     OptionChip(method, filters.payment == method) {
                         onChange(filters.copy(payment = method))
                     }

@@ -1,17 +1,14 @@
 package com.manu.txnkeeper
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -30,7 +27,6 @@ import androidx.compose.ui.unit.dp
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.manudesignsystem.components.ManuButton
-import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.components.ManuListItem
@@ -173,8 +169,7 @@ private fun AccountCard(
         ManuListItem(
             title = account.name,
             description = formatBalance(account.balancePaise),
-            time = account.type + " • " +
-                    if (account.txnCount == 1) "1 transaction" else "${account.txnCount} transactions",
+            time = if (account.txnCount == 1) "1 transaction" else "${account.txnCount} transactions",
             leadingContent = {
                 Box(
                     modifier = Modifier
@@ -203,16 +198,18 @@ private fun AccountCard(
     }
 }
 
-/** Add (initial = null) or edit an account: name, type and opening balance. */
+/**
+ * Add (initial = null) or edit an account: just a name and an optional opening balance.
+ * Not private: the Add and Edit transaction pages open it too, for "+ New account".
+ */
 @Composable
-private fun AccountDialog(
+internal fun AccountDialog(
     initial: AccountSummary?,
     takenNames: Set<String>,
     onSave: (AccountEntity) -> Unit,
     onDismiss: () -> Unit
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
-    var type by remember { mutableStateOf(initial?.type ?: ACCOUNT_TYPES.first()) }
     var openingText by remember {
         mutableStateOf(initial?.openingBalancePaise?.takeIf { it != 0L }?.let { formatAmountPaise(it) } ?: "")
     }
@@ -233,7 +230,8 @@ private fun AccountDialog(
                     AccountEntity(
                         id = initial?.id ?: 0,
                         name = clean,
-                        type = type,
+                        // The type is no longer asked for; an existing account keeps what it has
+                        type = initial?.type ?: "BANK",
                         openingBalancePaise = opening
                     )
                 )
@@ -248,14 +246,6 @@ private fun AccountDialog(
                 label = { Text("Account name") },
                 placeholder = { Text("e.g. PNB savings") }
             )
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ACCOUNT_TYPES.forEach { t ->
-                    ManuChip(label = t, selected = type == t, onClick = { type = t })
-                }
-            }
             ManuTextField(
                 value = openingText,
                 onValueChange = { openingText = it },

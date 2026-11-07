@@ -81,6 +81,19 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE description LIKE '%' || :ref || '%' LIMIT 1")
     suspend fun findByReference(ref: String): TransactionEntity?
 
+    // ------------------------------------------------------------------ payment methods
+
+    /**
+     * Every payment method that at least one transaction uses. The filter list adds these to the
+     * saved list, so you can still filter by a method after removing it from the dropdown.
+     */
+    @Query("SELECT DISTINCT paymentMethod FROM transactions WHERE paymentMethod != '' ORDER BY paymentMethod")
+    fun observePaymentMethodsInUse(): Flow<List<String>>
+
+    /** How many transactions use one payment method (shown before removing it from the list). */
+    @Query("SELECT COUNT(*) FROM transactions WHERE paymentMethod = :method")
+    suspend fun countByPaymentMethod(method: String): Int
+
     // ------------------------------------------------------------------ accounts
 
     @Insert

@@ -122,6 +122,7 @@ class MainActivity : ComponentActivity() {
  *   - the "Add transaction" page (the + button, or after scanning a receipt)
  *   - the camera (the camera icon, or swipe from left to right)
  *   - the Settings page (from the three-dot menu), and the Accounts page (from Settings)
+ *   - the Help and About pages (from the three-dot menu)
  */
 @PreviewScreenSizes
 @Composable
@@ -141,6 +142,8 @@ fun TxnkeeperApp(
     var accountFilter by rememberSaveable { mutableStateOf<Long?>(null) }
     var showAccounts by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showHelp by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     // Safety net: there is always at least one account (the database adds it, this covers odd cases)
     LaunchedEffect(Unit) {
@@ -216,6 +219,8 @@ fun TxnkeeperApp(
         showAdd = false
     }
     BackHandler(enabled = showSettings) { showSettings = false }
+    BackHandler(enabled = showHelp) { showHelp = false }
+    BackHandler(enabled = showAbout) { showAbout = false }
     // Declared after Settings, so Back closes Accounts first when it was opened from Settings
     BackHandler(enabled = showAccounts) { showAccounts = false }
 
@@ -242,10 +247,13 @@ fun TxnkeeperApp(
                 ) {
                     TransactionsScreen(
                         dao = dao,
+                        settings = settings,
                         accounts = accounts,
                         accountId = accountFilter,
                         onAccountChange = { accountFilter = it },
                         onOpenSettings = { showSettings = true },
+                        onOpenHelp = { showHelp = true },
+                        onOpenAbout = { showAbout = true },
                         onScan = { openCamera() },
                         onScrollDirection = { fabVisible = it }
                     )
@@ -280,6 +288,16 @@ fun TxnkeeperApp(
                 AddTransactionScreen(
                     form = form,
                     accounts = accounts,
+                    settings = settings,
+                    // "+ New account" on the Add page: save it, then the page selects it
+                    onAddAccount = { newAccount, onCreated ->
+                        scope.launch {
+                            var newId = 0L
+                            if (safeWrite(context, "add the account") { newId = dao.insertAccount(newAccount) }) {
+                                onCreated(newId)
+                            }
+                        }
+                    },
                     onClose = { showAdd = false },
                     onScan = { openCamera() },
                     onSubmit = { entity, stay ->
@@ -313,6 +331,9 @@ fun TxnkeeperApp(
                     settings = settings,
                     database = database,
                     onManageAccounts = { showAccounts = true },
+                    // Help and About slide in over Settings, and Back returns to it
+                    onOpenHelp = { showHelp = true },
+                    onOpenAbout = { showAbout = true },
                     onClose = { showSettings = false }
                 )
             }
@@ -340,6 +361,24 @@ fun TxnkeeperApp(
                         }
                     }
                 )
+            }
+
+            // ---------------- Help page slides in from the right over the list
+            AnimatedVisibility(
+                visible = showHelp,
+                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+            ) {
+                HelpScreen(onClose = { showHelp = false })
+            }
+
+            // ---------------- About page slides in from the right over the list
+            AnimatedVisibility(
+                visible = showAbout,
+                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+            ) {
+                AboutScreen(onClose = { showAbout = false })
             }
 
             // ---------------- Camera slides in from the left over everything

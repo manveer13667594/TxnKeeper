@@ -14,7 +14,7 @@ data class TxnRow(
     val title: String,
     val amountPaise: Long,       // whole paise: 1250 = 12.50
     val type: String,            // "INCOME" or "EXPENSE"
-    val paymentMethod: String,   // one of PAYMENT_METHODS
+    val paymentMethod: String,   // a payment method name (CASH when the file has none)
     val accountName: String,
     val description: String
 )
@@ -200,11 +200,12 @@ object TxnCsv {
             else -> null
         }
 
-    /** Blank or unknown methods become CASH (the app only knows the methods in PAYMENT_METHODS). */
-    internal fun parsePayment(text: String): String {
-        val s = text.trim().uppercase().replace('_', ' ')
-        return PAYMENT_METHODS.firstOrNull { it == s } ?: "CASH"
-    }
+    /**
+     * A blank method becomes CASH. Any other name is kept (tidied), so payment methods you added
+     * yourself survive an export and import.
+     */
+    internal fun parsePayment(text: String): String =
+        cleanPaymentMethodName(text.replace('_', ' ')).ifEmpty { "CASH" }
 
     /**
      * Splits CSV text into rows of cells. Handles "quoted, cells", "" for a quote inside a

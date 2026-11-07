@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -62,6 +64,7 @@ import com.manu.manudesignsystem.components.ManuListItemData
 import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuDropdownMenu
 import com.manu.manudesignsystem.components.ManuButton
+import com.manu.manudesignsystem.components.ManuTextButton
 import com.manu.manudesignsystem.theme.ExpenseColor
 import com.manu.manudesignsystem.theme.IncomeColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
@@ -107,10 +110,14 @@ private fun buildGroups(list: List<TransactionEntity>): List<DayGroup> {
 @Composable
 fun TransactionsScreen(
     dao: TransactionDao,
+    /** Where the payment methods come from (the Edit dialog and the filters use them). */
+    settings: AppSettings,
     accounts: List<AccountSummary>,
     accountId: Long?,                       // null = all accounts
     onAccountChange: (Long?) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onOpenAbout: () -> Unit,
     onScan: () -> Unit,
     /** true = the floating + button should show, false = hide it (scrolling down the list). */
     onScrollDirection: (Boolean) -> Unit = {},
@@ -150,6 +157,13 @@ fun TransactionsScreen(
 
     val overallFlow = remember { dao.getTotalCount() }
     val overall: Int? by overallFlow.collectAsState(initial = null)
+
+    // Filter chips: your payment methods, plus any a transaction still uses (e.g. one you removed)
+    val usedMethodsFlow = remember { dao.observePaymentMethodsInUse() }
+    val usedMethods by usedMethodsFlow.collectAsState(initial = emptyList())
+    val filterMethods = remember(settings.paymentMethods, usedMethods) {
+        (settings.paymentMethods + usedMethods).distinct()
+    }
 
     val groups = remember(page) { buildGroups(page.orEmpty()) }
 
@@ -202,6 +216,22 @@ fun TransactionsScreen(
         ManuTopBar(
             title = "TxnKeeper",
             actions = {
+                // Filter icon with the number of filters on. Only shown while filters are applied,
+                // so it is easy to see that the list is filtered. Tap it to change them.
+                if (filters.activeCount > 0) {
+                    IconButton(onClick = {
+                        focusManager.clearFocus()
+                        filterSheetOpen = true
+                    }) {
+                        BadgedBox(badge = { Badge { Text("${filters.activeCount}") } }) {
+                            Icon(
+                                AppIcons.FilterList,
+                                contentDescription = "Filters applied: ${filters.activeCount}",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
                 IconButton(onClick = {
                     focusManager.clearFocus()
                     onScan() }
@@ -221,7 +251,7 @@ fun TransactionsScreen(
                         contentDescription = if (searchOpen) "Close search" else "Search"
                     )
                 }
-                // Three-dot menu (the actions are added later)
+                // Three-dot menu
                 Box {
                     IconButton(onClick = { menuOpen = true }) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
@@ -238,11 +268,9 @@ fun TransactionsScreen(
                                 }
                             ),
                             ManuMenuItem(label = "Settings", onClick = onOpenSettings),
-                            ManuMenuItem(label = "Help", onClick = { comingSoon(context, "Help") }),
-                            ManuMenuItem(label = "About", onClick = { comingSoon(context, "About") }),
-                            ManuMenuItem(label = "Remove ads", onClick = { comingSoon(context, "Remove ads") }),
-
-                            ),
+                            ManuMenuItem(label = "Help", onClick = onOpenHelp),
+                            ManuMenuItem(label = "About", onClick = onOpenAbout)
+                        ),
                     )
                 }
             }
@@ -258,6 +286,24 @@ fun TransactionsScreen(
                     .padding(bottom = ManuDesignSystem.spacing.sm)
                     .focusRequester(searchFocus)
             )
+        }
+
+        // ---- "2 filters applied  [Clear filters]" (only while filters are on). Sort order is kept.
+        AnimatedVisibility(visible = filters.activeCount > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (filters.activeCount == 1) "1 filter applied" else "${filters.activeCount} filters applied",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                ManuTextButton(
+                    onClick = { filters = TxnFilters(newestFirst = filters.newestFirst) }
+                ) { Text("Clear filters") }
+            }
         }
 
         // ---- Accounts: All | Main account | PNB ...  (only when there is more than one account)
@@ -349,7 +395,8 @@ fun TransactionsScreen(
         FilterSheet(
             filters = filters,
             onChange = { filters = it },
-            onDismiss = { filterSheetOpen = false }
+            onDismiss = { filterSheetOpen = false },
+            paymentMethods = filterMethods
         )
     }
 
@@ -357,6 +404,15 @@ fun TransactionsScreen(
         EditTransactionDialog(
             original = txn,
             accounts = accounts,
+            settings = settings,
+            onAddAccount = { newAccount, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the account") { newId = dao.insertAccount(newAccount) }) {
+                        onCreated(newId)
+                    }
+                }
+            },
             onSave = { updated ->
                 scope.launch { safeWrite(context, "save the changes") { dao.update(updated) } }
                 editing = null
@@ -385,10 +441,6 @@ fun TransactionsScreen(
 }
 
 // --------------------------------------------------------------- pieces
-
-private fun comingSoon(context: android.content.Context, what: String) {
-    android.widget.Toast.makeText(context, "$what: coming soon", android.widget.Toast.LENGTH_SHORT).show()
-}
 
 @Composable
 private fun TotalsCard(totals: TransactionTotals, balance: Long, balanceLabel: String) {
@@ -517,7 +569,8 @@ private fun transactionItem(
         title = txn.title,
         description = buildString {
             append(sign).append(formatMoney(txn.amountPaise))
-            append(" • ").append(txn.paymentMethod)
+            // A transaction can have no payment method (when you removed every method)
+            if (txn.paymentMethod.isNotBlank()) append(" • ").append(txn.paymentMethod)
             if (accountName != null) append(" • ").append(accountName)
         },
         time = buildString {

@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.TransactionEntity
 import com.manu.manudesignsystem.components.ManuChip
@@ -35,7 +36,11 @@ fun EditTransactionDialog(
     original: TransactionEntity,
     onSave: (TransactionEntity) -> Unit,
     onDismiss: () -> Unit,
-    accounts: List<AccountSummary> = emptyList()      // the account picker only shows with 2 or more
+    /** Where the payment methods come from (and where a new one is saved). */
+    settings: AppSettings,
+    /** Saves a new account; calls the second function with its id once it exists. */
+    onAddAccount: (AccountEntity, (Long) -> Unit) -> Unit,
+    accounts: List<AccountSummary> = emptyList()
 ) {
     var title by remember { mutableStateOf(original.title) }
     var amountText by remember { mutableStateOf(formatAmountPaise(original.amountPaise)) }
@@ -49,6 +54,13 @@ fun EditTransactionDialog(
     var timePickerOpen by remember { mutableStateOf(false) }
     var accountId by remember { mutableStateOf(original.accountId) }
     var accountMenuOpen by remember { mutableStateOf(false) }
+    var addAccountOpen by remember { mutableStateOf(false) }
+    var addPaymentOpen by remember { mutableStateOf(false) }
+
+    // Your list from Settings. If this transaction uses a method you have since removed, it stays
+    // in the dropdown too, so editing the transaction doesn't force you to change it.
+    val methods = settings.paymentMethods
+    val options = methods + listOfNotNull(original.paymentMethod.takeIf { it.isNotBlank() && it !in methods })
 
     // The lib's dialog: title, scrolling content, Cancel + Save buttons
     ManuDialog(
@@ -99,27 +111,27 @@ fun EditTransactionDialog(
                     onClick = { type = "INCOME" }
                 )
             }
-            if (accounts.size > 1) {
-                Box {
-                    ManuPickerField(
-                        value = accounts.firstOrNull { it.id == accountId }?.name ?: "?",
-                        label = { Text("Account") },
-                        leadingIcon = AppIcons.Wallet,
-                        trailingIcon = Icons.Default.KeyboardArrowDown,
-                        onClick = { accountMenuOpen = true }
-                    )
-                    ManuDropdownMenu(
-                        expanded = accountMenuOpen,
-                        onDismissRequest = { accountMenuOpen = false },
-                        items = accounts.map { account ->
-                            ManuMenuItem(label = account.name, onClick = { accountId = account.id })
-                        }
-                    )
-                }
-            }
+            // Account: always shown, so a new one can be added from here
             Box {
                 ManuPickerField(
-                    value = payment,
+                    value = accounts.firstOrNull { it.id == accountId }?.name ?: "?",
+                    label = { Text("Account") },
+                    leadingIcon = AppIcons.Wallet,
+                    trailingIcon = Icons.Default.KeyboardArrowDown,
+                    onClick = { accountMenuOpen = true }
+                )
+                ManuDropdownMenu(
+                    expanded = accountMenuOpen,
+                    onDismissRequest = { accountMenuOpen = false },
+                    items = accounts.map { account ->
+                        ManuMenuItem(label = account.name, onClick = { accountId = account.id })
+                    } + ManuMenuItem(label = "+ New account", onClick = { addAccountOpen = true })
+                )
+            }
+            // Payment method: your list from Settings, plus "+ Add new" at the end
+            Box {
+                ManuPickerField(
+                    value = payment.ifBlank { "None" },
                     label = { Text("Payment method") },
                     leadingIcon = AppIcons.Wallet,
                     trailingIcon = Icons.Default.KeyboardArrowDown,
@@ -128,9 +140,9 @@ fun EditTransactionDialog(
                 ManuDropdownMenu(
                     expanded = payMenuOpen,
                     onDismissRequest = { payMenuOpen = false },
-                    items = PAYMENT_METHODS.map { method ->
+                    items = options.map { method ->
                         ManuMenuItem(label = method, onClick = { payment = method })
-                    }
+                    } + ManuMenuItem(label = "+ Add new", onClick = { addPaymentOpen = true })
                 )
             }
             ManuPickerField(
@@ -157,6 +169,32 @@ fun EditTransactionDialog(
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+
+    // "+ New account": name and optional opening balance; the new account is selected right away
+    if (addAccountOpen) {
+        AccountDialog(
+            initial = null,
+            takenNames = accounts.map { it.name.trim().lowercase() }.toSet(),
+            onSave = { newAccount ->
+                onAddAccount(newAccount) { id -> accountId = id }
+                addAccountOpen = false
+            },
+            onDismiss = { addAccountOpen = false }
+        )
+    }
+
+    // "+ Add new" payment method: saved to the list and selected right away
+    if (addPaymentOpen) {
+        AddPaymentMethodDialog(
+            existing = methods,
+            onAdd = { name ->
+                settings.addPaymentMethod(name)
+                payment = name
+                addPaymentOpen = false
+            },
+            onDismiss = { addPaymentOpen = false }
+        )
     }
 
     ManuDatePicker(

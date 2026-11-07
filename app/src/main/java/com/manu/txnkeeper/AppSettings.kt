@@ -38,9 +38,41 @@ class AppSettings(context: Context) {
         return ThemeMode.entries.firstOrNull { it.name == saved } ?: ThemeMode.SYSTEM
     }
 
+    /**
+     * The payment methods offered when adding or editing a transaction. It starts as the built-in
+     * list ([PAYMENT_METHODS]); after that it is entirely yours: add new ones, remove any of them
+     * (even the built-in ones, even all of them).
+     */
+    var paymentMethods by mutableStateOf(readPaymentMethods())
+        private set
+
+    /** Adds a payment method (the name is tidied first). Does nothing for a blank or repeated name. */
+    fun addPaymentMethod(name: String) {
+        val clean = cleanPaymentMethodName(name)
+        if (clean.isEmpty() || clean in paymentMethods) return
+        savePaymentMethods(paymentMethods + clean)
+    }
+
+    /** Removes it from the list. Transactions that already use it keep their label. */
+    fun removePaymentMethod(name: String) {
+        savePaymentMethods(paymentMethods - name)
+    }
+
+    private fun savePaymentMethods(list: List<String>) {
+        paymentMethods = list
+        // An empty list is saved as an empty text, which is different from "never changed"
+        prefs.edit().putString(KEY_PAYMENT_METHODS, list.joinToString("\n")).apply()
+    }
+
+    private fun readPaymentMethods(): List<String> {
+        val saved = prefs.getString(KEY_PAYMENT_METHODS, null) ?: return PAYMENT_METHODS
+        return saved.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+    }
+
     private companion object {
         const val PREFS_NAME = "txnkeeper_settings"
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_PAYMENT_METHODS = "payment_methods"
     }
 }
 
