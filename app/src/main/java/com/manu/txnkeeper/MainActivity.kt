@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
@@ -46,6 +47,7 @@ import kotlinx.coroutines.launch
 import com.manu.manudesignsystem.components.ManuFab
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import com.manu.manudesignsystem.components.ManuScaffold
@@ -169,6 +171,34 @@ fun TxnkeeperApp(
             showCamera = false
             ocr.run(it)
             onSharedImageHandled()
+        }
+    }
+
+    // A finished scan fills the Add page right away; what was detected is shown above the fields
+    LaunchedEffect(ocr.outcome) {
+        val outcome = ocr.outcome ?: return@LaunchedEffect
+        ocr.outcome = null
+        when {
+            outcome.text.isBlank() ->
+                Toast.makeText(context, "No text found in this image.", Toast.LENGTH_SHORT).show()
+
+            outcome.parsed.isEmpty ->
+                Toast.makeText(context, "Text detected, but no transaction details found.", Toast.LENGTH_LONG).show()
+
+            else -> {
+                var message = "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save."
+                // Warn before saving if the same reference number is already in the list
+                val ref = outcome.parsed.description?.removePrefix("Ref: ")?.trim()
+                if (!ref.isNullOrEmpty()) {
+                    dao.findByReference(ref)?.let { d ->
+                        message += "\n\nPossible duplicate: you already saved \"${d.title}\" " +
+                                "(${formatMoney(d.amountPaise)}, ${formatDateLong(d.dateTime)}) " +
+                                "with the same reference number."
+                    }
+                }
+                form.fill(outcome.parsed, message = message)
+                showAdd = true
+            }
         }
     }
 
@@ -323,20 +353,17 @@ fun TxnkeeperApp(
                     onPhotoSaved = { lastPhotoUri = it },
                     onImageReady = { uri ->
                         showCamera = false   // back first
-                        ocr.run(uri)         // then the dialog opens over it
+                        ocr.run(uri)         // then the Add page opens, filled in
                     }
                 )
             }
+
+            // ---------------- Shown briefly while a scanned image is being read
+            if (ocr.busy) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
         }
     }
-
-    // Recognized-text dialog (shown over everything). "Fill form" opens the Add page, filled in.
-    OcrResultDialog(
-        ocr = ocr,
-        findDuplicate = { ref -> dao.findByReference(ref) },
-        onFill = { parsed ->
-            form.fill(parsed)
-            showAdd = true
-        }
-    )
 }

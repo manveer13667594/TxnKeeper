@@ -2,32 +2,21 @@ package com.manu.txnkeeper
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
-import android.widget.Toast
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.manu.manudesignsystem.components.ManuButton
-import com.manu.manudesignsystem.components.ManuCustomDialog
-import com.manu.manudesignsystem.components.ManuOutlineButton
-import com.manu.manudesignsystem.components.ManuTextButton
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
@@ -203,8 +192,6 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
     var recording by remember { mutableStateOf(false) }
     var seconds by remember { mutableIntStateOf(0) }
     var working by remember { mutableStateOf<String?>(null) }
-    // Set when a transcription finishes; the dialog below shows it
-    var result by remember { mutableStateOf<VoiceTranscript?>(null) }
 
     // Free the model's memory when the Add page is closed
     DisposableEffect(Unit) { onDispose { VoiceEngine.release() } }
@@ -221,9 +208,8 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
             working = "Working…"
             form.notice = "Working…"
             try {
-                // Nothing is filled yet: the dialog shows the text and the parsed fields first
-                result = VoiceEngine.transcribe(context, samples) { working = it; form.notice = it }
-                form.notice = null
+                val heard = VoiceEngine.transcribe(context, samples) { working = it; form.notice = it }
+                fillFromSpeech(form, heard.text)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -283,140 +269,29 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
             else -> Icon(Icons.Default.Mic, contentDescription = "Speak a transaction")
         }
     }
-
-    result?.let { heard ->
-        VoiceResultDialog(
-            heard = heard,
-            onClose = { result = null },
-            onFill = { parsed ->
-                form.fill(parsed, message = "Heard: \"${heard.text}\". Check the form, then save.")
-            },
-            onReviewAll = { list -> form.startBatch(list, heard.text) }
-        )
-    }
 }
-
-private fun voiceAmount(a: Double): String =
-    "₹" + if (a % 1.0 == 0.0) a.toLong().toString() else a.toString()
-
-private fun voiceDate(millis: Long): String =
-    java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.getDefault()).format(java.util.Date(millis))
-
-private fun voiceSummaryLines(p: ParsedTransaction): List<String> = buildList {
-    p.title?.let { add("Title: $it") }
-    p.amount?.let { add("Amount: " + voiceAmount(it)) }
-    p.type?.let { add("Type: " + it.lowercase().replaceFirstChar { c -> c.uppercase() }) }
-    p.paymentMethod?.let { add("Payment: $it") }
-    p.dateMillis?.let { add("Date: " + voiceDate(it)) }
-    p.description?.let { add(it) }
-}
-
-/** One line per transaction when a recording holds several: "Rahul · ₹500 · Expense · UPI". */
-private fun voiceOneLine(p: ParsedTransaction): String = listOfNotNull(
-    p.title ?: "Voice entry",
-    p.amount?.let { voiceAmount(it) },
-    p.type?.lowercase()?.replaceFirstChar { it.uppercase() },
-    p.paymentMethod,
-    p.dateMillis?.let { voiceDate(it) },
-    p.description
-).joinToString(" · ")
 
 /**
- * What was heard, how long it took, and what the parser found.
- * One transaction: "Fill form" fills the form, nothing is saved.
- * Several: they are listed, and "Review" opens them one by one in the form (Save & next).
+ * Puts what was said straight into the form, with the words shown above the fields:
+ *   Heard: "rahul gave 35rs". Check the form, then save.
+ * Several transactions in one recording open one at a time (Save & next).
+ * Nothing is saved here.
  */
-@Composable
-private fun VoiceResultDialog(
-    heard: VoiceTranscript,
-    onClose: () -> Unit,
-    onFill: (ParsedTransaction) -> Unit,
-    onReviewAll: (List<ParsedTransaction>) -> Unit
-) {
-    val context = LocalContext.current
-    val found = remember(heard) { SpokenTransactionParser.parseAll(heard.text) }
-    // Nothing with an amount: still show whatever the parser could pick up (a title, a date...)
-    val single = remember(found) { found.firstOrNull() ?: SpokenTransactionParser.parse(heard.text) }
-    val summary = remember(single) { voiceSummaryLines(single) }
-    val several = found.size > 1
-
-    ManuCustomDialog(
-        onDismissRequest = onClose,
-        title = "Heard",
-        buttons = {
-            ManuOutlineButton(onClick = onClose) { Text("Close") }
-            if (heard.text.isNotBlank()) {
-                ManuTextButton(onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    clipboard.setPrimaryClip(ClipData.newPlainText("Voice text", heard.text))
-                    Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show()
-                }) { Text("Copy") }
-            }
-            when {
-                several -> ManuButton(onClick = {
-                    onReviewAll(found)
-                    onClose()
-                }) { Text("Review ${found.size}") }
-
-                !single.isEmpty -> ManuButton(onClick = {
-                    onFill(single)
-                    onClose()
-                }) { Text("Fill form") }
-            }
-        }
-    ) {
-        if (heard.text.isBlank()) {
-            Text("Could not hear anything. Try again, a bit closer to the mic.")
-        } else {
-            Text(
-                "Model: ${VOICE_MODEL.name}  ·  " +
-                        "${"%.1f".format(java.util.Locale.US, heard.seconds)}s to transcribe " +
-                        "${"%.1f".format(java.util.Locale.US, heard.audioSeconds)}s of audio",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            Text("Full text", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(bottom = 4.dp))
-            SelectionContainer {
-                Text(heard.text, style = MaterialTheme.typography.bodyMedium)
-            }
-            when {
-                several -> {
-                    Text(
-                        "Found ${found.size} transactions",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-                    )
-                    found.forEachIndexed { i, p ->
-                        Text("${i + 1}. ${voiceOneLine(p)}", modifier = Modifier.padding(bottom = 4.dp))
-                    }
-                    Text(
-                        "Tap Review: they open one at a time in the form so you can edit each, then Save & next.",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Normal,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                summary.isEmpty() -> Text(
-                    "Couldn't find transaction details in this.",
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-
-                else -> {
-                    Text(
-                        "Found",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
-                    )
-                    summary.forEach { Text(it) }
-                    Text(
-                        "Check these, then tap Fill form. Nothing is saved automatically.",
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Normal,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-            }
-        }
+private fun fillFromSpeech(form: TxnFormState, text: String) {
+    if (text.isBlank()) {
+        form.notice = "Could not hear anything. Try again, a bit closer to the mic."
+        return
+    }
+    val found = SpokenTransactionParser.parseAll(text)
+    if (found.size > 1) {
+        form.startBatch(found, text)
+        return
+    }
+    // Nothing with an amount: still use whatever the parser could pick up (a title, a date...)
+    val single = found.firstOrNull() ?: SpokenTransactionParser.parse(text)
+    if (single.isEmpty) {
+        form.notice = "Heard: \"$text\". Couldn't find transaction details in this."
+    } else {
+        form.fill(single, message = "Heard: \"$text\". Check the form, then save.")
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -34,6 +35,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -209,64 +213,69 @@ fun AddTransactionScreen(
                             ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
                             ManuChip(label = "Income", selected = form.type == "INCOME", onClick = { form.type = "INCOME" })
                         }
+                  Column(
+                      modifier = Modifier.width(220.dp),
+                      verticalArrangement = Arrangement.spacedBy(16.dp)
 
-                        // Account (only when there is a choice)
-                        if (accounts.size > 1) {
-                            Box {
-                                ManuPickerField(
-                                    value = account?.name ?: "",
-                                    leadingIcon = AppIcons.Wallet,
-                                    trailingIcon = Icons.Default.KeyboardArrowDown,
-                                    onClick = { accountMenuOpen = true }
-                                )
-                                ManuDropdownMenu(
-                                    expanded = accountMenuOpen,
-                                    onDismissRequest = { accountMenuOpen = false },
-                                    items = accounts.map { a ->
-                                        ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
-                                    }
-                                )
-                            }
-                        }
+                  ) {
+                      // Account (only when there is a choice)
+                      if (accounts.size > 1) {
+                          Box {
+                              ManuPickerField(
+                                  value = account?.name ?: "",
+                                  leadingIcon = AppIcons.Wallet,
+                                  trailingIcon = Icons.Default.KeyboardArrowDown,
+                                  onClick = { accountMenuOpen = true }
+                              )
+                              ManuDropdownMenu(
+                                  expanded = accountMenuOpen,
+                                  onDismissRequest = { accountMenuOpen = false },
+                                  items = accounts.map { a ->
+                                      ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
+                                  }
+                              )
+                          }
+                      }
 
-                        // Payment method
-                        Box {
-                            ManuPickerField(
-                                value = form.payment,
-                                leadingIcon = AppIcons.Wallet,
-                                trailingIcon = Icons.Default.KeyboardArrowDown,
-                                onClick = { payMenuOpen = true }
-                            )
-                            ManuDropdownMenu(
-                                expanded = payMenuOpen,
-                                onDismissRequest = { payMenuOpen = false },
-                                items = PAYMENT_METHODS.map { method ->
-                                    ManuMenuItem(label = method, onClick = { form.payment = method })
-                                }
-                            )
-                        }
+                      // Payment method
+                      Box {
+                          ManuPickerField(
+                              value = form.payment,
+                              leadingIcon = AppIcons.Wallet,
+                              trailingIcon = Icons.Default.KeyboardArrowDown,
+                              onClick = { payMenuOpen = true }
+                          )
+                          ManuDropdownMenu(
+                              expanded = payMenuOpen,
+                              onDismissRequest = { payMenuOpen = false },
+                              items = PAYMENT_METHODS.map { method ->
+                                  ManuMenuItem(label = method, onClick = { form.payment = method })
+                              }
+                          )
+                      }
 
-                        // Date
-                        ManuPickerField(
-                            value = formatDateLong(form.dateTime),
-                            leadingIcon = Icons.Default.DateRange,
-                            trailingIcon = Icons.Default.KeyboardArrowDown,
-                            onClick = {
-                                focusManager.clearFocus()
-                                datePickerOpen = true
-                            }
-                        )
+                      // Date
+                      ManuPickerField(
+                          value = formatDateLong(form.dateTime),
+                          leadingIcon = Icons.Default.DateRange,
+                          trailingIcon = Icons.Default.KeyboardArrowDown,
+                          onClick = {
+                              focusManager.clearFocus()
+                              datePickerOpen = true
+                          }
+                      )
 
-                        // Time
-                        ManuPickerField(
-                            value = formatTime(form.dateTime),
-                            leadingIcon = AppIcons.Schedule,
-                            trailingIcon = Icons.Default.KeyboardArrowDown,
-                            onClick = {
-                                focusManager.clearFocus()
-                                timePickerOpen = true
-                            }
-                        )
+                      // Time
+                      ManuPickerField(
+                          value = formatTime(form.dateTime),
+                          leadingIcon = AppIcons.Schedule,
+                          trailingIcon = Icons.Default.KeyboardArrowDown,
+                          onClick = {
+                              focusManager.clearFocus()
+                              timePickerOpen = true
+                          }
+                      )
+                  }
 
                         ManuTextField(
                             value = form.description,
@@ -298,11 +307,11 @@ fun AddTransactionScreen(
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                            ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
-                                Text("Save & exit", maxLines = 1)
-                            }
                             ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
                                 Text("Save & next", maxLines = 1)
+                            }
+                            ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
+                                Text("Save & exit", maxLines = 1)
                             }
                         }
 
