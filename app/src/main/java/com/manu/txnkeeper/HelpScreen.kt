@@ -57,8 +57,9 @@ private val FAQS = listOf(
     ),
     Faq(
         question = "How does voice entry work?",
-        answer = "On the Add page, tap the mic button and say one or more transactions, " +
-                "like \"paid 500 to Rahul, got 2000 salary\". Tap it again to stop.\n" +
+        answer = "Swipe from right to left on the home screen. Tap the mic button at the bottom and say one or more transactions, " +
+                "like \"paid 500 to Rahul, got 2000 salary\". Tap it again to stop, and the Add page opens filled in. " +
+                "The mic button on the Add page works too.\n" +
                 "The first time, a speech model is downloaded, so you need internet that once. After that it works offline."
     ),
     Faq(

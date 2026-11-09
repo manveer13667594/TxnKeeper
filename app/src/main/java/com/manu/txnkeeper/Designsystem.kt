@@ -51,3 +51,21 @@ fun Modifier.swipeRightTo(onSwipe: () -> Unit): Modifier {
         )
     }
 }
+
+/**
+ * Calls [onSwipe] after a drag from right to left of more than 100dp (the mirror of [swipeRightTo]).
+ * Vertical scrolling is not affected.
+ */
+@Composable
+fun Modifier.swipeLeftTo(onSwipe: () -> Unit): Modifier {
+    val current by rememberUpdatedState(onSwipe)
+    return pointerInput(Unit) {
+        var total = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragCancel = { total = 0f },
+            onDragEnd = { if (total < -100.dp.toPx()) current() },
+            onHorizontalDrag = { _, amount -> total += amount }
+        )
+    }
+}

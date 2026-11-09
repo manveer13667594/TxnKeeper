@@ -2,6 +2,8 @@ package com.manu.txnkeeper
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -106,6 +108,20 @@ private fun scrollMetrics(state: LazyListState, before: IntArray, total: Int): S
     )
 }
 
+/** Roughly how tall one transaction is on screen (average over the visible days; a guess if none). */
+private fun pixelsPerTransaction(state: LazyListState, before: IntArray): Float {
+    var px = 0
+    var count = 0
+    for (item in state.layoutInfo.visibleItemsInfo) {
+        val day = item.index - 1
+        if (day in 0 until before.size - 1) {
+            px += item.size
+            count += before[day + 1] - before[day]
+        }
+    }
+    return if (count > 0) px.toFloat() / count else 72f
+}
+
 /** The day (0-based) that holds transaction number [txn] (0-based), given the "before" counts. */
 private fun dayAt(before: IntArray, txn: Int): Int {
     var low = 0
@@ -138,7 +154,11 @@ fun BoxScope.TransactionScrollbar(
     }
     val total by rememberUpdatedState(totalCount)
     val loadUpTo by rememberUpdatedState(onLoadUpTo)
-    val metrics by remember(before) { derivedStateOf { scrollMetrics(listState, before, total) } }
+    val beforeNow by rememberUpdatedState(before)
+    // The thumb's length only changes when the number of rows on screen does, not on every scroll frame
+    val thumbFraction by remember(before) {
+        derivedStateOf { scrollMetrics(listState, before, total)?.visibleFraction }
+    }
 
     var trackPx by remember { mutableIntStateOf(0) }
     // While the thumb is held: where it is (0..1) and how many transactions that spans
@@ -167,8 +187,15 @@ fun BoxScope.TransactionScrollbar(
         val loaded = before[days]
         val target = (progress * dragRange).roundToInt()
         if (target >= loaded && loaded < total) loadUpTo(target + 100)
-        val day = dayAt(before, target.coerceIn(0, loaded - 1))
-        listState.scrollToItem(if (target <= 0) 0 else day + 1)
+        if (target <= 0) {
+            listState.scrollToItem(0)
+        } else {
+            // Land inside the day too (not only on its first row), so the list follows the thumb smoothly
+            val wanted = target.coerceIn(0, loaded - 1)
+            val day = dayAt(before, wanted)
+            val inside = ((wanted - before[day]) * pixelsPerTransaction(listState, before)).roundToInt()
+            listState.scrollToItem(day + 1, inside)
+        }
     }
 
     val thumbWidth by animateDpAsState(
@@ -189,27 +216,36 @@ fun BoxScope.TransactionScrollbar(
             .width(TouchWidth)
             .onSizeChanged { trackPx = it.height }
     ) {
-        val m = metrics
-        if (m != null && trackPx > 0) {
+        val fraction = thumbFraction
+        if (fraction != null && trackPx > 0) {
             val minPx = with(density) { ThumbMinHeight.toPx() }
             val trackF = trackPx.toFloat()
-            val thumbPx = max(minPx, m.visibleFraction * trackF).coerceAtMost(trackF)
+            // Glides to its new length instead of jumping when days of different size scroll by
+            val thumbPx by animateFloatAsState(
+                targetValue = max(minPx, fraction * trackF).coerceAtMost(trackF),
+                animationSpec = tween(250),
+                label = "scrollbarThumbLength"
+            )
             val room = (trackF - thumbPx).coerceAtLeast(0f)       // how far the thumb can travel
-            val progress = dragProgress ?: m.progress
 
-            // The drag handler is set up once, so it reads these through State to see the latest values
-            val latestProgress by rememberUpdatedState(m.progress)
+            // The drag handler is set up once, so it reads this through State to see the latest value
             val latestRoom by rememberUpdatedState(room)
-            val latestRange by rememberUpdatedState(m.scrollRange)
 
             AnimatedVisibility(
                 visible = shown,
-                enter = fadeIn(),
-                exit = fadeOut(),
-                // The offset moves the whole thumb, touch area included, so it can be grabbed where it is drawn
+                enter = fadeIn(tween(120)),
+                exit = fadeOut(tween(400)),
+                // The offset moves the whole thumb, touch area included, so it can be grabbed where it is drawn.
+                // It is read while the screen is laid out (not while it is composed), so scrolling
+                // only moves the thumb and never rebuilds it.
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset { IntOffset(0, (progress * room).roundToInt()) }
+                    .offset {
+                        val progress = dragProgress
+                            ?: scrollMetrics(listState, beforeNow, total)?.progress
+                            ?: 0f
+                        IntOffset(0, (progress * room).roundToInt())
+                    }
             ) {
                 Box(
                     modifier = Modifier
@@ -219,8 +255,9 @@ fun BoxScope.TransactionScrollbar(
                             var position = 0f
                             detectVerticalDragGestures(
                                 onDragStart = {
-                                    position = latestProgress
-                                    dragRange = latestRange
+                                    val now = scrollMetrics(listState, beforeNow, total)
+                                    position = now?.progress ?: 0f
+                                    dragRange = now?.scrollRange ?: 1
                                     dragProgress = position
                                 },
                                 onDragEnd = { dragProgress = null },

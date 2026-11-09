@@ -121,6 +121,7 @@ class MainActivity : ComponentActivity() {
  * The app has one home screen (the transactions list). On top of it, when needed:
  *   - the "Add transaction" page (the + button, or after scanning a receipt)
  *   - the camera (the camera icon, or swipe from left to right)
+ *   - voice entry (swipe from right to left): its own page with the mic button, then the Add page opens filled in
  *   - the Settings page (from the three-dot menu), and the Accounts page (from Settings)
  *   - the Help and About pages (from the three-dot menu)
  */
@@ -165,6 +166,7 @@ fun TxnkeeperApp(
     var showAdd by remember { mutableStateOf(false) }
     var fabVisible by remember { mutableStateOf(true) }
     var showCamera by remember { mutableStateOf(false) }
+    var showVoice by remember { mutableStateOf(false) }
     // Text recognition runs here, after the camera has closed
     val ocr = rememberOcrController()
 
@@ -213,6 +215,11 @@ fun TxnkeeperApp(
         showCamera = true
     }
 
+    fun openVoice() {
+        focusManager.clearFocus()
+        showVoice = true
+    }
+
     // Back from the Add page or the Accounts page returns to the list (the camera has its own back handling)
     BackHandler(enabled = showAdd) {
         focusManager.clearFocus()
@@ -244,6 +251,7 @@ fun TxnkeeperApp(
                     modifier = Modifier
                         .fillMaxSize()
                         .swipeRightTo { openCamera() }
+                        .swipeLeftTo { openVoice() }
                 ) {
                     TransactionsScreen(
                         dao = dao,
@@ -393,6 +401,24 @@ fun TxnkeeperApp(
                     onImageReady = { uri ->
                         showCamera = false   // back first
                         ocr.run(uri)         // then the Add page opens, filled in
+                    }
+                )
+            }
+
+            // ---------------- Voice entry slides in from the right over everything
+            AnimatedVisibility(
+                visible = showVoice,
+                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+            ) {
+                VoiceScreen(
+                    onClose = { showVoice = false },
+                    onHeard = { text ->
+                        // Same as the + button: new entries go to the account you are looking at
+                        form.accountId = accountFilter ?: form.accountId
+                        fillFromSpeech(form, text)
+                        showVoice = false
+                        showAdd = true
                     }
                 )
             }

@@ -277,7 +277,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
  * Several transactions in one recording open one at a time (Save & next).
  * Nothing is saved here.
  */
-private fun fillFromSpeech(form: TxnFormState, text: String) {
+internal fun fillFromSpeech(form: TxnFormState, text: String) {
     if (text.isBlank()) {
         form.notice = "Could not hear anything. Try again, a bit closer to the mic."
         return
