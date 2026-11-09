@@ -3,11 +3,13 @@ package com.manu.txnkeeper
 import android.content.Context
 import android.net.Uri
 import androidx.room.withTransaction
+import androidx.sqlite.db.SimpleSQLiteQuery
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
 import com.manu.txnkeeper.data.local.TransactionEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 /** What an import did. If [fileError] is set nothing was imported. */
@@ -51,51 +53,119 @@ sealed interface ExportScope {
 }
 
 /**
+ * Extra conditions on top of an [ExportScope]. Every condition that is set must match, and they
+ * also apply to "Latest N" (the newest N of the transactions that match). null = don't filter on it.
+ */
+data class ExportFilters(
+    val accountId: Long? = null,
+    val paymentMethod: String? = null,
+    val type: String? = null,               // "INCOME" / "EXPENSE"
+    val minAmountPaise: Long? = null,
+    val maxAmountPaise: Long? = null
+) {
+    /** How many conditions are on (the min / max pair counts as one). */
+    val activeCount: Int
+        get() = listOf(
+            accountId != null,
+            paymentMethod != null,
+            type != null,
+            minAmountPaise != null || maxAmountPaise != null
+        ).count { it }
+}
+
+/**
+ * The scope and filters as one [TxnQuery], so export uses the very same condition builder
+ * (TxnSql) as the transaction list and the two always agree on what "UPI over 500" means.
+ */
+internal fun exportQuery(scope: ExportScope, filters: ExportFilters): TxnQuery = TxnQuery(
+    txType = filters.type,
+    payMethod = filters.paymentMethod,
+    minAmount = filters.minAmountPaise?.let { it / 100.0 },
+    maxAmount = filters.maxAmountPaise?.let { it / 100.0 },
+    dateFrom = (scope as? ExportScope.DateRange)?.from,
+    dateTo = (scope as? ExportScope.DateRange)?.to,
+    accountId = filters.accountId,
+    search = "",
+    newestFirst = true
+)
+
+/**
  * Reads and writes the files the user picked in the system file picker. The picker hands over a
  * Uri we may read or write directly, so no storage permission is needed.
  */
 object DataTransfer {
 
-    /** Writes the transactions of [scope] to [uri] as CSV. Returns how many were written. */
+    /** Writes the transactions of [scope] that match [filters] to [uri] as CSV. Returns how many were written. */
     suspend fun exportCsv(
-        context: Context, database: AppDatabase, uri: Uri, scope: ExportScope = ExportScope.All
+        context: Context, database: AppDatabase, uri: Uri,
+        scope: ExportScope = ExportScope.All,
+        filters: ExportFilters = ExportFilters()
     ): Int = withContext(Dispatchers.IO) {
-        val rows = loadRows(database, scope)
+        val rows = loadRows(database, scope, filters)
         val csv = TxnCsv.write(rows)
         context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(csv.toByteArray(Charsets.UTF_8)) }
             ?: error("Could not open the file for writing")
         rows.size
     }
 
-    /** Writes the transactions of [scope] to [uri] as a PDF. Returns how many were written. */
+    /** Writes the transactions of [scope] that match [filters] to [uri] as a PDF. Returns how many were written. */
     suspend fun exportPdf(
-        context: Context, database: AppDatabase, uri: Uri, scope: ExportScope = ExportScope.All
+        context: Context, database: AppDatabase, uri: Uri,
+        scope: ExportScope = ExportScope.All,
+        filters: ExportFilters = ExportFilters()
     ): Int = withContext(Dispatchers.IO) {
-        val rows = loadRows(database, scope)
-        context.contentResolver.openOutputStream(uri, "wt")?.use { TxnPdf.write(rows, it, scopeLabel = scopeLabel(scope)) }
+        val rows = loadRows(database, scope, filters)
+        val accountName = filters.accountId?.let { id ->
+            database.transactionDao().getAccountsOnce().firstOrNull { it.id == id }?.name
+        }
+        val label = scopeLabel(scope, filters, accountName)
+        context.contentResolver.openOutputStream(uri, "wt")?.use { TxnPdf.write(rows, it, scopeLabel = label) }
             ?: error("Could not open the file for writing")
         rows.size
     }
 
-    /** How many transactions [scope] matches (used to say "nothing to export" before the file picker opens). */
-    suspend fun countFor(database: AppDatabase, scope: ExportScope): Int =
-        withContext(Dispatchers.IO) { loadRows(database, scope).size }
+    /** How many transactions the choice matches (used to say "nothing to export" before the file picker opens). */
+    suspend fun countFor(
+        database: AppDatabase, scope: ExportScope, filters: ExportFilters = ExportFilters()
+    ): Int = withContext(Dispatchers.IO) { loadRows(database, scope, filters).size }
 
     /** Text shown under the PDF title, or null when everything is exported. */
-    fun scopeLabel(scope: ExportScope): String? = when (scope) {
-        ExportScope.All -> null
-        is ExportScope.DateRange -> "${formatDateLong(scope.from)} - ${formatDateLong(scope.to)}"
-        is ExportScope.Latest -> "Latest ${scope.count} transactions"
+    fun scopeLabel(
+        scope: ExportScope,
+        filters: ExportFilters = ExportFilters(),
+        accountName: String? = null
+    ): String? {
+        val parts = mutableListOf<String>()
+        when (scope) {
+            ExportScope.All -> Unit
+            is ExportScope.DateRange -> parts += "${formatDateLong(scope.from)} - ${formatDateLong(scope.to)}"
+            is ExportScope.Latest -> parts += "Latest ${scope.count} transactions"
+        }
+        filters.accountId?.let { parts += "Account: ${accountName ?: "#$it"}" }
+        filters.paymentMethod?.let { parts += "Payment: $it" }
+        filters.type?.let { parts += if (it == "INCOME") "Income only" else "Expense only" }
+        val min = filters.minAmountPaise
+        val max = filters.maxAmountPaise
+        when {
+            min != null && max != null -> parts += "Amount ${formatMoney(min)} to ${formatMoney(max)}"
+            min != null -> parts += "Amount at least ${formatMoney(min)}"
+            max != null -> parts += "Amount at most ${formatMoney(max)}"
+        }
+        return if (parts.isEmpty()) null else parts.joinToString("  ·  ")
     }
 
-    private suspend fun loadRows(database: AppDatabase, scope: ExportScope): List<TxnRow> {
+    private suspend fun loadRows(database: AppDatabase, scope: ExportScope, filters: ExportFilters): List<TxnRow> {
         val dao = database.transactionDao()
         val accountNames = dao.getAccountsOnce().associate { it.id to it.name }
-        val transactions = when (scope) {
-            ExportScope.All -> dao.getAllOnce()
-            is ExportScope.DateRange -> dao.getBetweenOnce(scope.from, scope.to)
-            is ExportScope.Latest -> dao.getLatestOnce(scope.count)
-        }
+
+        // Same WHERE builder as the list screen; "Latest N" is the first N of the filtered, newest-first rows
+        val where = TxnSql.where(exportQuery(scope, filters))
+        val limit = (scope as? ExportScope.Latest)?.count
+        val sql = "SELECT * FROM transactions WHERE ${where.sql} ORDER BY dateTime DESC, id DESC" +
+                (if (limit != null) " LIMIT ?" else "")
+        val args = if (limit != null) where.args + limit else where.args
+        val transactions = dao.rawTransactions(SimpleSQLiteQuery(sql, args.toTypedArray())).first()
+
         return transactions.map {
             TxnRow(
                 dateTime = it.dateTime,

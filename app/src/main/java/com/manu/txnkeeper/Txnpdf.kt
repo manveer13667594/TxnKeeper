@@ -46,8 +46,8 @@ object TxnPdf {
         }
 
     /**
-     * Writes the PDF to [out]. [generatedAt] is shown under the title, followed by [scopeLabel]
-     * (for example the date range) when the PDF holds only some of the transactions.
+     * Writes the PDF to [out]. [generatedAt] is shown under the title, and [scopeLabel] (for example
+     * the date range and filters) on the line below it when the PDF holds only some of the transactions.
      */
     fun write(
         rows: List<TxnRow>,
@@ -115,10 +115,15 @@ object TxnPdf {
             canvas!!.drawText("TxnKeeper transactions", MARGIN, y + 18f, titlePaint)
             y += 30f
             canvas!!.drawText(
-                "Generated ${formatDateLong(generatedAt)}, ${formatTime(generatedAt)}  ·  ${rows.size} transactions" +
-                        (scopeLabel?.let { "  ·  $it" } ?: ""),
+                "Generated ${formatDateLong(generatedAt)}, ${formatTime(generatedAt)}  ·  ${rows.size} transactions",
                 MARGIN, y + 9f, metaPaint
             )
+            // Which transactions this is (date range, account, filters...) gets its own line,
+            // cut with "…" if it is longer than the page is wide
+            if (scopeLabel != null) {
+                y += 13f
+                canvas!!.drawText(fit(scopeLabel, metaPaint, RIGHT_EDGE - MARGIN), MARGIN, y + 9f, metaPaint)
+            }
             y += 24f
             canvas!!.drawText(
                 "Income ${formatMoney(income)}     Expense ${formatMoney(expense)}     Net ${formatBalance(income - expense)}",

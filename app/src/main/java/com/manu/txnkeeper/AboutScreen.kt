@@ -45,6 +45,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuDialog
 import com.manu.manudesignsystem.components.ManuOutlineButton
@@ -57,9 +58,9 @@ private const val PRIVACY_POLICY_URL = "https://txnkeeper.github.io/txnkeeper-pr
 
 /**
  * The address that "Send feedback" writes to. Put yours here.
- * While it is empty, the Send feedback button is hidden.
+ * While it is empty, "Send feedback" is hidden, both on this page and in the home screen's ⋮ menu.
  */
-private const val FEEDBACK_EMAIL = ""
+const val FEEDBACK_EMAIL = "txnkeeper@gmail.com"
 
 /** One line of the highlights card: an icon, a short title and one line of detail. */
 private class Highlight(val icon: ImageVector, val title: String, val detail: String)
@@ -74,6 +75,7 @@ private val HIGHLIGHTS = listOf(
 /** The libraries the app is built with, and their licenses. Shown by "Open-source licenses". */
 private val LICENSES = listOf(
     "Jetpack Compose, Room, CameraX, Material Icons (AndroidX)" to "Apache License 2.0",
+    "Kotlin and kotlinx.coroutines" to "Apache License 2.0",
     "Google ML Kit Text Recognition" to "ML Kit Terms of Service",
     "whisper.cpp" to "MIT License",
     "OpenAI Whisper speech model" to "MIT License"
@@ -193,7 +195,7 @@ fun AboutScreen(
                         text = "Found a problem or have an idea? Tell us. Your email app opens with the app version filled in.",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    ManuOutlineButton(
+                    ManuButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { sendFeedback(context, versionName) }
                     ) { Text("Send feedback") }
@@ -299,8 +301,20 @@ private fun AboutSection(
     }
 }
 
-/** Opens the email app with a new message to [FEEDBACK_EMAIL]. Nothing from the app's data is added. */
-private fun sendFeedback(context: Context, versionName: String?) {
+/** The app's version, read from the app itself (null if it can't be read). */
+fun appVersionName(context: Context): String? =
+    try {
+        @Suppress("DEPRECATION")
+        context.packageManager.getPackageInfo(context.packageName, 0).versionName
+    } catch (e: Exception) {
+        null
+    }
+
+/**
+ * Opens the email app with a new message to [FEEDBACK_EMAIL]. Nothing from the app's data is added.
+ * Used by the About page and by the ⋮ menu on the home screen.
+ */
+fun sendFeedback(context: Context, versionName: String? = appVersionName(context)) {
     val version = versionName ?: "?"
     val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")).apply {
         putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL))

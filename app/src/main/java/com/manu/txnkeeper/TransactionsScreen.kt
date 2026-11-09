@@ -1,6 +1,11 @@
 package com.manu.txnkeeper
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,6 +26,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
@@ -28,6 +34,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -166,6 +173,8 @@ fun TransactionsScreen(
     }
 
     val groups = remember(page) { buildGroups(page.orEmpty()) }
+    // How many transactions each day holds (the scroll bar needs only the counts)
+    val dayCounts = remember(groups) { groups.map { it.txns.size } }
 
     // Load the next page when the user scrolls near the end
     val listState = rememberLazyListState()
@@ -181,10 +190,17 @@ fun TransactionsScreen(
         // A full page means there may be more
         if (nearEnd && (page?.size ?: 0) >= limit) limit += PAGE_SIZE
     }
+    // Whether the floating + button is showing (the "back to top" arrow rides above it)
+    var fabShown by remember { mutableStateOf(true) }
     FabAutoHide(
         position = { listState.firstVisibleItemIndex * 100_000 + listState.firstVisibleItemScrollOffset },
-        onVisible = onScrollDirection
+        onVisible = {
+            fabShown = it
+            onScrollDirection(it)
+        }
     )
+    // The totals card is the first list item: once it has scrolled away you are no longer at the top
+    val showScrollTop by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
     // New filters or search: start from the top
     LaunchedEffect(query) { listState.scrollToItem(0) }
 
@@ -207,189 +223,221 @@ fun TransactionsScreen(
     // Name the account on each row only when rows from several accounts are mixed together
     val showAccountOnRows = accounts.size > 1 && accountId == null
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 20.dp)
-    ) {
-        // ---- Title + scan / search buttons
-        ManuTopBar(
-            title = "TxnKeeper",
-            actions = {
-                // Filter icon, always shown next to the camera. Tap it to open the filters.
-                // While filters are on, it turns to the accent colour and shows how many.
-                IconButton(onClick = {
-                    focusManager.clearFocus()
-                    filterSheetOpen = true
-                }) {
-                    if (filters.activeCount > 0) {
-                        BadgedBox(badge = { Badge { Text("${filters.activeCount}") } }) {
-                            Icon(
-                                AppIcons.Sliders,
-                                contentDescription = "Filters applied: ${filters.activeCount}",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        Icon(AppIcons.Sliders, contentDescription = "Filters")
-                    }
-                }
-                IconButton(onClick = {
-                    focusManager.clearFocus()
-                    onScan() }
-                )
-                {
-                    Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
-                }
-                IconButton(onClick = {
-                    if (searchOpen) {
-                        searchText = ""
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 20.dp)
+        ) {
+            // ---- Title + scan / search buttons
+            ManuTopBar(
+                title = "TxnKeeper",
+                actions = {
+                    // Filter icon, always shown next to the camera. Tap it to open the filters.
+                    // While filters are on, it turns to the accent colour and shows how many.
+                    IconButton(onClick = {
                         focusManager.clearFocus()
+                        filterSheetOpen = true
+                    }) {
+                        if (filters.activeCount > 0) {
+                            BadgedBox(badge = { Badge { Text("${filters.activeCount}") } }) {
+                                Icon(
+                                    AppIcons.Sliders,
+                                    contentDescription = "Filters applied: ${filters.activeCount}",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        } else {
+                            Icon(AppIcons.Sliders, contentDescription = "Filters")
+                        }
                     }
-                    searchOpen = !searchOpen
-                }) {
-                    Icon(
-                        if (searchOpen) Icons.Default.Close else Icons.Default.Search,
-                        contentDescription = if (searchOpen) "Close search" else "Search"
+                    IconButton(onClick = {
+                        focusManager.clearFocus()
+                        onScan() }
                     )
-                }
-                // Three-dot menu
-                Box {
-                    IconButton(onClick = { menuOpen = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "More")
+                    {
+                        Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
                     }
-                    ManuDropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                        items = listOf(
-                            ManuMenuItem(
-                                label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    filterSheetOpen = true
-                                }
+                    IconButton(onClick = {
+                        if (searchOpen) {
+                            searchText = ""
+                            focusManager.clearFocus()
+                        }
+                        searchOpen = !searchOpen
+                    }) {
+                        Icon(
+                            if (searchOpen) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = if (searchOpen) "Close search" else "Search"
+                        )
+                    }
+                    // Three-dot menu
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        ManuDropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                            items = listOfNotNull(
+                                ManuMenuItem(
+                                    label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        filterSheetOpen = true
+                                    }
+                                ),
+                                ManuMenuItem(label = "Settings", onClick = onOpenSettings),
+                                ManuMenuItem(label = "Help", onClick = onOpenHelp),
+                                // Only there once an email address is set (FEEDBACK_EMAIL in AboutScreen.kt)
+                                if (FEEDBACK_EMAIL.isNotBlank()) {
+                                    ManuMenuItem(label = "Send feedback", onClick = { sendFeedback(context) })
+                                } else {
+                                    null
+                                },
+                                ManuMenuItem(label = "About", onClick = onOpenAbout)
                             ),
-                            ManuMenuItem(label = "Settings", onClick = onOpenSettings),
-                            ManuMenuItem(label = "Help", onClick = onOpenHelp),
-                            ManuMenuItem(label = "About", onClick = onOpenAbout)
-                        ),
+                        )
+                    }
+                }
+            )
+
+            // ---- Search box (opens from the search button)
+            AnimatedVisibility(visible = searchOpen) {
+                ManuTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    placeholder = { Text("Search title, amount, date, evening…") },
+                    modifier = Modifier
+                        .padding(bottom = ManuDesignSystem.spacing.sm)
+                        .focusRequester(searchFocus)
+                )
+            }
+
+            // ---- "2 filters applied  [Clear filters]" (only while filters are on). Sort order is kept.
+            AnimatedVisibility(visible = filters.activeCount > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = if (filters.activeCount == 1) "1 filter applied" else "${filters.activeCount} filters applied",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
                     )
+                    ManuTextButton(
+                        onClick = { filters = TxnFilters(newestFirst = filters.newestFirst) }
+                    ) { Text("Clear filters") }
                 }
             }
-        )
 
-        // ---- Search box (opens from the search button)
-        AnimatedVisibility(visible = searchOpen) {
-            ManuTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                placeholder = { Text("Search title, amount, date, evening…") },
-                modifier = Modifier
-                    .padding(bottom = ManuDesignSystem.spacing.sm)
-                    .focusRequester(searchFocus)
+            // ---- Accounts: All | Main account | PNB ...  (only when there is more than one account)
+            AccountChips(
+                accounts = accounts,
+                selectedId = accountId,
+                onSelect = onAccountChange
             )
-        }
 
-        // ---- "2 filters applied  [Clear filters]" (only while filters are on). Sort order is kept.
-        AnimatedVisibility(visible = filters.activeCount > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // ---- Period stepper: ‹ October 2026 › (only when a period filter is on)
+            PeriodNavigator(filters = filters, onChange = { filters = it })
+
+            // ---- Balance, and Income / Expense / Net for everything the filters match.
+            // In the list it is the first item, so it scrolls away and gives the rows the whole screen;
+            // scroll back to the top and it is there again. With no list it stays put.
+            val totalsHeader: @Composable () -> Unit = {
+                TotalsCard(totals, balance, balanceLabel)
                 Text(
-                    text = if (filters.activeCount == 1) "1 filter applied" else "${filters.activeCount} filters applied",
+                    text = countLabel,
                     style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.weight(1f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
                 )
-                ManuTextButton(
-                    onClick = { filters = TxnFilters(newestFirst = filters.newestFirst) }
-                ) { Text("Clear filters") }
             }
-        }
 
-        // ---- Accounts: All | Main account | PNB ...  (only when there is more than one account)
-        AccountChips(
-            accounts = accounts,
-            selectedId = accountId,
-            onSelect = onAccountChange
-        )
+            // ---- The list, or a message when there is nothing to show
+            val loaded = page
+            val allCount = overall
+            if (loaded != null && allCount != null) {
+                if (loaded.isEmpty() || allCount == 0) totalsHeader()
+                when {
+                    allCount == 0 -> EmptyMessage(
+                        title = "No transactions yet",
+                        hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
+                    )
 
-        // ---- Period stepper: ‹ October 2026 › (only when a period filter is on)
-        PeriodNavigator(filters = filters, onChange = { filters = it })
+                    loaded.isEmpty() && !filtersOn && selectedAccount != null -> EmptyMessage(
+                        title = "No transactions in ${selectedAccount.name}",
+                        hint = "Tap + to add one."
+                    )
 
-        // ---- Balance, and Income / Expense / Net for everything the filters match.
-        // In the list it is the first item, so it scrolls away and gives the rows the whole screen;
-        // scroll back to the top and it is there again. With no list it stays put.
-        val totalsHeader: @Composable () -> Unit = {
-            TotalsCard(totals, balance, balanceLabel)
-            Text(
-                text = countLabel,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
-            )
-        }
+                    loaded.isEmpty() -> EmptyMessage(
+                        title = "No transactions match",
+                        hint = "Try a different search, period or filter.",
+                        actionLabel = "Clear filters",
+                        onAction = {
+                            filters = TxnFilters(newestFirst = filters.newestFirst)
+                            searchText = ""
+                        }
+                    )
 
-        // ---- The list, or a message when there is nothing to show
-        val loaded = page
-        val allCount = overall
-        if (loaded != null && allCount != null) {
-            if (loaded.isEmpty() || allCount == 0) totalsHeader()
-            when {
-                allCount == 0 -> EmptyMessage(
-                    title = "No transactions yet",
-                    hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
-                )
-
-                loaded.isEmpty() && !filtersOn && selectedAccount != null -> EmptyMessage(
-                    title = "No transactions in ${selectedAccount.name}",
-                    hint = "Tap + to add one."
-                )
-
-                loaded.isEmpty() -> EmptyMessage(
-                    title = "No transactions match",
-                    hint = "Try a different search, period or filter.",
-                    actionLabel = "Clear filters",
-                    onAction = {
-                        filters = TxnFilters(newestFirst = filters.newestFirst)
-                        searchText = ""
-                    }
-                )
-
-                else -> LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    // Extra room at the bottom so the + button never covers the last row
-                    contentPadding = PaddingValues(bottom = 96.dp)
-                ) {
-                    item(key = "totals") { totalsHeader() }
-                    items(items = groups, key = { it.key }) { group ->
-                        Column {
-                            Text(
-                                text = group.label,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
-                            )
-                            // One lib list card per day, with a divider between its transactions
-                            ManuListCard(
-                                items = group.txns.map { txn ->
-                                    transactionItem(
-                                        txn = txn,
-                                        accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
-                                        onEdit = { editing = txn },
-                                        onDelete = { deleting = txn }
+                    else -> Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                    ) {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            // Extra room at the bottom so the + button never covers the last row
+                            contentPadding = PaddingValues(bottom = 96.dp)
+                        ) {
+                            item(key = "totals") { totalsHeader() }
+                            items(items = groups, key = { it.key }) { group ->
+                                Column {
+                                    Text(
+                                        text = group.label,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
+                                    )
+                                    // One lib list card per day, with a divider between its transactions
+                                    ManuListCard(
+                                        items = group.txns.map { txn ->
+                                            transactionItem(
+                                                txn = txn,
+                                                accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
+                                                onEdit = { editing = txn },
+                                                onDelete = { deleting = txn }
+                                            )
+                                        }
                                     )
                                 }
-                            )
+                            }
                         }
+
+                        // Scroll bar: shows where you are in the whole list; drag it to jump
+                        TransactionScrollbar(
+                            listState = listState,
+                            dayCounts = dayCounts,
+                            totalCount = totals.count,
+                            // Dragging far down needs more rows than are loaded: load them in steps of 500
+                            onLoadUpTo = { wanted ->
+                                val rounded = (wanted + 499) / 500 * 500
+                                if (rounded > limit) limit = rounded
+                            }
+                        )
                     }
                 }
             }
         }
+
+        // ---- "Back to top" arrow, floating over the list (only while scrolled down)
+        ScrollToTopButton(
+            visible = showScrollTop && groups.isNotEmpty(),
+            aboveFab = fabShown,
+            onClick = { scope.launch { listState.animateScrollToItem(0) } },
+            modifier = Modifier.align(Alignment.BottomEnd)
+        )
     }
 
     // ---- Dialogs and sheets
@@ -443,6 +491,49 @@ fun TransactionsScreen(
 }
 
 // --------------------------------------------------------------- pieces
+
+/**
+ * A small round "back to top" arrow at the bottom right, shown while the list is scrolled down
+ * (so after loading thousands of rows you do not have to scroll all the way back up).
+ *
+ * It sits just above the + button. When the + button slips away on scroll down, the arrow glides
+ * down into the corner, and it rises again when the + button returns. Call it inside a Box and
+ * pass Modifier.align(Alignment.BottomEnd) in [modifier].
+ */
+@Composable
+private fun ScrollToTopButton(
+    visible: Boolean,
+    /** true while the + button is showing, so the arrow keeps clear of it */
+    aboveFab: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // 16 dp from the bottom edge, like the + button; with the + button there, also clear its 56 dp and a gap
+    val bottom by animateDpAsState(
+        targetValue = if (aboveFab) 84.dp else 16.dp,
+        label = "scrollToTopBottomPadding"
+    )
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn() + scaleIn(),
+        exit = fadeOut() + scaleOut(),
+        // 26 dp from the right edge puts this 44 dp button on the same centre line as the 56 dp + button (20 dp margin)
+        modifier = modifier.padding(end = 26.dp, bottom = bottom)
+    ) {
+        Surface(
+            onClick = onClick,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            shadowElevation = 4.dp,
+            modifier = Modifier.size(44.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Back to top")
+            }
+        }
+    }
+}
 
 @Composable
 private fun TotalsCard(totals: TransactionTotals, balance: Long, balanceLabel: String) {

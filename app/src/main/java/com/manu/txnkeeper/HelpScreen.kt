@@ -89,6 +89,7 @@ private val FAQS = listOf(
         question = "How do I export or import my data?",
         answer = "Open the ⋮ menu, then Settings, then Data.\n" +
                 "Export as CSV or PDF: everything, a date range, or the latest transactions. " +
+                "You can narrow it down by account, payment method, income or expense, and an amount range.\n" +
                 "Import reads a CSV file, and it is all or nothing.\n" +
                 "Opening balances are not in the CSV, so set them again in Accounts if needed."
     ),

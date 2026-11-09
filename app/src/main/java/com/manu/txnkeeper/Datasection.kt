@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -14,21 +15,25 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.manu.manudesignsystem.components.ManuButton
+import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDateRangePicker
 import com.manu.manudesignsystem.components.ManuOutlineButton
 import com.manu.manudesignsystem.components.ManuPickerField
+import com.manu.manudesignsystem.components.ManuTextButton
 import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import kotlinx.coroutines.CancellationException
@@ -44,11 +49,26 @@ private enum class ExportKind(val label: String) {
     LATEST("Latest N")
 }
 
+/** Returned by [amountPaiseOrInvalid] for text that is not a usable amount. */
+private const val INVALID_AMOUNT = Long.MIN_VALUE
+
+/**
+ * Text from an amount box -> paise. Blank means "no limit" (null), a valid amount gives its paise,
+ * and anything else (letters, a negative number, too large) gives [INVALID_AMOUNT].
+ */
+private fun amountPaiseOrInvalid(text: String): Long? {
+    val clean = text.trim().replace(",", "")
+    if (clean.isEmpty()) return null
+    val paise = parsePaise(clean) ?: return INVALID_AMOUNT
+    return if (paise < 0) INVALID_AMOUNT else paise
+}
+
 /**
  * The "Data" group in Settings.
  *
  * Export: first choose what to export (everything, a date range, or the latest N transactions),
- * then export to CSV or PDF. Import: pick a CSV file.
+ * optionally narrow it down (account, payment method, income / expense, amount range), then export
+ * to CSV or PDF. Import: pick a CSV file.
  *
  * The system file picker chooses where a file is saved or which file is read, so the app needs
  * no storage permission. A short help text (and then the result of each action) is shown at the top.
@@ -67,8 +87,29 @@ fun DataTransferControls(database: AppDatabase) {
     var rangeTo by remember { mutableStateOf<Long?>(null) }     // end of the last day
     var countText by remember { mutableStateOf("50") }
     var rangeDialogOpen by remember { mutableStateOf(false) }
-    // The scope the file picker was opened for (the picker only gives back the file's Uri)
+
+    // Optional narrowing down (null / blank = don't filter on it)
+    var accountId by remember { mutableStateOf<Long?>(null) }
+    var payment by remember { mutableStateOf<String?>(null) }
+    var txType by remember { mutableStateOf<String?>(null) }    // "INCOME" / "EXPENSE"
+    var minText by remember { mutableStateOf("") }
+    var maxText by remember { mutableStateOf("") }
+
+    // What the file picker was opened for (the picker only gives back the file's Uri)
     var pendingScope by remember { mutableStateOf<ExportScope>(ExportScope.All) }
+    var pendingFilters by remember { mutableStateOf(ExportFilters()) }
+
+    // The accounts, and the payment methods that transactions use, to offer as chips
+    val dao = remember(database) { database.transactionDao() }
+    val accountsFlow = remember(dao) { dao.observeAccounts() }
+    val accounts: List<AccountSummary> by accountsFlow.collectAsState(initial = emptyList())
+    val methodsFlow = remember(dao) { dao.observePaymentMethodsInUse() }
+    val usedMethods: List<String> by methodsFlow.collectAsState(initial = emptyList())
+    // A selected method stays visible even if no transaction uses it any more, so it can be switched off
+    val methodChips = (usedMethods + listOfNotNull(payment)).distinct()
+
+    val filtersOn = accountId != null || payment != null || txType != null ||
+            minText.isNotBlank() || maxText.isNotBlank()
 
     /** Runs [work] once at a time and shows its returned message (or the error) as the status. */
     fun runTask(work: suspend () -> String) {
@@ -90,13 +131,13 @@ fun DataTransferControls(database: AppDatabase) {
 
     val csvExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) runTask {
-            val n = DataTransfer.exportCsv(context, database, uri, pendingScope)
+            val n = DataTransfer.exportCsv(context, database, uri, pendingScope, pendingFilters)
             "Exported $n transaction${if (n == 1) "" else "s"} to CSV."
         }
     }
     val pdfExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) runTask {
-            val n = DataTransfer.exportPdf(context, database, uri, pendingScope)
+            val n = DataTransfer.exportPdf(context, database, uri, pendingScope, pendingFilters)
             "Exported $n transaction${if (n == 1) "" else "s"} to PDF."
         }
     }
@@ -131,16 +172,39 @@ fun DataTransferControls(database: AppDatabase) {
         }
     }
 
+    /** The chosen filters, or null (with a message in [status]) when an amount is not usable. */
+    fun chosenFilters(): ExportFilters? {
+        val min = amountPaiseOrInvalid(minText)
+        val max = amountPaiseOrInvalid(maxText)
+        if (min == INVALID_AMOUNT || max == INVALID_AMOUNT) {
+            status = "Type the amounts as plain numbers, like 500 or 1250.50."
+            return null
+        }
+        if (min != null && max != null && min > max) {
+            status = "The minimum amount is higher than the maximum."
+            return null
+        }
+        return ExportFilters(
+            accountId = accountId,
+            paymentMethod = payment,
+            type = txType,
+            minAmountPaise = min,
+            maxAmountPaise = max
+        )
+    }
+
     /** Checks the choice, says so when nothing matches, and otherwise opens the "save as" picker. */
     fun exportClicked(open: () -> Unit) {
         if (busy) return
         status = null
         val scope = chosenScope() ?: return
+        val filters = chosenFilters() ?: return
         coroutines.launch {
-            if (DataTransfer.countFor(database, scope) == 0) {
-                status = "No transactions match that choice, so there is nothing to export."
+            if (DataTransfer.countFor(database, scope, filters) == 0) {
+                status = "No transactions match those choices, so there is nothing to export."
             } else {
                 pendingScope = scope
+                pendingFilters = filters
                 open()
             }
         }
@@ -197,6 +261,115 @@ fun DataTransferControls(database: AppDatabase) {
             )
         }
 
+        // ---- Narrow it down (optional). Everything chosen here must match, on top of the choice above.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Only export (optional)",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            ManuTextButton(
+                onClick = {
+                    accountId = null
+                    payment = null
+                    txType = null
+                    minText = ""
+                    maxText = ""
+                    status = null
+                },
+                enabled = filtersOn
+            ) { Text("Clear") }
+        }
+
+        // Account (with a single account there is nothing to choose between)
+        if (accounts.size > 1) {
+            ExportFilterLabel("Account")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+            ) {
+                ManuChip(label = "All", selected = accountId == null, onClick = {
+                    accountId = null
+                    status = null
+                })
+                accounts.forEach { account ->
+                    ManuChip(label = account.name, selected = accountId == account.id, onClick = {
+                        accountId = account.id
+                        status = null
+                    })
+                }
+            }
+        }
+
+        // Payment method
+        if (methodChips.isNotEmpty()) {
+            ExportFilterLabel("Payment method")
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+            ) {
+                ManuChip(label = "All", selected = payment == null, onClick = {
+                    payment = null
+                    status = null
+                })
+                methodChips.forEach { method ->
+                    ManuChip(label = method, selected = payment == method, onClick = {
+                        payment = method
+                        status = null
+                    })
+                }
+            }
+        }
+
+        // Income / expense
+        ExportFilterLabel("Type")
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+        ) {
+            ManuChip(label = "All", selected = txType == null, onClick = {
+                txType = null
+                status = null
+            })
+            ManuChip(label = "Income", selected = txType == "INCOME", onClick = {
+                txType = "INCOME"
+                status = null
+            })
+            ManuChip(label = "Expense", selected = txType == "EXPENSE", onClick = {
+                txType = "EXPENSE"
+                status = null
+            })
+        }
+
+        // Amount range
+        ExportFilterLabel("Amount (₹)")
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            ManuTextField(
+                value = minText,
+                onValueChange = {
+                    minText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
+                    status = null
+                },
+                label = { Text("Min") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f)
+            )
+            ManuTextField(
+                value = maxText,
+                onValueChange = {
+                    maxText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
+                    status = null
+                },
+                label = { Text("Max") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.weight(1f)
+            )
+        }
+
         ManuButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = { exportClicked { csvExport.launch(fileName("csv")) } }
@@ -234,5 +407,15 @@ fun DataTransferControls(database: AppDatabase) {
             rangeTo = endOfDay(pickerToLocalDay(endUtc))
             status = null
         }
+    )
+}
+
+/** Small grey heading above one group of export filters. */
+@Composable
+private fun ExportFilterLabel(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
