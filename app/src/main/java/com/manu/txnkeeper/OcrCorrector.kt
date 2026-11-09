@@ -119,7 +119,10 @@ object OcrCorrector {
         lines.forEachIndexed { k, l ->
             val s = l.text.trim()
             if (s.length in 5..25 && keywords.none { it.equals(s, ignoreCase = true) }) {
-                val best = keywords.map { it to similarity(s, it) }.maxByOrNull { it.second }
+                // similarity >= 0.85 needs lengths within 15% of each other, so skip the edit distance for the rest
+                val best = keywords
+                    .filter { kotlin.math.abs(it.length - s.length) <= 0.15 * maxOf(it.length, s.length) }
+                    .map { it to similarity(s, it) }.maxByOrNull { it.second }
                 if (best != null && best.second >= 0.85) {
                     lines[k] = l.copy(text = best.first)
                     changes += "'$s' -> '${best.first}'"

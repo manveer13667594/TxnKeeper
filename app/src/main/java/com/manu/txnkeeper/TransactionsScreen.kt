@@ -24,7 +24,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
@@ -76,6 +75,12 @@ import com.manu.manudesignsystem.theme.ExpenseColor
 import com.manu.manudesignsystem.theme.IncomeColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.draw.clip
 import com.manu.manudesignsystem.components.ManuDialogBox
 
@@ -280,21 +285,23 @@ fun TransactionsScreen(
                             onDismissRequest = { menuOpen = false },
                             items = listOfNotNull(
                                 ManuMenuItem(
+                                    leadingIcon = { Icon(AppIcons.Sliders,"Filters") },
                                     label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
                                     onClick = {
                                         focusManager.clearFocus()
                                         filterSheetOpen = true
-                                    }
+                                    },
                                 ),
-                                ManuMenuItem(label = "Settings", onClick = onOpenSettings),
-                                ManuMenuItem(label = "Help", onClick = onOpenHelp),
+                                ManuMenuItem(label = "Settings", leadingIcon = {Icon(Icons.Default.Settings,"Settings")}, onClick = onOpenSettings ),
+                                ManuMenuItem(label = "Help", onClick = onOpenHelp,  leadingIcon = {Icon(
+                                    Icons.AutoMirrored.Filled.Help,"Help")}),
                                 // Only there once an email address is set (FEEDBACK_EMAIL in AboutScreen.kt)
                                 if (FEEDBACK_EMAIL.isNotBlank()) {
-                                    ManuMenuItem(label = "Send feedback", onClick = { sendFeedback(context) })
+                                    ManuMenuItem(label = "Send feedback", leadingIcon = {Icon(Icons.AutoMirrored.Filled.Chat,"Send Feedback")} ,onClick = { sendFeedback(context) })
                                 } else {
                                     null
                                 },
-                                ManuMenuItem(label = "About", onClick = onOpenAbout)
+                                ManuMenuItem(label = "About", leadingIcon = {Icon(Icons.Default.AccountCircle,"About")} ,onClick = onOpenAbout)
                             ),
                         )
                     }

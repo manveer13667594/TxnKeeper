@@ -164,7 +164,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                ManuOutlineButton(
+                ManuButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onOpenHelp
                 ) { Text("Help") }
@@ -173,7 +173,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                ManuButton(
+                ManuOutlineButton(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = onOpenAbout
                 ) { Text("About") }

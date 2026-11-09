@@ -3,8 +3,18 @@ package com.manu.txnkeeper
 import java.util.Calendar
 import java.util.Locale
 
-/** One line of recognized text with its on-screen height (bigger text = more important). */
-data class OcrLine(val text: String, val height: Int)
+/**
+ * One line of recognized text with its on-screen height (bigger text = more important).
+ * top / bottom / left are the line's position in the photo; they are 0 when unknown and only
+ * ReceiptRows uses them (to put a label and its figure back on one row).
+ */
+data class OcrLine(
+    val text: String,
+    val height: Int,
+    val top: Int = 0,
+    val bottom: Int = 0,
+    val left: Int = 0
+)
 
 /** Everything is nullable: a field the parser isn't sure about stays null and the form keeps its value. */
 data class ParsedTransaction(
@@ -34,7 +44,7 @@ object TransactionParser {
 
         val type = findType(clean, lower)
         return ParsedTransaction(
-            title = findTitle(clean, type),
+            title = findTitle(clean, type) ?: findShopName(clean, lower),
             amount = findAmount(clean),
             type = type,
             paymentMethod = findPaymentMethod(lower),
@@ -70,15 +80,41 @@ object TransactionParser {
     // Words that mark the final payable figure on bills ("Net Amount 2622.00")
     private val strongAmountWords = listOf(
         "net amount", "grand total", "total amount", "net payable",
-        "amount payable", "amount paid", "total paid", "net total"
+        "amount payable", "amount paid", "total paid", "net total",
+        // other bill layouts: restaurant, fare, invoice and utility receipts
+        "total due", "amount due", "balance due", "bill amount", "total fare", "total bill",
+        "invoice total", "invoice value", "amount to pay", "total payable", "grand amount"
     )
+
+    // "TOTAL 672.00", "Total $11.63", "AMOUNT: 1250", "Total Rs. 540/-": a total label with its figure
+    // at the end of the line. A weak rule (see findAmount), so bills that already worked are unaffected.
+    private val totalLabelFigure = Regex(
+        """(?i)\b(?:grand\s*total|total(?:\s*(?:amount|due|payable|bill|fare|invoice\s*(?:value|amount)))?|amount(?:\s*(?:due|payable|to\s*pay))?|bill\s*amount|net\s*(?:amount|payable|total)|balance\s*due|invoice\s*(?:total|value)|sale\s*amount|you\s*pay)\b\s*[:\-=]?\s*(?:₹|rs\.?|inr|usd|rm|[$€£?])?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:/-|only)?\s*$"""
+    )
+
+    // Lines that look like a total but are not the amount to pay
+    private val notATotal = Regex(
+        """\b(sub\s*-?\s*total|qty|quantity|items?|savings?|saved|discount|taxable|tax|gst|cgst|sgst|igst|vat|cess|round|rounding|tendered|change|tip|gratuity|service charge|points|weight|volume|rate|mrp|pcs|nos)\b"""
+    )
+
+    private val endsWithDecimal = Regex("""([0-9][0-9,]*\.[0-9]{1,2})\s*$""")
 
     private fun toAmount(raw: String): Double? {
         val value = raw.replace(",", "").toDoubleOrNull() ?: return null
         return if (value > 0 && value < 1_000_000_000) value else null
     }
 
-    private fun findAmount(lines: List<OcrLine>): Double? {
+    private fun findAmount(lines: List<OcrLine>): Double? = findAmountScored(lines)?.value
+
+    /** How strongly the lines back up the amount (higher = more sure); null if there is no amount. */
+    fun amountScore(lines: List<OcrLine>): Double? {
+        val clean = lines.map { OcrLine(it.text.trim(), it.height) }.filter { it.text.isNotEmpty() }
+        return if (clean.isEmpty()) null else findAmountScored(clean)?.score
+    }
+
+    private class AmountGuess(val value: Double, val score: Double)
+
+    private fun findAmountScored(lines: List<OcrLine>): AmountGuess? {
         val maxHeight = lines.maxOf { it.height }.coerceAtLeast(1)
         var best: Double? = null
         var bestScore = 3.5   // anything weaker than this is not trusted
@@ -87,7 +123,9 @@ object TransactionParser {
             val lowerLine = line.text.lowercase(Locale.ROOT)
             // SMS put the amount and the balance on one line: "Rs 500 debited ... Avl Bal Rs 9000".
             // Only look at the part before the first balance / limit word.
-            val cut = ignoreWords.find(lowerLine)?.range?.first
+            // "Balance Due" on a bill is the amount to pay, not an account balance (same length, so the
+            // positions still line up with the original text).
+            val cut = ignoreWords.find(lowerLine.replace("balance due", "xxxxxxx due"))?.range?.first
             if (cut == 0) return@forEachIndexed
             val scan = if (cut == null) line.text else line.text.substring(0, cut)
             // A wrapped line: "Avl Bal Rs" / "20632.17"
@@ -105,11 +143,13 @@ object TransactionParser {
                 (if (amountWords.any { nearby.contains(it) }) 2.0 else 0.0) +
                         (if (strongAmountWords.any { nearby.contains(it) }) 4.0 else 0.0)
             val sizeBonus = 3.0 * line.height / maxHeight
+            // The label sits on this very line ("Total Fare Rs 768.60"), so it beats a fee line next to it
+            val ownBonus = if (strongAmountWords.any { lowerLine.contains(it) }) 1.5 else 0.0
 
             // Candidates with a currency marker
             currencyAmount.findAll(withCurrencyFromAbove).forEach { match ->
                 val value = toAmount(match.groupValues[1]) ?: return@forEach
-                val score = 4.0 + keywordBonus + sizeBonus
+                val score = 4.0 + keywordBonus + sizeBonus + ownBonus
                 if (score > bestScore) { bestScore = score; best = value }
             }
 
@@ -122,14 +162,24 @@ object TransactionParser {
 
             // "Net Amount 2622.00" with the number at the end of the same line
             if (strongAmountWords.any { lowerLine.contains(it) }) {
-                Regex("""([0-9][0-9,]*\.[0-9]{1,2})\s*$""").find(line.text)?.let { match ->
+                endsWithDecimal.find(line.text)?.let { match ->
                     val value = toAmount(match.groupValues[1]) ?: return@let
                     val score = 5.0 + keywordBonus + sizeBonus
                     if (score > bestScore) { bestScore = score; best = value }
                 }
             }
+
+            // "TOTAL 672.00" / "Total Amount: 450" with no currency sign. Scored low on purpose: it can
+            // only win on bills where none of the rules above found anything better.
+            if (!notATotal.containsMatchIn(lowerLine)) {
+                totalLabelFigure.find(scan)?.let { match ->
+                    val value = toAmount(match.groupValues[1]) ?: return@let
+                    val score = 1.5 + keywordBonus + sizeBonus
+                    if (score > bestScore) { bestScore = score; best = value }
+                }
+            }
         }
-        return best
+        return best?.let { AmountGuess(it, bestScore) }
     }
 
     // ------------------------------------------------------------------ type
@@ -143,7 +193,9 @@ object TransactionParser {
 
     private val headerDirection = Regex("""(?i)^\s*(to|from)\s+(?!:)\S""")
     private val outgoingHints = Regex("""requested money|payment of .* completed|autopay""")
-    private val billHints = Regex("""\b(invoice|counter sale|bill no|receipt)\b""")
+    private val billHints = Regex(
+        """\b(invoice|counter sale|bill no|receipt|cash memo|gstin|cgst|sgst|igst|sub\s*-?total|grand total|net payable|amount due|total due|balance due|bill amount)\b"""
+    )
     private val firstToFor = Regex("""(?i)^\s*(to|for)\s*:""")
     private val firstFrom = Regex("""(?i)^\s*from\s*:""")
 
@@ -176,10 +228,10 @@ object TransactionParser {
 
     // -------------------------------------------------------- payment method
 
-    private val upiRegex = Regex("""\b(upi|gpay|google pay|phonepe|paytm|bhim|amazon pay)\b""")
+    private val upiRegex = Regex("""\b(upi|gpay|google pay|phonepe|paytm|bhim|amazon pay|bharatpe|mobikwik|freecharge)\b""")
     private val vpaRegex = Regex("""[\w.\-]{2,}@[a-z]{2,}""")
     private val bankRegex = Regex("""\b(neft|imps|rtgs|bank transfer|net banking|netbanking)\b""")
-    private val cardRegex = Regex("""\b(card|visa|mastercard|rupay|pos)\b|(?<!a/c\s)(?<!ac\s)(?<!acct\s)x{2,}\s?\d{4}""")
+    private val cardRegex = Regex("""\b(card|visa|mastercard|rupay|pos|amex|american express|maestro|diners)\b|(?<!a/c\s)(?<!ac\s)(?<!acct\s)(?:x{2,}|\*{2,})\s?\d{4}""")
     private val cashRegex = Regex("""\bcash\b""")
 
     private fun findPaymentMethod(lower: String): String? = when {
@@ -203,7 +255,7 @@ object TransactionParser {
     private val monthDayYear = Regex(
         """\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b"""
     )
-    private val isoDate = Regex("""\b(\d{4})-(\d{2})-(\d{2})\b""")
+    private val isoDate = Regex("""\b(\d{4})[-/.](\d{2})[-/.](\d{2})\b""")
 
     private fun monthIndex(name: String): Int? {
         val i = months.indexOf(name.take(3).lowercase(Locale.ROOT))
@@ -235,8 +287,12 @@ object TransactionParser {
     private fun findDate(text: String): Long? {
         // Indian formats are day first: 16/10/2026
         numericDate.allMatches(text).forEach { m ->
-            buildDate(m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt())
-                ?.let { return it }
+            val a = m.groupValues[1].toInt()
+            val b = m.groupValues[2].toInt()
+            val year = m.groupValues[3].toInt()
+            buildDate(a, b, year)?.let { return it }
+            // 10/25/2026 can only be month first (there is no 25th month), as US receipts print it
+            if (b > 12 && a in 1..12) buildDate(b, a, year)?.let { return it }
         }
         dayMonthYear.allMatches(text).forEach { m ->
             val month = monthIndex(m.groupValues[2]) ?: return@forEach
@@ -319,6 +375,33 @@ object TransactionParser {
             "INCOME" -> fromName ?: toName
             else -> toName ?: fromName
         }
+    }
+
+    // ------------------------------------------------------- shop name (bills)
+
+    // Only bills and invoices carry the shop's name at the top; payment screenshots don't
+    private val shopBillHints = Regex(
+        """\b(invoice|bill no|receipt|cash memo|gstin|cgst|sgst|igst|sub\s*-?total|grand total|net payable|net amount|amount due|total due|bill amount|counter sale)\b"""
+    )
+    private val notAShopName = Regex(
+        """(?i)\b(tax invoice|invoice|receipt|cash memo|cash bill|bill|gstin|gst|vat|welcome|thank|thanks|customer copy|duplicate|original|tel|phone|ph|mob|mobile|date|time|order|guest|folio|e-ticket|ticket|copy)\b"""
+    )
+
+    private fun looksLikeShopName(s: String): Boolean {
+        if (s.length !in 3..40 || s.contains('@') || s.contains(':')) return false
+        val letters = s.count { it.isLetter() }
+        // mostly letters: "Store #1234" or "Rice 5kg 300/-" are not names
+        if (letters < 3 || letters < s.count { !it.isWhitespace() } * 0.7) return false
+        return !notAShopName.containsMatchIn(s)
+    }
+
+    /** The shop's name on a bill: the biggest text in the first few lines (the first one if sizes tie). */
+    private fun findShopName(lines: List<OcrLine>, lower: String): String? {
+        if (!shopBillHints.containsMatchIn(lower)) return null
+        val best = lines.take(6).withIndex()
+            .filter { looksLikeShopName(it.value.text) }
+            .maxWithOrNull(compareBy({ it.value.height }, { -it.index }))
+        return best?.let { cleanTitle(it.value.text) }
     }
 
     // ------------------------------------------------------------- reference

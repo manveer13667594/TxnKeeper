@@ -23,7 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
@@ -120,7 +120,7 @@ fun AboutScreen(
             ManuTopBar(
                 title = "About",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.Default.ArrowBack,
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onNavigationClick = onClose
             )
         }
@@ -192,7 +192,7 @@ fun AboutScreen(
             AboutSection(title = "Support") {
                 if (FEEDBACK_EMAIL.isNotBlank()) {
                     Text(
-                        text = "Found a problem or have an idea? Tell us. Your email app opens with the app version filled in.",
+                        text = "Found a problem or have an idea? Tell us here.",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     ManuButton(
@@ -207,7 +207,7 @@ fun AboutScreen(
             }
 
             Text(
-                text = "Made by Manu · © ${Calendar.getInstance().get(Calendar.YEAR)}",
+                text = "Made by Manveer Singh · © ${Calendar.getInstance().get(Calendar.YEAR)}",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -321,7 +321,7 @@ fun sendFeedback(context: Context, versionName: String? = appVersionName(context
         putExtra(Intent.EXTRA_SUBJECT, "TxnKeeper feedback (v$version)")
         putExtra(
             Intent.EXTRA_TEXT,
-            "\n\n--\nApp version: $version\nAndroid: ${Build.VERSION.RELEASE}\nDevice: ${Build.MODEL}"
+            "\n\n--\nApp version: $version\nAndroid: ${Build.VERSION.RELEASE}\nDevice: ${Build.MODEL}\n\n"
         )
     }
     try {

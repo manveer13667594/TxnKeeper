@@ -1,4 +1,4 @@
-# TxnKeeper 🪙
+# TxnKeeper 
 
 **TxnKeeper** is an offline-first Android app for recording your own transactions. Add them by hand, scan a receipt or payment screenshot, or just say them out loud. Everything is stored on your phone.
 
@@ -9,6 +9,7 @@ Privacy policy: https://txnkeeper.github.io/txnkeeper-privacy/
 ## ✨ Key Features
 
 - **📸 Receipt scanning**: take a photo or pick an image (or share one into the app from your gallery or a payment app). Text is read on the device with **Google ML Kit** and **CameraX**, then amount, date, time, type and title are filled in for you.
+  Besides payment screenshots and bank SMS it now reads shop and restaurant bills, GST invoices, supermarket, fuel, pharmacy, hotel, cafe, ride, train and utility receipts, including totals with no currency sign (`TOTAL 672.00`, `Total Due`, `Balance Due`), US style dates and bills where OCR reads labels and figures in separate columns. If the first reading finds no amount, the photo is cleaned up (shadow removal, contrast, resizing) and read once more. Nothing already found is ever overwritten by these extra passes (`ReceiptInterpreter.kt`, `ReceiptRows.kt`, `ReceiptImageEnhancer.kt`).
 - **🎙️ Voice entry**: say one or several transactions ("paid 500 to Rahul, got 2000 salary"). Speech is turned into text on the device with **Whisper** (whisper.cpp, in the `whisperkit` module). The speech model is downloaded once the first time you use it.
 - **💳 Multiple accounts**: bank, cash, card and so on, each with its own balance.
 - **🔍 Search and filters**: search by title, amount, date, time of day or type, and filter by account, payment method, amount range and date range.
