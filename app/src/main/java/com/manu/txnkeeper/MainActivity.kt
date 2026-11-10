@@ -43,6 +43,7 @@ import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
 import com.manu.txnkeeper.data.local.DatabaseModule
 import com.manu.manudesignsystem.theme.ManuDesignSystemTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.manu.manudesignsystem.components.ManuFab
 import androidx.compose.material.icons.Icons
@@ -162,8 +163,9 @@ fun TxnkeeperApp(
     // Message shown by the design system's snackbar (null = hidden)
     var snackbarMessage by remember { mutableStateOf<String?>(null) }
 
-    val form = remember { TxnFormState() }
-    var showAdd by remember { mutableStateOf(false) }
+    // The form and the open Add page survive a screen rotation, nothing else
+    val form = rememberSaveable(saver = TxnFormState.Saver) { TxnFormState() }
+    var showAdd by rememberSaveable { mutableStateOf(false) }
     var fabVisible by remember { mutableStateOf(true) }
     var showCamera by remember { mutableStateOf(false) }
     var showVoice by remember { mutableStateOf(false) }
@@ -220,6 +222,17 @@ fun TxnkeeperApp(
         showVoice = true
     }
 
+    // Leaving the Add page (back arrow, system back, swipe) clears what was typed, so the next
+    // "Add transaction" starts empty. The short wait lets the page finish sliding away first.
+    LaunchedEffect(showAdd) {
+        if (!showAdd) {
+            delay(400)
+            val account = form.accountId
+            form.reset()
+            form.accountId = account
+        }
+    }
+
     // Back from the Add page or the Accounts page returns to the list (the camera has its own back handling)
     BackHandler(enabled = showAdd) {
         focusManager.clearFocus()
@@ -250,8 +263,8 @@ fun TxnkeeperApp(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .swipeRightTo { openCamera() }
-                        .swipeLeftTo { openVoice() }
+                        // Left to right opens the camera, right to left opens voice entry
+                        .swipeHorizontally(onLeft = { openVoice() }, onRight = { openCamera() })
                 ) {
                     TransactionsScreen(
                         dao = dao,
@@ -412,6 +425,7 @@ fun TxnkeeperApp(
                 exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
             ) {
                 VoiceScreen(
+                    showTips = settings.voiceTips,
                     onClose = { showVoice = false },
                     onHeard = { text ->
                         // Same as the + button: new entries go to the account you are looking at

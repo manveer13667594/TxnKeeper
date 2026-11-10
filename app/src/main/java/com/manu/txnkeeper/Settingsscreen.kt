@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -147,6 +148,27 @@ fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { addingMethod = true }
                 ) { Text("Add payment method") }
+            }
+
+            SettingsSection(title = "Voice entry") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Show tips", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            text = "A short tip on the voice screen, a different one each time.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = settings.voiceTips,
+                        onCheckedChange = { settings.updateVoiceTips(it) }
+                    )
+                }
             }
 
             SettingsSection(title = "Data") {

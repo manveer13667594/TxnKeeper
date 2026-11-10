@@ -53,6 +53,29 @@ fun Modifier.swipeRightTo(onSwipe: () -> Unit): Modifier {
 }
 
 /**
+ * Both swipes on one element: right-to-left calls [onLeft], left-to-right calls [onRight].
+ * Use this instead of chaining [swipeRightTo] and [swipeLeftTo]: two separate drag detectors
+ * on the same element fight over the touch and only one of them works.
+ */
+@Composable
+fun Modifier.swipeHorizontally(onLeft: () -> Unit, onRight: () -> Unit): Modifier {
+    val left by rememberUpdatedState(onLeft)
+    val right by rememberUpdatedState(onRight)
+    return pointerInput(Unit) {
+        var total = 0f
+        detectHorizontalDragGestures(
+            onDragStart = { total = 0f },
+            onDragCancel = { total = 0f },
+            onDragEnd = {
+                val limit = 100.dp.toPx()
+                if (total > limit) right() else if (total < -limit) left()
+            },
+            onHorizontalDrag = { _, amount -> total += amount }
+        )
+    }
+}
+
+/**
  * Calls [onSwipe] after a drag from right to left of more than 100dp (the mirror of [swipeRightTo]).
  * Vertical scrolling is not affected.
  */

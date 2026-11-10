@@ -38,6 +38,15 @@ class AppSettings(context: Context) {
         return ThemeMode.entries.firstOrNull { it.name == saved } ?: ThemeMode.SYSTEM
     }
 
+    /** Whether the voice screen shows its tips (one at a time). On by default; turned off in Settings. */
+    var voiceTips by mutableStateOf(prefs.getBoolean(KEY_VOICE_TIPS, true))
+        private set
+
+    fun updateVoiceTips(on: Boolean) {
+        voiceTips = on
+        prefs.edit().putBoolean(KEY_VOICE_TIPS, on).apply()
+    }
+
     /**
      * The payment methods offered when adding or editing a transaction. It starts as the built-in
      * list ([PAYMENT_METHODS]); after that it is entirely yours: add new ones, remove any of them
@@ -79,6 +88,7 @@ class AppSettings(context: Context) {
         const val PREFS_NAME = "txnkeeper_settings"
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_PAYMENT_METHODS = "payment_methods"
+        const val KEY_VOICE_TIPS = "voice_tips"
     }
 }
 
