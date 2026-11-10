@@ -213,11 +213,13 @@ fun TxnkeeperApp(
     var lastPhotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     fun openCamera() {
+        settings.markCameraHintDone()   // they found it: no need to keep explaining it
         focusManager.clearFocus()
         showCamera = true
     }
 
     fun openVoice() {
+        settings.markVoiceHintDone()
         focusManager.clearFocus()
         showVoice = true
     }

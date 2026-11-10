@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.items
@@ -45,8 +48,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+//import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -81,6 +85,7 @@ import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import com.manu.manudesignsystem.components.ManuDialogBox
 
@@ -258,7 +263,8 @@ fun TransactionsScreen(
                     }
                     IconButton(onClick = {
                         focusManager.clearFocus()
-                        onScan() }
+                        onScan()
+                    }
                     )
                     {
                         Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
@@ -285,23 +291,41 @@ fun TransactionsScreen(
                             onDismissRequest = { menuOpen = false },
                             items = listOfNotNull(
                                 ManuMenuItem(
-                                    leadingIcon = { Icon(AppIcons.Sliders,"Filters") },
+                                    leadingIcon = { Icon(AppIcons.Sliders, "Filters") },
                                     label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
                                     onClick = {
                                         focusManager.clearFocus()
                                         filterSheetOpen = true
                                     },
                                 ),
-                                ManuMenuItem(label = "Settings", leadingIcon = {Icon(Icons.Default.Settings,"Settings")}, onClick = onOpenSettings ),
-                                ManuMenuItem(label = "Help", onClick = onOpenHelp,  leadingIcon = {Icon(
-                                    Icons.AutoMirrored.Filled.Help,"Help")}),
+                                ManuMenuItem(
+                                    label = "Settings",
+                                    leadingIcon = { Icon(Icons.Default.Settings, "Settings") },
+                                    onClick = onOpenSettings
+                                ),
+                                ManuMenuItem(label = "Help", onClick = onOpenHelp, leadingIcon = {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.Help, "Help"
+                                    )
+                                }),
                                 // Only there once an email address is set (FEEDBACK_EMAIL in AboutScreen.kt)
                                 if (FEEDBACK_EMAIL.isNotBlank()) {
-                                    ManuMenuItem(label = "Send feedback", leadingIcon = {Icon(Icons.AutoMirrored.Filled.Chat,"Send Feedback")} ,onClick = { sendFeedback(context) })
+                                    ManuMenuItem(
+                                        label = "Send feedback",
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.Chat,
+                                                "Send Feedback"
+                                            )
+                                        },
+                                        onClick = { sendFeedback(context) })
                                 } else {
                                     null
                                 },
-                                ManuMenuItem(label = "About", leadingIcon = {Icon(Icons.Default.AccountCircle,"About")} ,onClick = onOpenAbout)
+                                ManuMenuItem(
+                                    label = "About",
+                                    leadingIcon = { Icon(Icons.Default.AccountCircle, "About") },
+                                    onClick = onOpenAbout)
                             ),
                         )
                     }
@@ -361,6 +385,24 @@ fun TransactionsScreen(
                 )
             }
 
+            // ---- First-use shortcut hints, one at a time (gone once closed, or once you use the shortcut).
+            // Takes no space: the card floats over the top of the list (or the empty message) instead.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(0.dp)
+                    .zIndex(1f)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
+                        .absoluteOffset(0.dp,350.dp)
+                        //.height(50.dp)
+                ) {
+                    SwipeHintCard(settings = settings, modifier = Modifier.padding(top = 8.dp))
+                }
+            }
+
             // ---- The list, or a message when there is nothing to show
             val loaded = page
             val allCount = overall
@@ -369,12 +411,13 @@ fun TransactionsScreen(
                 when {
                     allCount == 0 -> EmptyMessage(
                         title = "No transactions yet",
-                        hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
+                        hint = "Tap + to add one"
+                       // hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
                     )
 
                     loaded.isEmpty() && !filtersOn && selectedAccount != null -> EmptyMessage(
                         title = "No transactions in ${selectedAccount.name}",
-                        hint = "Tap + to add one."
+                        hint = "Tap + to add one"
                     )
 
                     loaded.isEmpty() -> EmptyMessage(
@@ -465,7 +508,9 @@ fun TransactionsScreen(
             onAddAccount = { newAccount, onCreated ->
                 scope.launch {
                     var newId = 0L
-                    if (safeWrite(context, "add the account") { newId = dao.insertAccount(newAccount) }) {
+                    if (safeWrite(context, "add the account") {
+                            newId = dao.insertAccount(newAccount)
+                        }) {
                         onCreated(newId)
                     }
                 }
@@ -561,7 +606,12 @@ private fun TotalsCard(totals: TransactionTotals, balance: Long, balanceLabel: S
             )
             Row(modifier = Modifier.padding(top = 10.dp)) {
                 TotalCell("Income", formatMoney(totals.incomePaise), IncomeColor, Alignment.Start)
-                TotalCell("Expense", formatMoney(totals.expensePaise), ExpenseColor, Alignment.CenterHorizontally)
+                TotalCell(
+                    "Expense",
+                    formatMoney(totals.expensePaise),
+                    ExpenseColor,
+                    Alignment.CenterHorizontally
+                )
                 TotalCell(
                     "Net",
                     formatSignedMoney(net),
@@ -648,7 +698,10 @@ private fun EmptyMessage(
             modifier = Modifier.padding(top = 8.dp)
         )
         if (actionLabel != null) {
-            ManuButton(onClick = onAction, modifier = Modifier.padding(top = ManuDesignSystem.spacing.md)) {
+            ManuButton(
+                onClick = onAction,
+                modifier = Modifier.padding(top = ManuDesignSystem.spacing.md)
+            ) {
                 Text(actionLabel)
             }
         }

@@ -138,6 +138,9 @@ fun VoiceScreen(
     var seconds by remember { mutableIntStateOf(0) }
     var working by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
+    // First use only: the question "download the speech model?", and the download itself
+    var askDownload by remember { mutableStateOf(false) }
+    var preparing by remember { mutableStateOf<String?>(null) }
 
     // Today's tip: the next one in the list each time this screen opens
     // (null when tips are off; the list only moves on when a tip is actually shown)
@@ -237,13 +240,36 @@ fun VoiceScreen(
 
     fun onMicClick() {
         when {
-            working != null -> Unit
+            working != null || preparing != null -> Unit
             recording -> finish()
+            !VoiceEngine.isModelReady(context) -> askDownload = true
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
+
+    VoiceDownloadDialog(
+        visible = askDownload,
+        onConfirm = {
+            askDownload = false
+            message = null
+            scope.launch {
+                preparing = "Downloading voice model… 0%"
+                try {
+                    VoiceEngine.prepare(context) { preparing = it }
+                    message = "Voice model ready. Tap the mic and speak."
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    message = e.message ?: "Download failed. Check your internet and try again."
+                } finally {
+                    preparing = null
+                }
+            }
+        },
+        onDismiss = { askDownload = false }
+    )
 
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         Column(
@@ -307,6 +333,7 @@ fun VoiceScreen(
                         val wanted = when {
                             working != null && workStep == 0 -> ANIM_CELEBRATE
                             working != null -> WAITING_ANIMS[(workStep - 1) % WAITING_ANIMS.size]
+                            preparing != null -> WAITING_ANIMS[0]
                             recording -> ANIM_TALKING
                             notDetected -> ANIM_CURIOUS
                             else -> ANIM_IDLE
@@ -384,6 +411,7 @@ fun VoiceScreen(
                 // The space is always kept, so the face and the mic do not move when it appears.
                 val status = when {
                     working != null -> working
+                    preparing != null -> preparing
                     recording -> "Listening… ${seconds}s. Tap to stop."
                     else -> message
                 }
@@ -411,7 +439,7 @@ fun VoiceScreen(
                     contentPadding = PaddingValues(20.dp)
                 ) {
                     when {
-                        working != null -> CircularProgressIndicator(
+                        working != null || preparing != null -> CircularProgressIndicator(
                             modifier = Modifier.size(28.dp),
                             color = LocalContentColor.current,
                             strokeWidth = 2.dp

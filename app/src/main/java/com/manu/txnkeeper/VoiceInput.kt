@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
+import com.manu.manudesignsystem.components.ManuDialogBox
 import com.manu.manudesignsystem.components.ManuFab
 import com.manu.manudesignsystem.theme.ExpenseColor
 import io.whisperkit.TranscribeOptions
@@ -168,11 +169,52 @@ object VoiceEngine {
         )
     }
 
+    /** True when the speech model is already on the phone (so no download is needed). */
+    fun isModelReady(context: Context): Boolean =
+        WhisperKit.isModelDownloaded(context.applicationContext, VOICE_MODEL)
+
+    /** Downloads the model if needed and loads it, without transcribing anything. */
+    suspend fun prepare(context: Context, onStatus: (String) -> Unit) {
+        mutex.withLock {
+            if (kit == null) {
+                onStatus("Downloading voice model… 0%")
+                kit = WhisperKit.create(context.applicationContext, VOICE_MODEL) { p ->
+                    onStatus("Downloading voice model… ${(p * 100).toInt()}%")
+                }
+            }
+        }
+    }
+
     /** Frees the model's memory. It reloads (a second or two) the next time it is needed. */
     fun release() {
         kit?.close()
         kit = null
     }
+}
+
+// ------------------------------------------------------------------ the download question
+
+/**
+ * Asked before the speech model is downloaded for the first time: what it is, how big, that it needs
+ * internet once. Used by the voice screen and by the mic button on the Add page.
+ */
+@Composable
+fun VoiceDownloadDialog(
+    visible: Boolean,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    ManuDialogBox(
+        visible = visible,
+        title = "Download essential resources?",
+        message = "Voice entry needs a some resources of about ${VOICE_MODEL.approxSizeMb} MB. " +
+                "Click download to continue...\n\n"+
+                "(Required to process data on your phone)",
+        confirmText = "Download",
+        dismissText = "Not now",
+        onConfirm = onConfirm,
+        onDismiss = onDismiss
+    )
 }
 
 // ------------------------------------------------------------------ the button
@@ -237,15 +279,39 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         if (granted) start() else form.notice = "Microphone permission is needed for voice input."
     }
 
+    var askDownload by remember { mutableStateOf(false) }
+
     fun onClick() {
         when {
             working != null -> Unit
             recording -> finish()
+            !VoiceEngine.isModelReady(context) -> askDownload = true
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
+
+    VoiceDownloadDialog(
+        visible = askDownload,
+        onConfirm = {
+            askDownload = false
+            scope.launch {
+                working = "Downloading voice model… 0%"
+                try {
+                    VoiceEngine.prepare(context) { working = it; form.notice = it }
+                    form.notice = "Voice model ready. Tap the mic and speak."
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    form.notice = e.message ?: "Download failed. Check your internet and try again."
+                } finally {
+                    working = null
+                }
+            }
+        },
+        onDismiss = { askDownload = false }
+    )
 
     ManuFab(
         onClick = { onClick() },

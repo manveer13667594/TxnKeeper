@@ -64,6 +64,8 @@ dependencies {
     // Plays the speaking animation (res/raw/voice_speaking.riv) on the voice screen
     implementation("app.rive:rive-android:10.4.5")
     implementation("androidx.startup:startup-runtime:1.2.0")
+    // Plays the swipe hand animation (res/raw/swipe_left.json) in the first-launch hint
+    implementation("com.airbnb.android:lottie-compose:6.6.2")
     // implementation("com.github.manveer13667594:oneui-design:v1.0.1")
     val camerax = "1.6.2"
     implementation("androidx.camera:camera-core:$camerax")

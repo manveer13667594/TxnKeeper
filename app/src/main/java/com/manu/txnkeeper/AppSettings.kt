@@ -48,6 +48,27 @@ class AppSettings(context: Context) {
     }
 
     /**
+     * The first-use hints on the home screen ("swipe left for voice", "swipe right for the camera").
+     * Each is shown until it is closed or the shortcut has been used once.
+     */
+    var voiceHintDone by mutableStateOf(prefs.getBoolean(KEY_VOICE_HINT_DONE, false))
+        private set
+    var cameraHintDone by mutableStateOf(prefs.getBoolean(KEY_CAMERA_HINT_DONE, false))
+        private set
+
+    fun markVoiceHintDone() {
+        if (voiceHintDone) return
+        voiceHintDone = true
+        prefs.edit().putBoolean(KEY_VOICE_HINT_DONE, true).apply()
+    }
+
+    fun markCameraHintDone() {
+        if (cameraHintDone) return
+        cameraHintDone = true
+        prefs.edit().putBoolean(KEY_CAMERA_HINT_DONE, true).apply()
+    }
+
+    /**
      * The payment methods offered when adding or editing a transaction. It starts as the built-in
      * list ([PAYMENT_METHODS]); after that it is entirely yours: add new ones, remove any of them
      * (even the built-in ones, even all of them).
@@ -89,6 +110,8 @@ class AppSettings(context: Context) {
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_PAYMENT_METHODS = "payment_methods"
         const val KEY_VOICE_TIPS = "voice_tips"
+        const val KEY_VOICE_HINT_DONE = "voice_hint_done"
+        const val KEY_CAMERA_HINT_DONE = "camera_hint_done"
     }
 }
 
