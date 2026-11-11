@@ -255,7 +255,7 @@ fun VoiceScreen(
             askDownload = false
             message = null
             scope.launch {
-                preparing = "Downloading voice model… 0%"
+                preparing = downloadStatus(0f)
                 try {
                     VoiceEngine.prepare(context) { preparing = it }
                     message = "Voice model ready. Tap the mic and speak."

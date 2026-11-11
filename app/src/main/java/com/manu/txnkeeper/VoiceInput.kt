@@ -15,6 +15,15 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import android.media.AudioFormat
@@ -37,7 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
-import com.manu.manudesignsystem.components.ManuDialogBox
+import com.manu.manudesignsystem.components.ManuDialog
 import com.manu.manudesignsystem.components.ManuFab
 import com.manu.manudesignsystem.theme.ExpenseColor
 import io.whisperkit.TranscribeOptions
@@ -144,6 +153,13 @@ class VoiceRecorder {
 data class VoiceTranscript(val text: String, val seconds: Double, val audioSeconds: Double)
 
 /** Holds the one loaded speech model and turns recorded audio into text. */
+/** "Downloading voice model… 23% (13 of 57 MB)". The size is the model's approximate size. */
+internal fun downloadStatus(fraction: Float): String {
+    val total = VOICE_MODEL.approxSizeMb
+    val done = (fraction * total).toInt().coerceIn(0, total)
+    return "Downloading voice model… ${(fraction * 100).toInt()}% ($done of $total MB)"
+}
+
 object VoiceEngine {
     private val mutex = Mutex()
     @Volatile private var kit: WhisperKit? = null
@@ -156,7 +172,7 @@ object VoiceEngine {
         val loaded = kit ?: run {
             onStatus("Loading voice model…")
             WhisperKit.create(context.applicationContext, VOICE_MODEL) { p ->
-                onStatus("Downloading voice model… ${(p * 100).toInt()}%")
+                onStatus(downloadStatus(p))
             }.also { kit = it }
         }
         onStatus("Transcribing…")
@@ -177,9 +193,9 @@ object VoiceEngine {
     suspend fun prepare(context: Context, onStatus: (String) -> Unit) {
         mutex.withLock {
             if (kit == null) {
-                onStatus("Downloading voice model… 0%")
+                onStatus(downloadStatus(0f))
                 kit = WhisperKit.create(context.applicationContext, VOICE_MODEL) { p ->
-                    onStatus("Downloading voice model… ${(p * 100).toInt()}%")
+                    onStatus(downloadStatus(p))
                 }
             }
         }
@@ -204,17 +220,42 @@ fun VoiceDownloadDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    ManuDialogBox(
+    ManuDialog(
         visible = visible,
         title = "Download essential resources?",
-        message = "Voice entry needs a some resources of about ${VOICE_MODEL.approxSizeMb} MB. " +
-                "Click download to continue...\n\n"+
-                "(Required to process data on your phone)",
         confirmText = "Download",
         dismissText = "Not now",
         onConfirm = onConfirm,
         onDismiss = onDismiss
-    )
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Voice entry needs some resources of about ${VOICE_MODEL.approxSizeMb} MB. Click Download to continue.")
+            Text(
+                text = "(Required to process data on your phone)",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            // "privacy policy" is a link: tapping it opens the policy page in the browser
+            Text(
+                text = buildAnnotatedString {
+                    append("To know more, read the ")
+                    withLink(
+                        LinkAnnotation.Url(
+                            url = PRIVACY_POLICY_URL,
+                            styles = TextLinkStyles(
+                                style = SpanStyle(
+                                    color = MaterialTheme.colorScheme.primary,
+                                    textDecoration = TextDecoration.Underline
+                                )
+                            )
+                        )
+                    ) { append("privacy policy") }
+                    append(".")
+                },
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
 }
 
 // ------------------------------------------------------------------ the button
@@ -297,7 +338,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         onConfirm = {
             askDownload = false
             scope.launch {
-                working = "Downloading voice model… 0%"
+                working = downloadStatus(0f)
                 try {
                     VoiceEngine.prepare(context) { working = it; form.notice = it }
                     form.notice = "Voice model ready. Tap the mic and speak."

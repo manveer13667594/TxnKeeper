@@ -54,7 +54,7 @@ import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import java.util.Calendar
 
-private const val PRIVACY_POLICY_URL = "https://txnkeeper.github.io/txnkeeper-privacy/"
+ const val PRIVACY_POLICY_URL = "https://txnkeeper.github.io/txnkeeper-privacy/"
 
 /**
  * The address that "Send feedback" writes to. Put yours here.
