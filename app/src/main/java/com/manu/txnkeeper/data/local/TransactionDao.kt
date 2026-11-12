@@ -16,6 +16,12 @@ data class TransactionTotals(
     val count: Int
 )
 
+/** The net change (income minus expense, in paise) of one time slice; slice 0 is the oldest. */
+data class SparkBucket(
+    val bucket: Int,
+    val netPaise: Long
+)
+
 /** An account with its current balance and how many transactions it holds. */
 data class AccountSummary(
     val id: Long,
@@ -73,6 +79,10 @@ interface TransactionDao {
     /** Income / expense / count over ALL matching rows, not just the loaded page. */
     @RawQuery(observedEntities = [TransactionEntity::class, AccountEntity::class])
     fun rawTotals(query: SupportSQLiteQuery): Flow<TransactionTotals>
+
+    /** Net change per time slice for the home card's trend line (see observeSparkBuckets). */
+    @RawQuery(observedEntities = [TransactionEntity::class, AccountEntity::class])
+    fun rawSparkBuckets(query: SupportSQLiteQuery): Flow<List<SparkBucket>>
 
     @Query("SELECT COUNT(*) FROM transactions")
     fun getTotalCount(): Flow<Int>

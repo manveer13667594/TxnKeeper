@@ -31,6 +31,9 @@ object TxnPdf {
     private const val RIGHT_EDGE = PAGE_W - MARGIN
     private const val CELL_PAD = 3f
 
+    // Built once: it was being compiled again for every cell of every row
+    private val WHITESPACE = Regex("\\s+")
+
     private const val INK = 0xFF1C1B1F.toInt()
     private const val MUTED = 0xFF625B71.toInt()
     private const val GREEN = 0xFF1B7F3B.toInt()
@@ -106,7 +109,7 @@ object TxnPdf {
         }
 
         fun fit(value: String, paint: TextPaint, width: Float): String =
-            TextUtils.ellipsize(value.replace(Regex("\\s+"), " "), paint, width - CELL_PAD * 2, TextUtils.TruncateAt.END)
+            TextUtils.ellipsize(value.replace(WHITESPACE, " "), paint, width - CELL_PAD * 2, TextUtils.TruncateAt.END)
                 .toString()
 
         try {

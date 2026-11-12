@@ -23,13 +23,23 @@ fun formatAmountPaise(paise: Long): String =
 
 // The functions below take WHOLE PAISE (1250 = ₹12.50), the way amounts are stored.
 
+// NumberFormat is slow to create and not thread-safe, so each thread builds its two formats once.
+private val wholeMoneyFormat = ThreadLocal.withInitial {
+    NumberFormat.getNumberInstance(IndianLocale).apply {
+        minimumFractionDigits = 0
+        maximumFractionDigits = 0
+    }
+}
+private val paiseMoneyFormat = ThreadLocal.withInitial {
+    NumberFormat.getNumberInstance(IndianLocale).apply {
+        minimumFractionDigits = 2
+        maximumFractionDigits = 2
+    }
+}
+
 /** Display money with Indian grouping: ₹1,25,000 or ₹1,250.50 (paise only when present). */
 fun formatMoney(paise: Long): String {
-    val whole = paise % 100L == 0L
-    val nf = NumberFormat.getNumberInstance(IndianLocale).apply {
-        minimumFractionDigits = if (whole) 0 else 2
-        maximumFractionDigits = if (whole) 0 else 2
-    }
+    val nf = if (paise % 100L == 0L) wholeMoneyFormat.get() else paiseMoneyFormat.get()
     return "₹" + nf.format(BigDecimal.valueOf(paise, 2))
 }
 
@@ -47,14 +57,37 @@ fun formatSignedMoney(paise: Long): String =
 
 // ------------------------------------------------------------------ dates
 
-fun startOfDay(millis: Long): Long =
-    Calendar.getInstance().apply {
-        timeInMillis = millis
-        set(Calendar.HOUR_OF_DAY, 0)
-        set(Calendar.MINUTE, 0)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.timeInMillis
+private val dayCalendar = ThreadLocal<Calendar>()
+
+/**
+ * One Calendar per thread, reused: building a new Calendar for every row is slow when thousands of
+ * rows are grouped by day. It is rebuilt if the phone's time zone changes.
+ */
+private fun sharedCalendar(): Calendar {
+    val zone = TimeZone.getDefault()
+    var c = dayCalendar.get()
+    if (c == null || c.timeZone.id != zone.id) {
+        c = Calendar.getInstance(zone)
+        dayCalendar.set(c)
+    }
+    return c
+}
+
+fun startOfDay(millis: Long): Long {
+    val c = sharedCalendar()
+    c.timeInMillis = millis
+    c.set(Calendar.HOUR_OF_DAY, 0)
+    c.set(Calendar.MINUTE, 0)
+    c.set(Calendar.SECOND, 0)
+    c.set(Calendar.MILLISECOND, 0)
+    return c.timeInMillis
+}
+
+private fun yearOf(millis: Long): Int {
+    val c = sharedCalendar()
+    c.timeInMillis = millis
+    return c.get(Calendar.YEAR)
+}
 
 fun endOfDay(millis: Long): Long =
     Calendar.getInstance().apply {
@@ -103,23 +136,42 @@ fun withClockTime(millis: Long, hour: Int, minute: Int): Long =
         set(Calendar.SECOND, 0)
         set(Calendar.MILLISECOND, 0)
     }.timeInMillis
-fun formatDateLong(millis: Long): String =
-    SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(millis))
 
-fun formatTime(millis: Long): String =
-    SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(millis))
+/**
+ * A SimpleDateFormat kept per thread (they are slow to create and not thread-safe), rebuilt if the
+ * phone's language or time zone changes while the app is running.
+ */
+private class CachedDateFormat(private val pattern: String) {
+    private class Cached(val locale: Locale, val zoneId: String, val format: SimpleDateFormat)
+
+    private val perThread = ThreadLocal<Cached>()
+
+    fun format(millis: Long): String {
+        val locale = Locale.getDefault()
+        val zoneId = TimeZone.getDefault().id
+        var cached = perThread.get()
+        if (cached == null || cached.locale != locale || cached.zoneId != zoneId) {
+            cached = Cached(locale, zoneId, SimpleDateFormat(pattern, locale))
+            perThread.set(cached)
+        }
+        return cached.format.format(Date(millis))
+    }
+}
+
+private val longDateFormat = CachedDateFormat("d MMM yyyy")
+private val shortDateFormat = CachedDateFormat("d MMM")
+private val clockTimeFormat = CachedDateFormat("h:mm a")
+
+fun formatDateLong(millis: Long): String = longDateFormat.format(millis)
+
+fun formatTime(millis: Long): String = clockTimeFormat.format(millis)
 
 /** "Today", "Yesterday", "12 Oct" (or "12 Oct 2025" for another year). [dayStart] = startOfDay(...). */
 fun dayHeading(dayStart: Long): String {
-    val today = startOfDay(System.currentTimeMillis())
-    val yesterday = Calendar.getInstance().apply {
-        timeInMillis = today
-        add(Calendar.DAY_OF_YEAR, -1)
-    }.timeInMillis
+    val now = System.currentTimeMillis()
+    val today = startOfDay(now)
     if (dayStart == today) return "Today"
-    if (dayStart == yesterday) return "Yesterday"
-    val sameYear = Calendar.getInstance().apply { timeInMillis = dayStart }.get(Calendar.YEAR) ==
-            Calendar.getInstance().get(Calendar.YEAR)
-    return SimpleDateFormat(if (sameYear) "d MMM" else "d MMM yyyy", Locale.getDefault())
-        .format(Date(dayStart))
+    // One millisecond before today began is somewhere in yesterday
+    if (dayStart == startOfDay(today - 1)) return "Yesterday"
+    return if (yearOf(dayStart) == yearOf(now)) shortDateFormat.format(dayStart) else longDateFormat.format(dayStart)
 }
