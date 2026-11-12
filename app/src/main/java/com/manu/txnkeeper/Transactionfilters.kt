@@ -160,6 +160,17 @@ fun TransactionDao.observePage(q: TxnQuery, limit: Int): Flow<List<TransactionEn
     )
 }
 
+/** Every matching row, oldest first, with no limit: the stats chart plots one point per transaction. */
+fun TransactionDao.observeAllForChart(q: TxnQuery): Flow<List<TransactionEntity>> {
+    val where = TxnSql.where(q)
+    return rawTransactions(
+        SimpleSQLiteQuery(
+            "SELECT * FROM transactions WHERE ${where.sql} ORDER BY dateTime ASC, id ASC",
+            where.args.toTypedArray()
+        )
+    )
+}
+
 fun TransactionDao.observeTotals(q: TxnQuery): Flow<TransactionTotals> {
     val where = TxnSql.where(q)
     return rawTotals(

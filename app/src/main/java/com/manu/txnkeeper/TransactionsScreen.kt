@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -136,6 +137,11 @@ fun TransactionsScreen(
     onOpenHelp: () -> Unit,
     onOpenAbout: () -> Unit,
     onScan: () -> Unit,
+    /**
+     * Tapping the balance card opens the stats chart for what the list shows now: the query,
+     * a title, and whether the line may start from the real account balance (no filters/search on).
+     */
+    onOpenStats: (filters: TxnFilters, search: String, accountId: Long?) -> Unit = { _, _, _ -> },
     /** true = the floating + button should show, false = hide it (scrolling down the list). */
     onScrollDirection: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
@@ -168,6 +174,10 @@ fun TransactionsScreen(
 
     val pageFlow = remember(query, limit) { dao.observePage(query, limit) }
     val page: List<TransactionEntity>? by pageFlow.collectAsState(initial = null)
+
+    // Small trend line in the balance card: the running balance of what the list shows
+    val previewFlow = remember(query) { dao.observeAllForChart(query) }
+    val previewTxns by previewFlow.collectAsState(initial = null)
 
     val totalsFlow = remember(query) { dao.observeTotals(query) }
     val totals by totalsFlow.collectAsState(initial = NoTotals)
@@ -228,6 +238,13 @@ fun TransactionsScreen(
         selectedAccount != null -> "Balance · ${selectedAccount.name}"
         accounts.size > 1 -> "Balance · all accounts"
         else -> "Balance"
+    }
+    val sparkline = remember(previewTxns, balance, totals, filtersOn) {
+        previewTxns?.let { list ->
+            // Same rule as the Stats screen: real balance when nothing is filtered, otherwise a running net
+            val start = if (filtersOn) 0L else balance - (totals.incomePaise - totals.expensePaise)
+            sparklineValues(buildChartSeries(list, start), start)
+        }.orEmpty()
     }
     val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }
     // Name the account on each row only when rows from several accounts are mixed together
@@ -376,7 +393,13 @@ fun TransactionsScreen(
             // In the list it is the first item, so it scrolls away and gives the rows the whole screen;
             // scroll back to the top and it is there again. With no list it stays put.
             val totalsHeader: @Composable () -> Unit = {
-                TotalsCard(totals, balance, balanceLabel)
+                TotalsCard(
+                    totals, balance, balanceLabel, sparkline,
+                    modifier = Modifier.clickable {
+                        focusManager.clearFocus()
+                        onOpenStats(filters, search, accountId)
+                    }
+                )
                 Text(
                     text = countLabel,
                     style = MaterialTheme.typography.labelLarge,
@@ -588,22 +611,42 @@ private fun ScrollToTopButton(
 }
 
 @Composable
-private fun TotalsCard(totals: TransactionTotals, balance: Long, balanceLabel: String) {
+private fun TotalsCard(
+    totals: TransactionTotals,
+    balance: Long,
+    balanceLabel: String,
+    trend: List<Long>,
+    modifier: Modifier = Modifier
+) {
     val net = totals.incomePaise - totals.expensePaise
-    ManuCard(modifier = Modifier.fillMaxWidth()) {
+    ManuCard(modifier = modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
-            Text(
-                text = balanceLabel,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = formatBalance(balance),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (balance < 0) ExpenseColor else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = balanceLabel,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = formatBalance(balance),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = if (balance < 0) ExpenseColor else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+                }
+                // The empty top-right corner: a small preview of the Stats chart
+                if (trend.size >= 2) {
+                    Sparkline(
+                        values = trend,
+                        modifier = Modifier
+                            .padding(start = 12.dp)
+                            .size(width = 110.dp, height = 44.dp)
+                    )
+                }
+            }
             Row(modifier = Modifier.padding(top = 10.dp)) {
                 TotalCell("Income", formatMoney(totals.incomePaise), IncomeColor, Alignment.Start)
                 TotalCell(
@@ -629,7 +672,7 @@ private fun TotalsCard(totals: TransactionTotals, balance: Long, balanceLabel: S
  * three-dot menu and in Settings.
  */
 @Composable
-private fun AccountChips(
+internal fun AccountChips(
     accounts: List<AccountSummary>,
     selectedId: Long?,
     onSelect: (Long?) -> Unit

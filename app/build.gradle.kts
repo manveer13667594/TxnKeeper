@@ -27,6 +27,10 @@ android {
             optimization {
                 enable = true
             }
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     compileOptions {
@@ -77,4 +81,6 @@ dependencies {
     ksp("androidx.room:room-compiler:2.8.5")
     implementation(project(":whisperkit"))
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
+    // Line chart for the stats screen (View-based, shown inside Compose with AndroidView)
+    implementation("com.github.PhilJay:MPAndroidChart:v3.1.0")
 }
