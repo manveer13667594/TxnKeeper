@@ -104,13 +104,17 @@ private class DayGroup(val dayStart: Long, val label: String, val txns: List<Tra
 private fun buildGroups(list: List<TransactionEntity>): List<DayGroup> {
     val out = ArrayList<DayGroup>()
     var day = Long.MIN_VALUE
+    var dayEnd = Long.MIN_VALUE      // the first moment after [day]
     var bucket = ArrayList<TransactionEntity>()
     for (t in list) {
-        val d = startOfDay(t.dateTime)
+        // The rows are sorted, so most sit in the day we already know: no calendar work for those
+        val d = if (day != Long.MIN_VALUE && t.dateTime >= day && t.dateTime < dayEnd) day else startOfDay(t.dateTime)
         if (d != day) {
             if (bucket.isNotEmpty()) out += DayGroup(day, dayHeading(day), bucket)
             bucket = ArrayList()
             day = d
+            // 36 hours after a day starts is always inside the next day (days last 23 to 25 hours)
+            dayEnd = startOfDay(d + 36L * 3_600_000L)
         }
         bucket += t
     }
@@ -176,8 +180,9 @@ fun TransactionsScreen(
     val page: List<TransactionEntity>? by pageFlow.collectAsState(initial = null)
 
     // Small trend line in the balance card: the running balance of what the list shows
-    val previewFlow = remember(query) { dao.observeAllForChart(query) }
-    val previewTxns by previewFlow.collectAsState(initial = null)
+    // (the database sums it into about 60 slices, so no transaction rows are loaded for it)
+    val sparkFlow = remember(query) { dao.observeSparkBuckets(query) }
+    val sparkBuckets by sparkFlow.collectAsState(initial = null)
 
     val totalsFlow = remember(query) { dao.observeTotals(query) }
     val totals by totalsFlow.collectAsState(initial = NoTotals)
@@ -208,7 +213,9 @@ fun TransactionsScreen(
     }
     LaunchedEffect(nearEnd, page?.size, limit) {
         // A full page means there may be more
-        if (nearEnd && (page?.size ?: 0) >= limit) limit += PAGE_SIZE
+        // Grow by half again each time (not a fixed 50): the page is re-read from the start whenever
+        // the limit changes, so fixed steps would re-read thousands of rows over and over
+        if (nearEnd && (page?.size ?: 0) >= limit) limit += maxOf(PAGE_SIZE, limit / 2)
     }
     // Whether the floating + button is showing (the "back to top" arrow rides above it)
     var fabShown by remember { mutableStateOf(true) }
@@ -239,11 +246,11 @@ fun TransactionsScreen(
         accounts.size > 1 -> "Balance · all accounts"
         else -> "Balance"
     }
-    val sparkline = remember(previewTxns, balance, totals, filtersOn) {
-        previewTxns?.let { list ->
+    val sparkline = remember(sparkBuckets, balance, totals, filtersOn) {
+        sparkBuckets?.let { buckets ->
             // Same rule as the Stats screen: real balance when nothing is filtered, otherwise a running net
             val start = if (filtersOn) 0L else balance - (totals.incomePaise - totals.expensePaise)
-            sparklineValues(buildChartSeries(list, start), start)
+            sparklineFromBuckets(buckets, start)
         }.orEmpty()
     }
     val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }

@@ -171,6 +171,26 @@ fun TransactionDao.observeAllForChart(q: TxnQuery): Flow<List<TransactionEntity>
     )
 }
 
+/**
+ * What the matching transactions add up to over time, in at most [buckets] slices between the first
+ * and the last of them (slices with nothing in them are left out). The home card's small trend line
+ * only needs this, so SQLite does the adding and no transaction rows are loaded.
+ */
+fun TransactionDao.observeSparkBuckets(q: TxnQuery, buckets: Int = 60): Flow<List<com.manu.txnkeeper.data.local.SparkBucket>> {
+    val where = TxnSql.where(q)
+    return rawSparkBuckets(
+        SimpleSQLiteQuery(
+            "SELECT CAST((t.dateTime - m.lo) * $buckets / (m.hi - m.lo + 1) AS INTEGER) AS bucket, " +
+                    "SUM(CASE t.type WHEN 'INCOME' THEN t.amountPaise WHEN 'EXPENSE' THEN -t.amountPaise ELSE 0 END) AS netPaise " +
+                    "FROM transactions t, " +
+                    "(SELECT MIN(dateTime) AS lo, MAX(dateTime) AS hi FROM transactions WHERE ${where.sql}) m " +
+                    "WHERE ${where.sql} GROUP BY bucket ORDER BY bucket",
+            // the filter text appears twice, so its values are passed twice
+            (where.args + where.args).toTypedArray()
+        )
+    )
+}
+
 fun TransactionDao.observeTotals(q: TxnQuery): Flow<TransactionTotals> {
     val where = TxnSql.where(q)
     return rawTotals(

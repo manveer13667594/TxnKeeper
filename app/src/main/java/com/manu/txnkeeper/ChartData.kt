@@ -97,6 +97,22 @@ fun sparklineValues(series: ChartSeries, startPaise: Long, maxPoints: Int = 60):
     return List(maxPoints) { i -> all[(i.toLong() * last / (maxPoints - 1)).toInt()] }
 }
 
+/**
+ * The same small trend line as [sparklineValues], built from the database's time slices
+ * (see observeSparkBuckets): the starting balance, then the running balance after each slice.
+ */
+fun sparklineFromBuckets(buckets: List<com.manu.txnkeeper.data.local.SparkBucket>, startPaise: Long): List<Long> {
+    if (buckets.isEmpty()) return emptyList()
+    val out = ArrayList<Long>(buckets.size + 1)
+    var running = startPaise
+    out += running
+    for (b in buckets) {
+        running += b.netPaise
+        out += running
+    }
+    return out
+}
+
 /** A balance at a moment (for "peak" and "lowest"). */
 data class BalanceMark(val paise: Long, val millis: Long)
 

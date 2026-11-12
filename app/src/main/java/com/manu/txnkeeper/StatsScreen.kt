@@ -6,6 +6,7 @@ import android.graphics.LinearGradient
 import android.graphics.Matrix
 import android.graphics.Shader
 import android.view.MotionEvent
+import android.view.View
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.width
@@ -731,6 +732,10 @@ private fun TxnChart(
                 chart.xAxis.axisMinimum = minX - pad
                 chart.xAxis.axisMaximum = maxX + pad
                 chart.tag = ChartState(series, rangeTick)
+                // Until showWindow has zoomed in, the chart would draw every point at once (thousands of
+                // dots plus the fill), which is the half-second freeze on opening. Hidden views skip
+                // drawing, so showWindow makes it visible again once the first window is in place.
+                chart.visibility = View.INVISIBLE
                 showWindow(chart, series, rangeDays)
             } else if (rangeAsked) {
                 chart.tag = ChartState(series, rangeTick)
@@ -828,6 +833,7 @@ private fun showWindow(chart: LineChart, series: ChartSeries, days: Int?) {
             vp.refresh(m, chart, true)
         }
         chart.invalidate()
+        chart.visibility = View.VISIBLE
     }
     // Wait until the chart view has been measured
     if (chart.width > 0 && chart.height > 0) chart.post(apply)
