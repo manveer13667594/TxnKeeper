@@ -440,13 +440,13 @@ fun TransactionsScreen(
                 when {
                     allCount == 0 -> EmptyMessage(
                         title = "No transactions yet",
-                        hint = "Tap + to add one"
+                        hint = ""
                         // hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
                     )
 
                     loaded.isEmpty() && !filtersOn && selectedAccount != null -> EmptyMessage(
                         title = "No transactions in ${selectedAccount.name}",
-                        hint = "Tap + to add one"
+                        hint = ""
                     )
 
                     loaded.isEmpty() -> EmptyMessage(

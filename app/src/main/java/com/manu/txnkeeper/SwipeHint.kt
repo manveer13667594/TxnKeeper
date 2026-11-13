@@ -58,7 +58,7 @@ fun SwipeHintCard(settings: AppSettings, modifier: Modifier = Modifier) {
         )
     )
 
-    val title = if (voice) "Swipe left to add by voice" else "Swipe right to scan a receipt"
+    val title = if (voice) "Swipe left to add transaction by voice" else "Swipe right to scan a receipt"
     val detail = if (voice) {
         "Anywhere on this screen. Say a transaction instead of typing it."
     } else {
@@ -77,7 +77,7 @@ fun SwipeHintCard(settings: AppSettings, modifier: Modifier = Modifier) {
                     iterations = LottieConstants.IterateForever,
                     dynamicProperties = dynamic,
                     modifier = Modifier
-                        .size(84.dp)
+                        .size(90.dp)
                         // Voice = the drawing as it is (swipe left); camera = flipped (swipe right)
                         .graphicsLayer(scaleX = if (voice) 1f else -1f)
                 )
