@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -188,29 +189,34 @@ fun TxnkeeperApp(
     }
 
     // A finished scan fills the Add page right away; what was detected is shown above the fields
-    LaunchedEffect(ocr.outcome) {
-        val outcome = ocr.outcome ?: return@LaunchedEffect
-        ocr.outcome = null
-        when {
-            outcome.text.isBlank() ->
-                Toast.makeText(context, "No text found in this image.", Toast.LENGTH_SHORT).show()
+    // This listens with snapshotFlow instead of keying the effect on ocr.outcome: clearing the outcome
+    // below used to restart the effect and cancel it in the middle of the duplicate check, so
+    // sometimes nothing was shown at all (no form, no message).
+    LaunchedEffect(Unit) {
+        snapshotFlow { ocr.outcome }.collect { outcome ->
+            if (outcome == null) return@collect
+            ocr.outcome = null
+            when {
+                outcome.text.isBlank() ->
+                    Toast.makeText(context, "No text found in this image.", Toast.LENGTH_SHORT).show()
 
-            outcome.parsed.isEmpty ->
-                Toast.makeText(context, "Text detected, but no transaction details found.", Toast.LENGTH_LONG).show()
+                outcome.parsed.isEmpty ->
+                    Toast.makeText(context, "Text detected, but no transaction details found.", Toast.LENGTH_LONG).show()
 
-            else -> {
-                var message = "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save."
-                // Warn before saving if the same reference number is already in the list
-                val ref = outcome.parsed.description?.removePrefix("Ref: ")?.trim()
-                if (!ref.isNullOrEmpty()) {
-                    dao.findByReference(ref)?.let { d ->
-                        message += "\n\nPossible duplicate: you already saved \"${d.title}\" " +
-                                "(${formatMoney(d.amountPaise)}, ${formatDateLong(d.dateTime)}) " +
-                                "with the same reference number."
+                else -> {
+                    var message = "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save."
+                    // Warn before saving if the same reference number is already in the list
+                    val ref = outcome.parsed.description?.removePrefix("Ref: ")?.trim()
+                    if (!ref.isNullOrEmpty()) {
+                        dao.findByReference(ref)?.let { d ->
+                            message += "\n\nPossible duplicate: you already saved \"${d.title}\" " +
+                                    "(${formatMoney(d.amountPaise)}, ${formatDateLong(d.dateTime)}) " +
+                                    "with the same reference number."
+                        }
                     }
+                    form.fill(outcome.parsed, message = message)
+                    showAdd = true
                 }
-                form.fill(outcome.parsed, message = message)
-                showAdd = true
             }
         }
     }

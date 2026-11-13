@@ -98,12 +98,13 @@ private const val WAITING_ANIM_MS = 2500L                 // how long each waiti
  * The tips can be turned off in Settings.
  */
 private val VOICE_TIPS = listOf(
-    "Your voice is turned into text on this phone. Recordings are not saved and nothing is uploaded.",
-    "Say several at once: \u201CChai 80, petrol 800, lunch 250\u201D. They open one by one to check.",
-    "Add a day: \u201Cyesterday\u201D, \u201Ctwo days ago\u201D or \u201Con Monday\u201D.",
-    "No financial data leaves your phone. Everything you record stays on this device.",
+    "Try saying: \u201CPaid 500 to Rahul\u201D",
+    "Recordings are not saved and nothing is uploaded.",
+    "Try saying: \u201CChai 80, petrol 800, lunch 250\u201D.",
+    "Try saying: \u201Cyesterday\u201D, \u201Ctwo days ago\u201D or \u201Con Monday\u201D.",
+    "No financial data leaves your phone.",
     "Say how you paid: \u201Cby UPI\u201D, \u201Cby card\u201D or \u201Cin cash\u201D.",
-    "After the first download, voice entry works without internet.",
+    "Voice entry works without internet.",
     "Numbers can be words: \u201Ctwo thousand five hundred\u201D, \u201C5k\u201D or \u201C1.5 lakh\u201D.",
     "Money coming in? Say \u201Creceived 2000 from Amit\u201D or \u201Csalary credited 30000\u201D."
 )
@@ -152,14 +153,9 @@ fun VoiceScreen(
     }
     // Says "ready" only when the download finishes while this screen is open
     var sawDownload by remember { mutableStateOf(false) }
-    LaunchedEffect(download) {
-        if (download is VoiceDownloadState.Downloading) {
-            sawDownload = true
-        } else if (download is VoiceDownloadState.Done && sawDownload) {
-            sawDownload = false
-            message = "Voice model ready. Tap the mic and speak."
-        }
-    }
+    // First use only: the recording made before the speech model existed. It waits here while the
+    // download question is answered and the download runs, then it is transcribed (see finish()).
+    var pendingSamples by remember { mutableStateOf<FloatArray?>(null) }
 
     // Today's tip: the next one in the list each time this screen opens
     // (null when tips are off; the list only moves on when a tip is actually shown)
@@ -205,6 +201,50 @@ fun VoiceScreen(
     // Closing the screen cancels the scope (stops the mic) and frees the model's memory
     DisposableEffect(Unit) { onDispose { VoiceEngine.release() } }
 
+    /** Turns a recording into text; if a transaction was heard, hands it on to [onHeard]. */
+    suspend fun transcribeAndHandle(samples: FloatArray) {
+        working = "Working…"
+        try {
+            val heard = VoiceEngine.transcribe(context, samples) { working = it }
+            if (heard.text.isBlank()) {
+                notDetected = true
+                message = "Could not hear anything. Try again, a bit closer to the mic."
+            } else if (SpokenTransactionParser.parseAll(heard.text).isEmpty() &&
+                SpokenTransactionParser.parse(heard.text).isEmpty
+            ) {
+                // Heard words, but no amount or details: stay here and let the person try again
+                notDetected = true
+                message = "Heard: \"${heard.text}\". No transaction found, try again."
+            } else {
+                onHeard(heard.text)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            message = e.message ?: "Voice input failed"
+        } finally {
+            working = null
+        }
+    }
+
+    // Download progress. When it finishes and a first-use recording is waiting, transcribe that recording;
+    // otherwise just say the model is ready (only if the download finished while this screen is open).
+    LaunchedEffect(download) {
+        if (download is VoiceDownloadState.Downloading) {
+            sawDownload = true
+        } else if (download is VoiceDownloadState.Done) {
+            val waiting = pendingSamples
+            if (waiting != null) {
+                pendingSamples = null
+                sawDownload = false
+                transcribeAndHandle(waiting)
+            } else if (sawDownload) {
+                sawDownload = false
+                message = "Voice model ready. Tap the mic and speak."
+            }
+        }
+    }
+
     fun finish() {
         if (!recording) return
         recording = false
@@ -214,28 +254,19 @@ fun VoiceScreen(
                 message = "That was too short. Tap the mic and speak for at least a second."
                 return@launch
             }
-            working = "Working…"
-            try {
-                val heard = VoiceEngine.transcribe(context, samples) { working = it }
-                if (heard.text.isBlank()) {
-                    notDetected = true
-                    message = "Could not hear anything. Try again, a bit closer to the mic."
-                } else if (SpokenTransactionParser.parseAll(heard.text).isEmpty() &&
-                    SpokenTransactionParser.parse(heard.text).isEmpty
-                ) {
-                    // Heard words, but no amount or details: stay here and let the person try again
-                    notDetected = true
-                    message = "Heard: \"${heard.text}\". No transaction found, try again."
-                } else {
-                    onHeard(heard.text)
+            if (!VoiceEngine.isModelReady(context)) {
+                // First use: keep the recording, ask about the download now, and transcribe the
+                // recording as soon as the download is done
+                pendingSamples = samples
+                if (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) {
+                    message = null
+                    VoiceModelDownloader.start(context)
+                } else if (download !is VoiceDownloadState.Downloading) {
+                    askDownload = true
                 }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                message = e.message ?: "Voice input failed"
-            } finally {
-                working = null
+                return@launch
             }
+            transcribeAndHandle(samples)
         }
     }
 
@@ -262,15 +293,14 @@ fun VoiceScreen(
             working != null -> Unit
             download is VoiceDownloadState.Downloading -> VoiceModelDownloader.pause()
             recording -> finish()
-            !VoiceEngine.isModelReady(context) -> {
-                // Already agreed to the download before: carry on without asking again
-                if (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) {
-                    message = null
-                    VoiceModelDownloader.start(context)
-                } else {
-                    askDownload = true
-                }
+            // Already agreed to the download before and it stopped part-way: carry on without asking again
+            (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) &&
+                    !VoiceEngine.isModelReady(context) -> {
+                message = null
+                VoiceModelDownloader.start(context)
             }
+            // Otherwise record straight away, even if the speech model is not on the phone yet:
+            // the download question comes after the recording (see finish())
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
@@ -284,7 +314,19 @@ fun VoiceScreen(
             message = null
             VoiceModelDownloader.start(context)
         },
-        onDismiss = { askDownload = false }
+        onDismiss = {
+            askDownload = false
+            // "Not now": nothing can be transcribed without the model, so the recording is dropped.
+            // The dialog also reports a dismiss right after "Download" is tapped, so this only discards
+            // when no download has started a moment later; otherwise the recording must be kept.
+            scope.launch {
+                delay(300)
+                if (VoiceModelDownloader.state.value is VoiceDownloadState.Idle && !askDownload) {
+                    pendingSamples = null
+                    message = "Download skipped, so that recording was discarded. Tap the mic to try again."
+                }
+            }
+        }
     )
 
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
