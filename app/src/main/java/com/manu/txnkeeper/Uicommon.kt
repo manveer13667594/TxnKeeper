@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
 
-val PAYMENT_METHODS = listOf("CASH", "UPI", "CARD", "BANK TRANSFER")
+val PAYMENT_METHODS = listOf("CASH", "UPI", "CARD",)
 
 /** Kinds of account shown as chips when adding or editing an account. */
 val ACCOUNT_TYPES = listOf("BANK", "CASH", "WALLET", "CARD")

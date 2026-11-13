@@ -37,6 +37,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -276,6 +278,32 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
     var seconds by remember { mutableIntStateOf(0) }
     var working by remember { mutableStateOf<String?>(null) }
 
+    // The download runs in VoiceModelDownloader, not on this page, so it keeps going when you leave
+    val download by VoiceModelDownloader.state.collectAsState()
+    var sawDownload by remember { mutableStateOf(false) }
+    LaunchedEffect(download) {
+        when (val d = download) {
+            is VoiceDownloadState.Downloading -> {
+                sawDownload = true
+                form.notice = downloadStatus(d.fraction) + " Tap the mic to pause."
+            }
+            // The messages below only appear when the change happens while this page is open
+            is VoiceDownloadState.Done -> if (sawDownload) {
+                sawDownload = false
+                form.notice = "Voice model ready. Tap the mic and speak."
+            }
+            is VoiceDownloadState.Paused -> if (sawDownload) {
+                sawDownload = false
+                form.notice = "Download paused at ${(d.fraction * 100).toInt()}%. Tap the mic to resume."
+            }
+            is VoiceDownloadState.Failed -> if (sawDownload) {
+                sawDownload = false
+                form.notice = d.message + " Tap the mic to try again."
+            }
+            VoiceDownloadState.Idle -> Unit
+        }
+    }
+
     // Free the model's memory when the Add page is closed
     DisposableEffect(Unit) { onDispose { VoiceEngine.release() } }
 
@@ -325,8 +353,17 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
     fun onClick() {
         when {
             working != null -> Unit
+            download is VoiceDownloadState.Downloading -> VoiceModelDownloader.pause()
             recording -> finish()
-            !VoiceEngine.isModelReady(context) -> askDownload = true
+            !VoiceEngine.isModelReady(context) -> {
+                // Already agreed to the download before: carry on without asking again
+                if (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) {
+                    form.notice = null
+                    VoiceModelDownloader.start(context)
+                } else {
+                    askDownload = true
+                }
+            }
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
@@ -337,19 +374,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         visible = askDownload,
         onConfirm = {
             askDownload = false
-            scope.launch {
-                working = downloadStatus(0f)
-                try {
-                    VoiceEngine.prepare(context) { working = it; form.notice = it }
-                    form.notice = "Voice model ready. Tap the mic and speak."
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    form.notice = e.message ?: "Download failed. Check your internet and try again."
-                } finally {
-                    working = null
-                }
-            }
+            VoiceModelDownloader.start(context)
         },
         onDismiss = { askDownload = false }
     )
@@ -363,7 +388,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         contentPadding = if (recording) PaddingValues(horizontal = 20.dp, vertical = 16.dp) else PaddingValues(16.dp)
     ) {
         when {
-            working != null -> CircularProgressIndicator(
+            working != null || download is VoiceDownloadState.Downloading -> CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
                 color = LocalContentColor.current,
                 strokeWidth = 2.dp
