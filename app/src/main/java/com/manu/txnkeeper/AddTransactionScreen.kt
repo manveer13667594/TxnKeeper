@@ -23,9 +23,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ArrowBack as MirroredArrowBack
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.FilledIconButton
@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -269,7 +270,10 @@ fun AddTransactionScreen(
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val scrollState = rememberScrollState()
+    // Focus the title field and open the keyboard when this screen first appears.
+    val titleFocus = remember { FocusRequester() }
     // The Next key on the keyboard goes title -> amount -> description
     val amountFocus = remember { FocusRequester() }
     val descriptionFocus = remember { FocusRequester() }
@@ -283,6 +287,12 @@ fun AddTransactionScreen(
     // The account that will be used: the chosen one, or the first if none is chosen (or it was deleted).
     // The list is ordered oldest first, so the first one is the main account.
     val account = accounts.firstOrNull { it.id == form.accountId } ?: accounts.firstOrNull()
+
+    // Focus the title field and show the keyboard when the screen opens.
+    LaunchedEffect(Unit) {
+        titleFocus.requestFocus()
+        keyboardController?.show()
+    }
 
     // The payment methods you have set up in Settings
     val methods = settings.paymentMethods
@@ -300,7 +310,7 @@ fun AddTransactionScreen(
             ManuTopBar(
                 title = "Add Transaction",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.Default.ArrowBack,
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onNavigationClick = {
                     focusManager.clearFocus()
                     onClose()
@@ -367,9 +377,11 @@ fun AddTransactionScreen(
                         ManuTextField(
                             value = form.title,
                             onValueChange = { form.title = it },
-                            modifier = Modifier.focusProperties { next = amountFocus },
+                            modifier = Modifier
+                                .focusRequester(titleFocus)
+                                .focusProperties { next = amountFocus },
                             placeholder = { Text("Transaction title") },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         )
 
                         ManuTextField(
