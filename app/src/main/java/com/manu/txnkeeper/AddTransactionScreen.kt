@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.ArrowBack as MirroredArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -81,7 +82,9 @@ data class BatchEntry(
     val type: String,
     val payment: String,
     val dateTime: Long,
-    val description: String
+    val description: String,
+    /** Marked = will be saved. Unmark an entry you do not want to keep. */
+    val include: Boolean = true
 )
 
 /** The same defaults as the form: anything the parser was unsure about stays at its usual value. */
@@ -108,6 +111,9 @@ class TxnFormState {
     var payment by mutableStateOf("CASH")
     var dateTime by mutableStateOf(System.currentTimeMillis())
     var description by mutableStateOf("")
+
+    /** For an entry of a batch: is it marked to be saved? (Always true outside a batch.) */
+    var include by mutableStateOf(true)
 
     /** Chosen account. 0 = not chosen yet, so the first account is used. It is kept after saving. */
     var accountId by mutableStateOf(0L)
@@ -138,7 +144,7 @@ class TxnFormState {
         batchSaved = 0
         load(batch[0])
         notice = "Heard: \"$heard\". Use the arrows to move between the ${list.size} entries, " +
-                "check each one, then Save & next."
+                "check each one, untick any you don't want, then Save & exit."
     }
 
     /** Shows another entry of the batch (what you changed in the current one is kept). */
@@ -149,6 +155,40 @@ class TxnFormState {
         batch = batch.toMutableList().also { it[batchIndex] = snapshot() }
         batchIndex = t
         load(batch[t])
+    }
+
+    /**
+     * Keeps what is in the form as the current entry of the batch, then returns every entry that is
+     * still marked, in order. Nothing is removed. Not a batch: empty list.
+     */
+    fun markedEntries(): List<BatchEntry> {
+        if (!inBatch) return emptyList()
+        batch = batch.toMutableList().also { it[batchIndex] = snapshot() }
+        return batch.filter { it.include }
+    }
+
+    /** Shows the first marked entry that is not valid, so it can be fixed. Returns its number (1-based) or null. */
+    fun firstInvalidMarked(isValid: (BatchEntry) -> Boolean): Int? {
+        markedEntries()
+        val idx = batch.indexOfFirst { it.include && !isValid(it) }
+        if (idx < 0) return null
+        goToEntry(idx)
+        return idx + 1
+    }
+
+    /** Drops the unmarked entry on screen without saving it and shows the next one. False when none are left. */
+    fun skipCurrentInBatch(): Boolean {
+        if (!inBatch) return false
+        val rest = batch.toMutableList().also { it.removeAt(batchIndex) }
+        if (rest.isEmpty()) {
+            batch = emptyList()
+            batchIndex = 0
+            return false
+        }
+        batch = rest
+        batchIndex = batchIndex.coerceAtMost(rest.lastIndex)
+        load(rest[batchIndex])
+        return true
     }
 
     /**
@@ -189,7 +229,7 @@ class TxnFormState {
                     "batchIndex" to f.batchIndex,
                     "batchSaved" to f.batchSaved,
                     "batch" to f.batch.map {
-                        listOf(it.title, it.amount, it.type, it.payment, it.dateTime.toString(), it.description)
+                        listOf(it.title, it.amount, it.type, it.payment, it.dateTime.toString(), it.description, it.include.toString())
                     }
                 )
             },
@@ -207,14 +247,16 @@ class TxnFormState {
                     f.batchSaved = m["batchSaved"] as Int
                     @Suppress("UNCHECKED_CAST")
                     f.batch = (m["batch"] as List<List<String>>).map {
-                        BatchEntry(it[0], it[1], it[2], it[3], it[4].toLong(), it[5])
+                        BatchEntry(it[0], it[1], it[2], it[3], it[4].toLong(), it[5], it.getOrNull(6) != "false")
                     }
+                    // The entry on screen carries its own mark
+                    f.include = f.batch.getOrNull(f.batchIndex)?.include ?: true
                 }
             }
         )
     }
 
-    private fun snapshot() = BatchEntry(title, amount, type, payment, dateTime, description)
+    private fun snapshot() = BatchEntry(title, amount, type, payment, dateTime, description, include)
 
     private fun load(e: BatchEntry) {
         title = e.title
@@ -223,6 +265,7 @@ class TxnFormState {
         payment = e.payment
         dateTime = e.dateTime
         description = e.description
+        include = e.include
     }
 
     fun reset() {
@@ -235,6 +278,7 @@ class TxnFormState {
         payment = "CASH"
         dateTime = System.currentTimeMillis()
         description = ""
+        include = true
         notice = null
     }
 
@@ -266,6 +310,8 @@ fun AddTransactionScreen(
     onClose: () -> Unit,
     /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
     onSubmit: (TransactionEntity, stay: Boolean) -> Unit,
+    /** Save & exit on a recording with several entries: saves every marked one at once, then closes. */
+    onSubmitAll: (List<TransactionEntity>) -> Unit,
     onScan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -288,10 +334,14 @@ fun AddTransactionScreen(
     // The list is ordered oldest first, so the first one is the main account.
     val account = accounts.firstOrNull { it.id == form.accountId } ?: accounts.firstOrNull()
 
-    // Focus the title field and show the keyboard when the screen opens.
+    // Focus the title field and show the keyboard when the screen opens for a blank entry.
+    // Not when it opens already filled from speech or a receipt scan (the note above the form is
+    // set then): those only need a look, and you tap a field if something needs fixing.
     LaunchedEffect(Unit) {
-        titleFocus.requestFocus()
-        keyboardController?.show()
+        if (form.notice == null && !form.inBatch) {
+            titleFocus.requestFocus()
+            keyboardController?.show()
+        }
     }
 
     // The payment methods you have set up in Settings
@@ -351,7 +401,13 @@ fun AddTransactionScreen(
                                 text = "Entry ${form.batchIndex + 1} of ${form.batch.size}",
                                 style = MaterialTheme.typography.titleMedium
                             )
-                            if (form.batchSaved > 0) {
+                            if (!form.include) {
+                                Text(
+                                    text = "Won't be saved",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else if (form.batchSaved > 0) {
                                 Text(
                                     text = "${form.batchSaved} saved",
                                     style = MaterialTheme.typography.bodySmall,
@@ -359,13 +415,20 @@ fun AddTransactionScreen(
                                 )
                             }
                         }
-                        FilledIconButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                form.goToEntry(form.batchIndex + 1)
-                            },
-                            enabled = form.batchIndex < form.batch.lastIndex
-                        ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next entry") }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Marked by default; untick to leave this entry out when saving
+                            Checkbox(
+                                checked = form.include,
+                                onCheckedChange = { form.include = it }
+                            )
+                            FilledIconButton(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    form.goToEntry(form.batchIndex + 1)
+                                },
+                                enabled = form.batchIndex < form.batch.lastIndex
+                            ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next entry") }
+                        }
                     }
                 }
 
@@ -471,8 +534,41 @@ fun AddTransactionScreen(
                             singleLine = false
                         )
 
-                        // Both buttons save; "Save & next" stays here for another entry
+                        fun toEntity(e: BatchEntry, value: Long) = TransactionEntity(
+                            title = e.title.trim(),
+                            amountPaise = value,
+                            type = e.type,
+                            paymentMethod = e.payment,
+                            dateTime = e.dateTime,
+                            description = e.description.trim(),
+                            accountId = account?.id ?: 1L
+                        )
+                        fun amountOf(e: BatchEntry) = parsePaise(e.amount.replace(",", "").trim())
+
+                        // "Save & next" saves the one on screen and moves on (one by one);
+                        // "Save & exit" saves it, or in a recording with several entries, every marked one.
                         fun submit(stay: Boolean) {
+                            // Unmarked entry in a batch: nothing to save, "Save & next" just skips it
+                            if (form.inBatch && !form.include && stay) {
+                                error = null
+                                focusManager.clearFocus()
+                                if (!form.skipCurrentInBatch()) form.reset()
+                                return
+                            }
+                            if (form.inBatch && !stay) {
+                                val badNumber = form.firstInvalidMarked { e ->
+                                    val v = amountOf(e)
+                                    e.title.isNotBlank() && v != null && v > 0
+                                }
+                                if (badNumber != null) {
+                                    error = "Entry $badNumber: enter a valid title and amount."
+                                    return
+                                }
+                                error = null
+                                focusManager.clearFocus()
+                                onSubmitAll(form.markedEntries().map { toEntity(it, amountOf(it)!!) })
+                                return
+                            }
                             val value = parsePaise(form.amount.replace(",", "").trim())
                             if (form.title.isBlank() || value == null || value <= 0) {
                                 error = "Enter a valid title and amount."
@@ -495,7 +591,7 @@ fun AddTransactionScreen(
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
                             ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
-                                Text("Save & next", maxLines = 1)
+                                Text(if (form.inBatch && !form.include) "Skip & next" else "Save & next", maxLines = 1)
                             }
                             ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
                                 Text("Save & exit", maxLines = 1)

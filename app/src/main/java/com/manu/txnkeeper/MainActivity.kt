@@ -340,6 +340,23 @@ fun TxnkeeperApp(
                     },
                     onClose = { showAdd = false },
                     onScan = { openCamera() },
+                    // Save & exit on a recording with several entries: all marked ones, in one go
+                    onSubmitAll = { entities ->
+                        scope.launch {
+                            if (entities.isNotEmpty() &&
+                                !safeWrite(context, "save the transactions") { dao.insertAll(entities) }
+                            ) return@launch
+                            val account = form.accountId
+                            form.reset()
+                            form.accountId = account
+                            showAdd = false
+                            snackbarMessage = when (entities.size) {
+                                0 -> "Nothing saved"
+                                1 -> "Transaction saved"
+                                else -> "${entities.size} transactions saved"
+                            }
+                        }
+                    },
                     onSubmit = { entity, stay ->
                         scope.launch {
                             // If saving fails the form stays open with everything the user typed

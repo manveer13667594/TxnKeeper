@@ -73,7 +73,7 @@ fun DeleteDataControls(settings: AppSettings, database: AppDatabase) {
     Text(
         text = "Permanently delete what you have entered in this app: everything, or just one account. " +
                 "There is no cloud backup, so deleted data can't be recovered. " +
-                "Export a CSV first (see Data above) if you want a copy.",
+                "Export a CSV first (Settings > Export & import) if you want a copy.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )

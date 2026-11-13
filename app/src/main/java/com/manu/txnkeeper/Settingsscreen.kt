@@ -1,5 +1,6 @@
 package com.manu.txnkeeper
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -38,12 +39,27 @@ import com.manu.manudesignsystem.components.ManuOutlineButton
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.theme.ManuDesignSystem
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.Color
+
+/** The pages of Settings. Only [MAIN] is a list; the others open from a row on it. */
+private enum class SettingsPage(val title: String) {
+    MAIN("Settings"),
+    PAYMENT("Payment methods"),
+    DATA("Export & import"),
+    DELETE("Delete data")
+}
 
 /**
  * Full-screen Settings page (opened from the three-dot menu on the home screen).
- * Each group of settings is a [SettingsSection]; add new sections below "Data".
+ *
+ * The main page is a short list: a card of quick preferences, then cards of rows. A row with an
+ * arrow opens its own page inside Settings (Back returns to the list), so the long controls
+ * (payment methods, export filters, delete) are not all on one scrolling screen.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     settings: AppSettings,
@@ -54,6 +70,7 @@ fun SettingsScreen(
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var page by rememberSaveable { mutableStateOf(SettingsPage.MAIN) }
     var addingMethod by remember { mutableStateOf(false) }
     // The payment method being removed, and how many transactions use it (null while counting)
     var removingMethod by remember { mutableStateOf<String?>(null) }
@@ -63,15 +80,20 @@ fun SettingsScreen(
         removingMethod?.let { removingUsage = database.transactionDao().countByPaymentMethod(it) }
     }
 
+    // Back from a sub-page returns to the list; from the list it closes Settings (handled by the app)
+    BackHandler(enabled = page != SettingsPage.MAIN) { page = SettingsPage.MAIN }
+
     ManuScaffold(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 20.dp),
         topBar = {
             ManuTopBar(
-                title = "Settings",
+                title = page.title,
                 modifier = Modifier.padding(horizontal = 20.dp),
                 navigationIcon = Icons.Default.ArrowBack,
-                onNavigationClick = onClose
+                onNavigationClick = {
+                    if (page == SettingsPage.MAIN) onClose() else page = SettingsPage.MAIN
+                }
             )
         }
     ) { _ ->
@@ -82,126 +104,38 @@ fun SettingsScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-            SettingsSection(title = "Appearance") {
-                Text("Theme", style = MaterialTheme.typography.titleMedium)
-
-                Text(
-                    text = "System default follows your phone's light / dark setting.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            when (page) {
+                SettingsPage.MAIN -> MainSettings(
+                    settings = settings,
+                    onManageAccounts = onManageAccounts,
+                    onOpenPayment = { page = SettingsPage.PAYMENT },
+                    onOpenData = { page = SettingsPage.DATA },
+                    onOpenDelete = { page = SettingsPage.DELETE },
+                    onOpenHelp = onOpenHelp,
+                    onOpenAbout = onOpenAbout
                 )
 
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-                ) {
-                    ThemeMode.entries.forEach { mode ->
-                        ManuChip(
-                            label = mode.label,
-                            selected = settings.themeMode == mode,
-                            onClick = { settings.updateThemeMode(mode) }
-                        )
+                SettingsPage.PAYMENT -> PaymentMethodsPage(
+                    settings = settings,
+                    onAdd = { addingMethod = true },
+                    onRemove = { removingMethod = it }
+                )
+
+                SettingsPage.DATA -> SettingsCard {
+                    Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg)) {
+                        DataTransferControls(database = database)
                     }
                 }
-            }
 
-            SettingsSection(title = "Accounts") {
-                Text(
-                    text = "Add, edit or delete accounts. The account chips on the home screen show up once you have more than one.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ManuOutlineButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onManageAccounts
-                ) { Text("Manage accounts") }
-            }
-
-            SettingsSection(title = "Payment methods") {
-                Text(
-                    text = "The choices shown when you add or edit a transaction. Remove the ones you don't use, or add your own.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (settings.paymentMethods.isEmpty()) {
-                    Text(
-                        text = "No payment methods. Transactions are saved without one.",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-                settings.paymentMethods.forEach { method ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                SettingsPage.DELETE -> SettingsCard {
+                    Column(
+                        modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Text(
-                            text = method,
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.weight(1f)
-                        )
-                        IconButton(onClick = { removingMethod = method }) {
-                            Icon(Icons.Default.Close, contentDescription = "Remove $method")
-                        }
+                        DeleteDataControls(settings = settings, database = database)
                     }
                 }
-                ManuButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { addingMethod = true }
-                ) { Text("Add payment method") }
             }
-
-            SettingsSection(title = "Voice entry") {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Show tips", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "A short tip on the voice screen, a different one each time.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Switch(
-                        checked = settings.voiceTips,
-                        onCheckedChange = { settings.updateVoiceTips(it) }
-                    )
-                }
-            }
-
-            SettingsSection(title = "Data") {
-                DataTransferControls(database = database)
-            }
-
-            SettingsSection(title = "Delete data") {
-                DeleteDataControls(settings = settings, database = database)
-            }
-
-            SettingsSection(title = "Help & About") {
-                Text(
-                    text = "Quick answers on adding transactions, scanning receipts, voice entry, accounts, " +
-                            "filters, and importing or exporting your data.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ManuButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onOpenHelp
-                ) { Text("Help") }
-                Text(
-                    text = "See the app version, what TxnKeeper is for, and read the privacy policy.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                ManuOutlineButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onOpenAbout
-                ) { Text("About") }
-            }
-
-            // More sections (notifications, ...) go here later.
         }
     }
 
@@ -243,24 +177,175 @@ fun SettingsScreen(
     }
 }
 
-/** A small heading with a card under it that holds one group of settings. */
+/** The short list shown first. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SettingsSection(
-    title: String,
-    content: @Composable ColumnScope.() -> Unit
+private fun MainSettings(
+    settings: AppSettings,
+    onManageAccounts: () -> Unit,
+    onOpenPayment: () -> Unit,
+    onOpenData: () -> Unit,
+    onOpenDelete: () -> Unit,
+    onOpenHelp: () -> Unit,
+    onOpenAbout: () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        ManuCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                content = content
+    // Quick preferences, changed right here
+    SettingsCard {
+        Column(
+            modifier = Modifier.padding(vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text("Theme", style = MaterialTheme.typography.titleMedium)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+            ) {
+                ThemeMode.entries.forEach { mode ->
+                    ManuChip(
+                        label = mode.label,
+                        selected = settings.themeMode == mode,
+                        onClick = { settings.updateThemeMode(mode) }
+                    )
+                }
+            }
+        }
+        HorizontalDivider()
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Voice tips", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "Show a tip on the voice screen",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = settings.voiceTips,
+                onCheckedChange = { settings.updateVoiceTips(it) }
             )
         }
+    }
+
+    SettingsCard {
+        SettingsRow(title = "Accounts", subtitle = "Add, edit or delete", onClick = onManageAccounts)
+        HorizontalDivider()
+        val count = settings.paymentMethods.size
+        SettingsRow(
+            title = "Payment methods",
+            subtitle = if (count == 0) "None" else "$count saved",
+            onClick = onOpenPayment
+        )
+    }
+
+    SettingsCard {
+        SettingsRow(title = "Export & import", subtitle = "CSV and PDF", onClick = onOpenData)
+        HorizontalDivider()
+        SettingsRow(
+            title = "Delete data",
+            subtitle = "Everything, or one account",
+            titleColor = MaterialTheme.colorScheme.error,
+            onClick = onOpenDelete
+        )
+    }
+
+    SettingsCard {
+        SettingsRow(title = "Help", onClick = onOpenHelp)
+        HorizontalDivider()
+        SettingsRow(title = "About", subtitle = "Version and privacy policy", onClick = onOpenAbout)
+    }
+}
+
+/** The list of payment methods, with a remove button on each and one Add button. */
+@Composable
+private fun PaymentMethodsPage(
+    settings: AppSettings,
+    onAdd: () -> Unit,
+    onRemove: (String) -> Unit
+) {
+    Text(
+        text = "The choices shown when you add or edit a transaction.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    SettingsCard {
+        Column(
+            modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (settings.paymentMethods.isEmpty()) {
+                Text(
+                    text = "No payment methods. Transactions are saved without one.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            settings.paymentMethods.forEach { method ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = method,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { onRemove(method) }) {
+                        Icon(Icons.Default.Close, contentDescription = "Remove $method")
+                    }
+                }
+            }
+        }
+    }
+    ManuButton(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onAdd
+    ) { Text("Add payment method") }
+}
+
+/** One card that holds a group of rows or controls. */
+@Composable
+private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
+    ManuCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.fillMaxWidth(), content = content)
+    }
+}
+
+/** A tappable row: title, an optional one-line summary, and an arrow. */
+@Composable
+private fun SettingsRow(
+    title: String,
+    onClick: () -> Unit,
+    subtitle: String? = null,
+    titleColor: Color = Color.Unspecified
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, color = titleColor)
+            if (subtitle != null) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }

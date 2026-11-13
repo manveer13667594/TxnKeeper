@@ -34,10 +34,19 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -166,6 +175,8 @@ fun TransactionsScreen(
     var filterSheetOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
     var deleting by remember { mutableStateOf<TransactionEntity?>(null) }
+    // The transaction shown in full in a popup (tap a row)
+    var viewing by remember { mutableStateOf<TransactionEntity?>(null) }
 
     // Wait a moment after typing so we don't query on every keystroke
     LaunchedEffect(searchText) {
@@ -479,17 +490,21 @@ fun TransactionsScreen(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
                                     )
-                                    // One lib list card per day, with a divider between its transactions
-                                    ManuListCard(
-                                        items = group.txns.map { txn ->
-                                            transactionItem(
-                                                txn = txn,
-                                                accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
-                                                onEdit = { editing = txn },
-                                                onDelete = { deleting = txn }
-                                            )
+                                    // One card per day; amount at the right end of each row
+                                    ManuCard(modifier = Modifier.fillMaxWidth()) {
+                                        Column {
+                                            group.txns.forEachIndexed { index, txn ->
+                                                if (index > 0) HorizontalDivider()
+                                                TransactionRow(
+                                                    txn = txn,
+                                                    accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
+                                                    onOpen = { viewing = txn },
+                                                    onEdit = { editing = txn },
+                                                    onDelete = { deleting = txn }
+                                                )
+                                            }
                                         }
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -525,6 +540,22 @@ fun TransactionsScreen(
             onChange = { filters = it },
             onDismiss = { filterSheetOpen = false },
             paymentMethods = filterMethods
+        )
+    }
+
+    viewing?.let { txn ->
+        TransactionDetailDialog(
+            txn = txn,
+            accountName = accountNames[txn.accountId] ?: "",
+            onEdit = {
+                viewing = null
+                editing = txn
+            },
+            onDelete = {
+                viewing = null
+                deleting = txn
+            },
+            onDismiss = { viewing = null }
         )
     }
 
@@ -747,44 +778,235 @@ private fun EmptyMessage(
     }
 }
 
-/** One transaction as a row of the day's list card: tap to edit, three-dot menu for Edit / Delete. */
-private fun transactionItem(
+/**
+ * One transaction: icon, title, small details under it, and the amount at the right end
+ * (before the three-dot menu), so every row has the same shape. Tap to open it in full.
+ */
+@Composable
+private fun TransactionRow(
     txn: TransactionEntity,
     accountName: String?,
+    onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
-): ManuListItemData {
+) {
     val income = txn.type == "INCOME"
     val sign = if (income) "+" else "−"
+    var menuOpen by remember { mutableStateOf(false) }
 
-    return ManuListItemData(
-        title = txn.title,
-        description = buildString {
-            append(sign).append(formatMoney(txn.amountPaise))
-            // A transaction can have no payment method (when you removed every method)
-            if (txn.paymentMethod.isNotBlank()) append(" • ").append(txn.paymentMethod)
-            if (accountName != null) append(" • ").append(accountName)
-        },
-        time = buildString {
-            append(formatTime(txn.dateTime))
-            if (txn.description.isNotBlank()) append(" • ").append(txn.description)
-        },
-        leadingContent = {
-            Image(
-                painter = painterResource(
-                    if (income) R.drawable.ic_income else R.drawable.ic_expense
-                ),
-                contentDescription = if (income) "Income" else "Expense",
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape), // remove if your PNGs are already round or have their own shape
-                contentScale = ContentScale.Fit
-            )
-        },
-        onClick = onEdit,
-        menuItems = listOf(
-            ManuMenuItem(label = "Edit", onClick = onEdit),
-            ManuMenuItem(label = "Delete", onClick = onDelete)
+    // Details under the title: payment method and account (when there is something to show)
+    val details = buildString {
+        if (txn.paymentMethod.isNotBlank()) append(txn.paymentMethod)
+        if (accountName != null) {
+            if (isNotEmpty()) append(" • ")
+            append(accountName)
+        }
+    }
+    val timeLine = buildString {
+        append(formatTime(txn.dateTime))
+        if (txn.description.isNotBlank()) append(" • ").append(txn.description)
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Image(
+            painter = painterResource(if (income) R.drawable.ic_income else R.drawable.ic_expense),
+            contentDescription = if (income) "Income" else "Expense",
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Fit
         )
-    )
+        Column(modifier = Modifier.weight(1f)) {
+            // Title gets the full width up to the three-dot menu
+            Text(text = txn.title, style = MaterialTheme.typography.titleMedium)
+            // Payment / account and time on the left, the amount at the right end of this row
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    if (details.isNotEmpty()) {
+                        Text(
+                            text = details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Text(
+                        text = timeLine,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Text(
+                    text = sign + formatMoney(txn.amountPaise),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (income) IncomeColor else ExpenseColor,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 8.dp)
+                )
+            }
+        }
+        // Three-dot menu on its own, centred on the right
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More")
+            }
+            ManuDropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                items = listOf(
+                    ManuMenuItem(label = "Edit", onClick = onEdit),
+                    ManuMenuItem(label = "Delete", onClick = onDelete)
+                )
+            )
+        }
+    }
+}
+
+/**
+ * A transaction shown in full as a popup. Tap outside it or press Back to close.
+ * Layout: type and Edit / Delete on top, then title and amount, then the details as label / value
+ * rows, then the description in its own box.
+ */
+@Composable
+private fun TransactionDetailDialog(
+    txn: TransactionEntity,
+    accountName: String,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val income = txn.type == "INCOME"
+    val sign = if (income) "+" else "−"
+    val typeColor = if (income) IncomeColor else ExpenseColor
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            ) {
+                // Top: what it is, and Edit / Delete at the right
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(if (income) R.drawable.ic_income else R.drawable.ic_expense),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Fit
+                    )
+                    Text(
+                        text = if (income) "Income" else "Expense",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = typeColor,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 8.dp)
+                    )
+                    IconButton(onClick = onEdit) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit")
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Delete",
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+
+                // Title and amount
+                Text(
+                    text = txn.title,
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.padding(top = 4.dp)
+                )
+                Text(
+                    text = sign + formatMoney(txn.amountPaise),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = typeColor,
+                    modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
+                )
+
+                // Details: label on the left, value on the right
+                HorizontalDivider()
+                DetailLine("Date", formatDateLong(txn.dateTime))
+                HorizontalDivider()
+                DetailLine("Time", formatTime(txn.dateTime))
+                if (accountName.isNotBlank()) {
+                    HorizontalDivider()
+                    DetailLine("Account", accountName)
+                }
+                if (txn.paymentMethod.isNotBlank()) {
+                    HorizontalDivider()
+                    DetailLine("Payment", txn.paymentMethod)
+                }
+
+                // Description in its own box, shown in full
+                if (txn.description.isNotBlank()) {
+                    Text(
+                        text = "Description",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 6.dp)
+                    )
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            text = txn.description,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(12.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+    }
+}
+
+/** One detail: grey label at the left, its value at the right. */
+@Composable
+private fun DetailLine(label: String, value: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyLarge,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
+    }
 }

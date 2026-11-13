@@ -2,16 +2,21 @@ package com.manu.txnkeeper
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -87,6 +92,7 @@ fun DataTransferControls(database: AppDatabase) {
     var rangeTo by remember { mutableStateOf<Long?>(null) }     // end of the last day
     var countText by remember { mutableStateOf("50") }
     var rangeDialogOpen by remember { mutableStateOf(false) }
+    var filtersOpen by remember { mutableStateOf(false) }
 
     // Optional narrowing down (null / blank = don't filter on it)
     var accountId by remember { mutableStateOf<Long?>(null) }
@@ -211,18 +217,15 @@ fun DataTransferControls(database: AppDatabase) {
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // ------------------------------------------------ help text, and the result of the last action
-        val message = status
-        Text(
-            text = when {
-                busy -> "Working..."
-                message != null -> message
-                else -> "CSV columns: Date, Title, Amount, Type, Payment Method, Account, Description. " +
-                        "Importing a file again never adds the same transaction twice."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        // ------------------------------------------------ result of the last action (only when there is one)
+        val message = if (busy) "Working..." else status
+        if (message != null) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
 
         // ------------------------------------------------ export
         Text("Export", style = MaterialTheme.typography.titleMedium)
@@ -261,124 +264,149 @@ fun DataTransferControls(database: AppDatabase) {
             )
         }
 
-        // ---- Narrow it down (optional). Everything chosen here must match, on top of the choice above.
+        // ---- Filters: folded away until you open them. Everything chosen must match, on top of the choice above.
+        val activeFilters = listOf(
+            accountId != null,
+            payment != null,
+            txType != null,
+            minText.isNotBlank() || maxText.isNotBlank()
+        ).count { it }
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { filtersOpen = !filtersOpen }
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Only export (optional)",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Filters", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = if (activeFilters == 0) "None" else "$activeFilters on",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (filtersOpen && filtersOn) {
+                ManuTextButton(
+                    onClick = {
+                        accountId = null
+                        payment = null
+                        txType = null
+                        minText = ""
+                        maxText = ""
+                        status = null
+                    }
+                ) { Text("Clear") }
+            }
+            Icon(
+                if (filtersOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (filtersOpen) "Hide filters" else "Show filters",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            ManuTextButton(
-                onClick = {
-                    accountId = null
-                    payment = null
-                    txType = null
-                    minText = ""
-                    maxText = ""
-                    status = null
-                },
-                enabled = filtersOn
-            ) { Text("Clear") }
         }
 
-        // Account (with a single account there is nothing to choose between)
-        if (accounts.size > 1) {
-            ExportFilterLabel("Account")
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-            ) {
-                ManuChip(label = "All", selected = accountId == null, onClick = {
-                    accountId = null
-                    status = null
-                })
-                accounts.forEach { account ->
-                    ManuChip(label = account.name, selected = accountId == account.id, onClick = {
-                        accountId = account.id
+        if (filtersOpen) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // Account (with a single account there is nothing to choose between)
+                if (accounts.size > 1) {
+                    ExportFilterLabel("Account")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+                    ) {
+                        ManuChip(label = "All", selected = accountId == null, onClick = {
+                            accountId = null
+                            status = null
+                        })
+                        accounts.forEach { account ->
+                            ManuChip(label = account.name, selected = accountId == account.id, onClick = {
+                                accountId = account.id
+                                status = null
+                            })
+                        }
+                    }
+                }
+
+                // Payment method
+                if (methodChips.isNotEmpty()) {
+                    ExportFilterLabel("Payment method")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                        verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+                    ) {
+                        ManuChip(label = "All", selected = payment == null, onClick = {
+                            payment = null
+                            status = null
+                        })
+                        methodChips.forEach { method ->
+                            ManuChip(label = method, selected = payment == method, onClick = {
+                                payment = method
+                                status = null
+                            })
+                        }
+                    }
+                }
+
+                // Income / expense
+                ExportFilterLabel("Type")
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+                ) {
+                    ManuChip(label = "All", selected = txType == null, onClick = {
+                        txType = null
                         status = null
                     })
+                    ManuChip(label = "Income", selected = txType == "INCOME", onClick = {
+                        txType = "INCOME"
+                        status = null
+                    })
+                    ManuChip(label = "Expense", selected = txType == "EXPENSE", onClick = {
+                        txType = "EXPENSE"
+                        status = null
+                    })
+                }
+
+                // Amount range
+                ExportFilterLabel("Amount (₹)")
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ManuTextField(
+                        value = minText,
+                        onValueChange = {
+                            minText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
+                            status = null
+                        },
+                        label = { Text("Min") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
+                    ManuTextField(
+                        value = maxText,
+                        onValueChange = {
+                            maxText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
+                            status = null
+                        },
+                        label = { Text("Max") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
 
-        // Payment method
-        if (methodChips.isNotEmpty()) {
-            ExportFilterLabel("Payment method")
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-            ) {
-                ManuChip(label = "All", selected = payment == null, onClick = {
-                    payment = null
-                    status = null
-                })
-                methodChips.forEach { method ->
-                    ManuChip(label = method, selected = payment == method, onClick = {
-                        payment = method
-                        status = null
-                    })
-                }
-            }
+        // CSV and PDF side by side
+        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+            ManuButton(
+                modifier = Modifier.weight(1f),
+                onClick = { exportClicked { csvExport.launch(fileName("csv")) } }
+            ) { Text("Export CSV", maxLines = 1) }
+            ManuOutlineButton(
+                modifier = Modifier.weight(1f),
+                onClick = { exportClicked { pdfExport.launch(fileName("pdf")) } }
+            ) { Text("Export PDF", maxLines = 1) }
         }
 
-        // Income / expense
-        ExportFilterLabel("Type")
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-        ) {
-            ManuChip(label = "All", selected = txType == null, onClick = {
-                txType = null
-                status = null
-            })
-            ManuChip(label = "Income", selected = txType == "INCOME", onClick = {
-                txType = "INCOME"
-                status = null
-            })
-            ManuChip(label = "Expense", selected = txType == "EXPENSE", onClick = {
-                txType = "EXPENSE"
-                status = null
-            })
-        }
-
-        // Amount range
-        ExportFilterLabel("Amount (₹)")
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            ManuTextField(
-                value = minText,
-                onValueChange = {
-                    minText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
-                    status = null
-                },
-                label = { Text("Min") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
-            )
-            ManuTextField(
-                value = maxText,
-                onValueChange = {
-                    maxText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
-                    status = null
-                },
-                label = { Text("Max") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        ManuButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { exportClicked { csvExport.launch(fileName("csv")) } }
-        ) { Text("Export to CSV") }
-
-        ManuOutlineButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = { exportClicked { pdfExport.launch(fileName("pdf")) } }
-        ) { Text("Export to PDF") }
+        HorizontalDivider()
 
         // ------------------------------------------------ import
         Text("Import", style = MaterialTheme.typography.titleMedium)
@@ -394,6 +422,11 @@ fun DataTransferControls(database: AppDatabase) {
                 }
             }
         ) { Text("Import from CSV") }
+        Text(
+            text = "Importing the same file again never adds a transaction twice.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 
     // ---- Date range for the export
