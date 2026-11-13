@@ -127,7 +127,18 @@ object DataTransfer {
     /** How many transactions the choice matches (used to say "nothing to export" before the file picker opens). */
     suspend fun countFor(
         database: AppDatabase, scope: ExportScope, filters: ExportFilters = ExportFilters()
-    ): Int = withContext(Dispatchers.IO) { loadRows(database, scope, filters).size }
+    ): Int = withContext(Dispatchers.IO) {
+        // Counted by the database: no need to load every row just to know how many there are
+        val where = TxnSql.where(exportQuery(scope, filters))
+        val matching = database.transactionDao().rawTotals(
+            SimpleSQLiteQuery(
+                "SELECT 0 AS incomePaise, 0 AS expensePaise, COUNT(*) AS count FROM transactions WHERE ${where.sql}",
+                where.args.toTypedArray()
+            )
+        ).first().count
+        val limit = (scope as? ExportScope.Latest)?.count
+        if (limit != null) minOf(matching, limit) else matching
+    }
 
     /** Text shown under the PDF title, or null when everything is exported. */
     fun scopeLabel(
@@ -206,8 +217,14 @@ object DataTransfer {
 
             // How many of each transaction the app already has
             val existing = HashMap<String, Int>()
-            dao.getAllOnce().forEach {
-                existing.merge(dupKey(it.accountId, it.dateTime, it.amountPaise, it.type, it.title), 1, Int::plus)
+            if (parsed.rows.isNotEmpty()) {
+                // Only rows inside the file's own time span (to the second) can be duplicates,
+                // so the rest of a big table is not loaded
+                val from = parsed.rows.minOf { it.dateTime } / 1000 * 1000
+                val to = parsed.rows.maxOf { it.dateTime } / 1000 * 1000 + 999
+                dao.getBetweenOnce(from, to).forEach {
+                    existing.merge(dupKey(it.accountId, it.dateTime, it.amountPaise, it.type, it.title), 1, Int::plus)
+                }
             }
 
             val toInsert = ArrayList<TransactionEntity>()

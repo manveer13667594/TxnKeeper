@@ -146,6 +146,12 @@ fun TxnkeeperApp(
     var showSettings by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    // The stats chart: what it plots (null = closed), kept after closing so it can slide out
+    // Saved, so rotating the phone keeps the Stats page open
+    var statsRequest by rememberSaveable(stateSaver = StatsRequestSaver) {
+        mutableStateOf(StatsRequest(TxnFilters(), "", null))
+    }
+    var showStats by rememberSaveable { mutableStateOf(false) }
 
     // Safety net: there is always at least one account (the database adds it, this covers odd cases)
     LaunchedEffect(Unit) {
@@ -240,6 +246,7 @@ fun TxnkeeperApp(
         focusManager.clearFocus()
         showAdd = false
     }
+    BackHandler(enabled = showStats) { showStats = false }
     BackHandler(enabled = showSettings) { showSettings = false }
     BackHandler(enabled = showHelp) { showHelp = false }
     BackHandler(enabled = showAbout) { showAbout = false }
@@ -278,6 +285,10 @@ fun TxnkeeperApp(
                         onOpenHelp = { showHelp = true },
                         onOpenAbout = { showAbout = true },
                         onScan = { openCamera() },
+                        onOpenStats = { filters, search, account ->
+                            statsRequest = StatsRequest(filters, search, account)
+                            showStats = true
+                        },
                         onScrollDirection = { fabVisible = it }
                     )
 
@@ -341,6 +352,21 @@ fun TxnkeeperApp(
                             snackbarMessage = "Transaction saved"
                         }
                     }
+                )
+            }
+
+            // ---------------- Stats chart slides in from the right (opened by tapping the balance card)
+            AnimatedVisibility(
+                visible = showStats,
+                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+            ) {
+                StatsScreen(
+                    dao = dao,
+                    request = statsRequest,
+                    settings = settings,
+                    accounts = accounts,
+                    onClose = { showStats = false }
                 )
             }
 
