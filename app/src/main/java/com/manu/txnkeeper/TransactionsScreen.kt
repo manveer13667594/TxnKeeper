@@ -108,7 +108,10 @@ private fun buildGroups(list: List<TransactionEntity>): List<DayGroup> {
     var bucket = ArrayList<TransactionEntity>()
     for (t in list) {
         // The rows are sorted, so most sit in the day we already know: no calendar work for those
-        val d = if (day != Long.MIN_VALUE && t.dateTime >= day && t.dateTime < dayEnd) day else startOfDay(t.dateTime)
+        val d =
+            if (day != Long.MIN_VALUE && t.dateTime >= day && t.dateTime < dayEnd) day else startOfDay(
+                t.dateTime
+            )
         if (d != day) {
             if (bucket.isNotEmpty()) out += DayGroup(day, dayHeading(day), bucket)
             bucket = ArrayList()
@@ -217,14 +220,9 @@ fun TransactionsScreen(
         // the limit changes, so fixed steps would re-read thousands of rows over and over
         if (nearEnd && (page?.size ?: 0) >= limit) limit += maxOf(PAGE_SIZE, limit / 2)
     }
-    // Whether the floating + button is showing (the "back to top" arrow rides above it)
-    var fabShown by remember { mutableStateOf(true) }
     FabAutoHide(
         position = { listState.firstVisibleItemIndex * 100_000 + listState.firstVisibleItemScrollOffset },
-        onVisible = {
-            fabShown = it
-            onScrollDirection(it)
-        }
+        onVisible = { onScrollDirection(it) }
     )
     // The totals card is the first list item: once it has scrolled away you are no longer at the top
     val showScrollTop by remember { derivedStateOf { listState.firstVisibleItemIndex > 0 } }
@@ -285,14 +283,14 @@ fun TransactionsScreen(
                             Icon(AppIcons.Sliders, contentDescription = "Filters")
                         }
                     }
-                    IconButton(onClick = {
-                        focusManager.clearFocus()
-                        onScan()
-                    }
-                    )
-                    {
-                        Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
-                    }
+//                    IconButton(onClick = {
+//                        focusManager.clearFocus()
+//                        onScan()
+//                         }
+//                    )
+//                    {
+//                        Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
+//                    }
                     IconButton(onClick = {
                         if (searchOpen) {
                             searchText = ""
@@ -349,7 +347,8 @@ fun TransactionsScreen(
                                 ManuMenuItem(
                                     label = "About",
                                     leadingIcon = { Icon(Icons.Default.AccountCircle, "About") },
-                                    onClick = onOpenAbout)
+                                    onClick = onOpenAbout
+                                )
                             ),
                         )
                     }
@@ -426,8 +425,8 @@ fun TransactionsScreen(
                 Box(
                     modifier = Modifier
                         .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
-                        .absoluteOffset(0.dp,350.dp)
-                        //.height(50.dp)
+                        .absoluteOffset(0.dp, 350.dp)
+                    //.height(50.dp)
                 ) {
                     SwipeHintCard(settings = settings, modifier = Modifier.padding(top = 8.dp))
                 }
@@ -442,7 +441,7 @@ fun TransactionsScreen(
                     allCount == 0 -> EmptyMessage(
                         title = "No transactions yet",
                         hint = "Tap + to add one"
-                       // hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
+                        // hint = "Tap + to add one, or tap the camera icon (or swipe right) to scan a receipt."
                     )
 
                     loaded.isEmpty() && !filtersOn && selectedAccount != null -> EmptyMessage(
@@ -514,9 +513,8 @@ fun TransactionsScreen(
         // ---- "Back to top" arrow, floating over the list (only while scrolled down)
         ScrollToTopButton(
             visible = showScrollTop && groups.isNotEmpty(),
-            aboveFab = fabShown,
             onClick = { scope.launch { listState.animateScrollToItem(0) } },
-            modifier = Modifier.align(Alignment.BottomEnd)
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
     }
 
@@ -578,29 +576,20 @@ fun TransactionsScreen(
  * A small round "back to top" arrow at the bottom right, shown while the list is scrolled down
  * (so after loading thousands of rows you do not have to scroll all the way back up).
  *
- * It sits just above the + button. When the + button slips away on scroll down, the arrow glides
- * down into the corner, and it rises again when the + button returns. Call it inside a Box and
- * pass Modifier.align(Alignment.BottomEnd) in [modifier].
+ * It sits at the bottom centre of the screen, 16 dp from the bottom edge (the + button is at the
+ * bottom right). Call it inside a Box and pass Modifier.align(Alignment.BottomCenter) in [modifier].
  */
 @Composable
 private fun ScrollToTopButton(
     visible: Boolean,
-    /** true while the + button is showing, so the arrow keeps clear of it */
-    aboveFab: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // 16 dp from the bottom edge, like the + button; with the + button there, also clear its 56 dp and a gap
-    val bottom by animateDpAsState(
-        targetValue = if (aboveFab) 84.dp else 16.dp,
-        label = "scrollToTopBottomPadding"
-    )
     AnimatedVisibility(
         visible = visible,
         enter = fadeIn() + scaleIn(),
         exit = fadeOut() + scaleOut(),
-        // 26 dp from the right edge puts this 44 dp button on the same centre line as the 56 dp + button (20 dp margin)
-        modifier = modifier.padding(end = 26.dp, bottom = bottom)
+        modifier = modifier.padding(bottom = 16.dp)
     ) {
         Surface(
             onClick = onClick,

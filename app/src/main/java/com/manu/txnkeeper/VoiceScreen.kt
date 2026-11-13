@@ -42,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -140,7 +141,25 @@ fun VoiceScreen(
     var message by remember { mutableStateOf<String?>(null) }
     // First use only: the question "download the speech model?", and the download itself
     var askDownload by remember { mutableStateOf(false) }
-    var preparing by remember { mutableStateOf<String?>(null) }
+    // The download runs in VoiceModelDownloader, not in this screen, so it keeps going when you leave
+    val download by VoiceModelDownloader.state.collectAsState()
+    val preparing: String? = (download as? VoiceDownloadState.Downloading)
+        ?.let { "${downloadStatus(it.fraction)}\nTap the mic to pause." }
+    val downloadNote: String? = when (val d = download) {
+        is VoiceDownloadState.Paused -> "Download paused at ${(d.fraction * 100).toInt()}%. Tap the mic to resume."
+        is VoiceDownloadState.Failed -> "${d.message} Tap the mic to try again."
+        else -> null
+    }
+    // Says "ready" only when the download finishes while this screen is open
+    var sawDownload by remember { mutableStateOf(false) }
+    LaunchedEffect(download) {
+        if (download is VoiceDownloadState.Downloading) {
+            sawDownload = true
+        } else if (download is VoiceDownloadState.Done && sawDownload) {
+            sawDownload = false
+            message = "Voice model ready. Tap the mic and speak."
+        }
+    }
 
     // Today's tip: the next one in the list each time this screen opens
     // (null when tips are off; the list only moves on when a tip is actually shown)
@@ -240,9 +259,18 @@ fun VoiceScreen(
 
     fun onMicClick() {
         when {
-            working != null || preparing != null -> Unit
+            working != null -> Unit
+            download is VoiceDownloadState.Downloading -> VoiceModelDownloader.pause()
             recording -> finish()
-            !VoiceEngine.isModelReady(context) -> askDownload = true
+            !VoiceEngine.isModelReady(context) -> {
+                // Already agreed to the download before: carry on without asking again
+                if (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) {
+                    message = null
+                    VoiceModelDownloader.start(context)
+                } else {
+                    askDownload = true
+                }
+            }
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
@@ -254,19 +282,7 @@ fun VoiceScreen(
         onConfirm = {
             askDownload = false
             message = null
-            scope.launch {
-                preparing = downloadStatus(0f)
-                try {
-                    VoiceEngine.prepare(context) { preparing = it }
-                    message = "Voice model ready. Tap the mic and speak."
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    message = e.message ?: "Download failed. Check your internet and try again."
-                } finally {
-                    preparing = null
-                }
-            }
+            VoiceModelDownloader.start(context)
         },
         onDismiss = { askDownload = false }
     )
@@ -413,7 +429,7 @@ fun VoiceScreen(
                     working != null -> working
                     preparing != null -> preparing
                     recording -> "Listening… ${seconds}s. Tap to stop."
-                    else -> message
+                    else -> downloadNote ?: message
                 }
                 Box(
                     modifier = Modifier.fillMaxWidth().height(44.dp),

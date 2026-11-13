@@ -111,6 +111,18 @@ class WhisperKit private constructor(
             WhisperKit(h, context.applicationContext)
         }
 
+        /**
+         * Only downloads [model] (does not load it). A partly downloaded file is continued, so after
+         * cancelling this you can call it again later. [onDownloadProgress] gets 0f..1f.
+         */
+        suspend fun downloadModel(
+            context: Context,
+            model: WhisperModel = WhisperModel.SmallQ5,
+            onDownloadProgress: (Float) -> Unit = {},
+        ) {
+            ModelStore.ensure(context, model, onDownloadProgress)
+        }
+
         fun isModelDownloaded(context: Context, model: WhisperModel = WhisperModel.SmallQ5): Boolean =
             ModelStore.isDownloaded(context, model)
 
