@@ -100,10 +100,10 @@ private const val WAITING_ANIM_MS = 2500L                 // how long each waiti
 private val VOICE_TIPS = listOf(
     "Try saying: \u201CPaid 500 to Rahul\u201D",
     "Recordings are not saved and nothing is uploaded.",
-    "Try saying: \u201CChai 80, petrol 800, lunch 250\u201D.",
-    "Try saying: \u201Cyesterday\u201D, \u201Ctwo days ago\u201D or \u201Con Monday\u201D.",
+    "Try saying: \u201CPetrol 800, lunch 250\u201D.",
+    "Try saying words like: \u201Cyesterday\u201D, \u201Ctwo days ago\u201D or \u201Con Monday\u201D.",
     "No financial data leaves your phone.",
-    "Say how you paid: \u201Cby UPI\u201D, \u201Cby card\u201D or \u201Cin cash\u201D.",
+    "Try saying how you paid: \u201Cby UPI\u201D, \u201Cby card\u201D or \u201Cin cash\u201D.",
     "Voice entry works without internet.",
     "Numbers can be words: \u201Ctwo thousand five hundred\u201D, \u201C5k\u201D or \u201C1.5 lakh\u201D.",
     "Money coming in? Say \u201Creceived 2000 from Amit\u201D or \u201Csalary credited 30000\u201D."
