@@ -6,8 +6,10 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -827,14 +829,44 @@ private fun TransactionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Image(
-            painter = painterResource(if (income) R.drawable.ic_income else R.drawable.ic_expense),
-            contentDescription = if (income) "Income" else "Expense",
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Fit
-        )
+        // The receipt image when there is one (tap it to see it full screen), otherwise the first
+        // letter of the title, in the same rounded square. The income / expense arrow is a small badge at its top right.
+        Box(modifier = Modifier.size(46.dp)) {
+            if (txn.imageFile != null) {
+                ReceiptThumb(
+                    fileName = txn.imageFile,
+                    size = 40.dp,
+                    modifier = Modifier.align(Alignment.BottomStart),
+                    onClick = { viewerOpen = true }
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .align(Alignment.BottomStart)
+                        // Same rounded square as the receipt image, so both look alike
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = txn.title.trim().take(1).uppercase().ifEmpty { "?" },
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            Image(
+                painter = painterResource(if (income) R.drawable.ic_income else R.drawable.ic_expense),
+                contentDescription = if (income) "Income" else "Expense",
+                modifier = Modifier
+                    .size(20.dp)
+                    .align(Alignment.TopEnd)
+                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Fit
+            )
+        }
         Column(modifier = Modifier.weight(1f)) {
             // Title gets the full width up to the three-dot menu
             Text(text = txn.title, style = MaterialTheme.typography.titleMedium)
@@ -863,10 +895,6 @@ private fun TransactionRow(
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
-        }
-        // A small picture when the transaction has an image; tap it to see it full screen
-        if (txn.imageFile != null) {
-            ReceiptThumb(fileName = txn.imageFile, size = 36.dp, onClick = { viewerOpen = true })
         }
         // Three-dot menu on its own, centred on the right
 //        Box {

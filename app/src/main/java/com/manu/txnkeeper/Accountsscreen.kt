@@ -1,17 +1,28 @@
 package com.manu.txnkeeper
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,29 +32,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.manu.txnkeeper.data.local.AccountEntity
-import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuCard
-import com.manu.manudesignsystem.components.ManuTopBar
-import com.manu.manudesignsystem.components.ManuListItem
-import com.manu.manudesignsystem.components.ManuMenuItem
-import com.manu.manudesignsystem.theme.ManuDesignSystem
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.background
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.layout.size
-import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.components.ManuDialog
+import com.manu.manudesignsystem.components.ManuDropdownMenu
+import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuScaffold
+import com.manu.manudesignsystem.components.ManuTextField
+import com.manu.manudesignsystem.components.ManuTopBar
+import com.manu.manudesignsystem.theme.ExpenseColor
+import com.manu.manudesignsystem.theme.ManuDesignSystem
+import com.manu.txnkeeper.data.local.AccountEntity
+import com.manu.txnkeeper.data.local.AccountSummary
 
 private const val MAX_ACCOUNT_NAME = 30
 
 /**
  * Full-screen page that lists the accounts with their balances, and lets you add, edit and delete them.
+ *
+ * It is laid out like the home screen and Settings: a balance card on top, then one card with a row
+ * per account (initial, name and number of transactions on the left, balance on the right).
  *
  * Deleting an account also deletes all of its transactions (after a clear confirmation that says
  * how many). The last account can't be deleted.
@@ -62,6 +75,9 @@ fun AccountsScreen(
     var adding by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<AccountSummary?>(null) }
 
+    val totalBalance = accounts.sumOf { it.balancePaise }
+    val canDelete = accounts.size > 1
+
     // ManuScaffold insets for the status bar, navigation bar and keyboard
     ManuScaffold(
         modifier = modifier,
@@ -70,7 +86,7 @@ fun AccountsScreen(
             ManuTopBar(
                 title = "Accounts",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.Default.ArrowBack,
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onNavigationClick = onClose
             )
         },
@@ -86,39 +102,58 @@ fun AccountsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Text(
+                text = "Tap an account to edit it. Deleting an account also deletes its transactions.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            // Same look as the balance card on the home screen
             ManuCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
                     Text(
-                        text = "Total balance",
+                        text = if (accounts.size > 1) "Total balance · ${accounts.size} accounts" else "Total balance",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                     Text(
-                        text = formatBalance(accounts.sumOf { it.balancePaise }),
+                        text = formatBalance(totalBalance),
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = if (totalBalance < 0) ExpenseColor else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
                     )
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-            ) {
-                items(items = accounts, key = { it.id }) { account ->
-                    AccountCard(
-                        account = account,
-                        canDelete = accounts.size > 1,
-                        onEdit = { editing = account },
-                        onDelete = { deleting = account }
-                    )
+            // One card, one row per account, like the day cards on the home screen
+            ManuCard(modifier = Modifier.fillMaxWidth()) {
+                Column {
+                    accounts.forEachIndexed { index, account ->
+                        if (index > 0) HorizontalDivider()
+                        AccountRow(
+                            account = account,
+                            canDelete = canDelete,
+                            onEdit = { editing = account },
+                            onDelete = { deleting = account }
+                        )
+                    }
                 }
             }
+
+            if (!canDelete) {
+                Text(
+                    text = "The last account can't be deleted.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
         }
     }
 
@@ -158,43 +193,80 @@ fun AccountsScreen(
     }
 }
 
+/**
+ * One account: its initial in a circle, the name with the number of transactions under it, the
+ * balance at the right end (red when it is below zero) and a three-dot menu. Tap the row to edit.
+ */
 @Composable
-private fun AccountCard(
+private fun AccountRow(
     account: AccountSummary,
     canDelete: Boolean,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    ManuCard(contentPadding = PaddingValues(0.dp), modifier = Modifier.fillMaxWidth()) {
-        ManuListItem(
-            title = account.name,
-            description = formatBalance(account.balancePaise),
-            time = if (account.txnCount == 1) "1 transaction" else "${account.txnCount} transactions",
-            leadingContent = {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = account.name.take(1).uppercase(),
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                }
-            },
-            onClick = onEdit,
-            menuItems = listOf(
-                ManuMenuItem(label = "Edit", onClick = onEdit),
-                ManuMenuItem(
-                    label = if (canDelete) "Delete" else "Delete (keep at least one)",
-                    onClick = onDelete,
-                    enabled = canDelete
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onEdit)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = account.name.take(1).uppercase(),
+                color = MaterialTheme.colorScheme.onPrimary,
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = account.name,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = if (account.txnCount == 1) "1 transaction" else "${account.txnCount} transactions",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Text(
+            text = formatBalance(account.balancePaise),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (account.balancePaise < 0) ExpenseColor else MaterialTheme.colorScheme.onSurface,
+            maxLines = 1
+        )
+
+        Box {
+            IconButton(onClick = { menuOpen = true }) {
+                Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "More options for ${account.name}",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            ManuDropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                items = listOf(
+                    ManuMenuItem(label = "Edit", onClick = onEdit),
+                    ManuMenuItem(label = "Delete", onClick = onDelete, enabled = canDelete)
                 )
             )
-        )
+        }
     }
 }
 
@@ -242,13 +314,21 @@ internal fun AccountDialog(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ManuTextField(
                 value = name,
-                onValueChange = { if (it.length <= MAX_ACCOUNT_NAME) name = it },
+                onValueChange = {
+                    if (it.length <= MAX_ACCOUNT_NAME) {
+                        name = it
+                        error = null
+                    }
+                },
                 label = { Text("Account name") },
                 placeholder = { Text("e.g. PNB savings") }
             )
             ManuTextField(
                 value = openingText,
-                onValueChange = { openingText = it },
+                onValueChange = {
+                    openingText = it
+                    error = null
+                },
                 label = { Text("Opening balance (₹)") },
                 placeholder = { Text("0") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)

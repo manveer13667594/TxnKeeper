@@ -18,7 +18,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -39,6 +38,7 @@ import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDateRangePicker
 import com.manu.manudesignsystem.components.ManuOutlineButton
 import com.manu.manudesignsystem.components.ManuPickerField
+import com.manu.manudesignsystem.components.ManuSwitch
 import com.manu.manudesignsystem.components.ManuTextButton
 import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.theme.ManuDesignSystem
@@ -78,8 +78,9 @@ private fun amountPaiseOrInvalid(text: String): Long? {
  *
  * Export: first choose what to export (everything, a date range, or the latest N transactions),
  * optionally narrow it down (account, payment method, income / expense, amount range), then export
- * to CSV or PDF. When some transactions have receipt images, an "Include images" switch appears:
+ * to CSV or PDF. An "Include images" switch (kept in Settings) decides about the receipt images:
  * on = a ZIP (the CSV and an images folder) and a PDF that shows the images after the table.
+ * It only changes anything once some transactions have an image.
  * Import: pick a CSV file, or a ZIP made by this export.
  *
  * The system file picker chooses where a file is saved or which file is read, so the app needs
@@ -103,8 +104,8 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
     var countText by remember { mutableStateOf("50") }
     var rangeDialogOpen by remember { mutableStateOf(false) }
     var filtersOpen by remember { mutableStateOf(false) }
-    // "Include images" starts as set in Settings; changing it here only affects this screen
-    var withImages by remember { mutableStateOf(settings.exportWithImagesByDefault) }
+    // "Include images" is saved, so the next export starts the way this one was left
+    val withImages = settings.exportWithImagesByDefault
 
     // Optional narrowing down (null / blank = don't filter on it)
     var accountId by remember { mutableStateOf<Long?>(null) }
@@ -423,33 +424,33 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
             }
         }
 
-        // Images: only offered when some transactions have one
-        if (imageCount > 0) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Include images", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        text = if (withImages) {
-                            "ZIP with the CSV and an images folder. PDF shows the images after the table."
-                        } else {
-                            "Transactions only, no images."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Switch(
-                    checked = withImages,
-                    onCheckedChange = {
-                        withImages = it
-                        status = null
-                    }
+        // Images in the export (ZIP and PDF). Always here, so it can be set before any image exists.
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Include images", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = when {
+                        !withImages -> "Transactions only, no images."
+                        imageCount == 0 ->
+                            "No images saved yet. When there are, the ZIP holds the CSV and an images folder, " +
+                                    "and the PDF shows them after the table."
+                        else -> "ZIP with the CSV and an images folder. PDF shows the images after the table."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            ManuSwitch(
+                checked = withImages,
+                onCheckedChange = {
+                    settings.updateExportWithImagesByDefault(it)
+                    status = null
+                }
+            )
         }
 
         // CSV (or ZIP with images) and PDF side by side

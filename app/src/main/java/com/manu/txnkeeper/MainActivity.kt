@@ -15,10 +15,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -311,7 +307,7 @@ fun TxnkeeperApp(
     // "Add transaction" starts empty. The short wait lets the page finish sliding away first.
     LaunchedEffect(showAdd) {
         if (!showAdd) {
-            delay(400)
+            delay(500)
             // Closed without saving: the image waiting in the form is not needed
             form.imageFile?.let { ReceiptStore.delete(context, it) }
             val account = form.accountId
@@ -393,12 +389,9 @@ fun TxnkeeperApp(
                 }
             }
 
-            // ---------------- Add transaction page slides up over the list
-            AnimatedVisibility(
-                visible = showAdd,
-                enter = slideInVertically(initialOffsetY = { it / 4 }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it / 4 }) + fadeOut()
-            ) {
+            // ---------------- Every full-screen page below opens and closes the same way (ScreenTransitions.kt)
+            // ---------------- Add transaction page slides in over the list
+            ScreenTransition(visible = showAdd) {
                 AddTransactionScreen(
                     form = form,
                     accounts = accounts,
@@ -455,12 +448,8 @@ fun TxnkeeperApp(
                 )
             }
 
-            // ---------------- Stats chart slides in from the right (opened by tapping the balance card)
-            AnimatedVisibility(
-                visible = showStats,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
+            // ---------------- Stats chart (opened by tapping the balance card)
+            ScreenTransition(visible = showStats) {
                 StatsScreen(
                     dao = dao,
                     request = statsRequest,
@@ -470,12 +459,8 @@ fun TxnkeeperApp(
                 )
             }
 
-            // ---------------- Settings page slides in from the right over the list
-            AnimatedVisibility(
-                visible = showSettings,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
+            // ---------------- Settings page
+            ScreenTransition(visible = showSettings) {
                 SettingsScreen(
                     settings = settings,
                     database = database,
@@ -487,12 +472,8 @@ fun TxnkeeperApp(
                 )
             }
 
-            // ---------------- Accounts page slides in from the right (over Settings, which opens it)
-            AnimatedVisibility(
-                visible = showAccounts,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
+            // ---------------- Accounts page (over Settings, which opens it)
+            ScreenTransition(visible = showAccounts) {
                 AccountsScreen(
                     accounts = accounts,
                     onClose = { showAccounts = false },
@@ -518,30 +499,18 @@ fun TxnkeeperApp(
                 )
             }
 
-            // ---------------- Help page slides in from the right over the list
-            AnimatedVisibility(
-                visible = showHelp,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
+            // ---------------- Help page
+            ScreenTransition(visible = showHelp) {
                 HelpScreen(onClose = { showHelp = false })
             }
 
-            // ---------------- About page slides in from the right over the list
-            AnimatedVisibility(
-                visible = showAbout,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
+            // ---------------- About page
+            ScreenTransition(visible = showAbout) {
                 AboutScreen(onClose = { showAbout = false })
             }
 
-            // ---------------- Camera slides in from the left over everything
-            AnimatedVisibility(
-                visible = showCamera,
-                enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
-            ) {
+            // ---------------- Camera slides in over everything, like the other pages
+            ScreenTransition(visible = showCamera) {
                 CameraScreen(
                     onClose = { showCamera = false },
                     onPhotoSaved = { lastPhotoUri = it },
@@ -552,12 +521,8 @@ fun TxnkeeperApp(
                 )
             }
 
-            // ---------------- Voice entry slides in from the right over everything
-            AnimatedVisibility(
-                visible = showVoice,
-                enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-                exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-            ) {
+            // ---------------- Voice entry, over everything
+            ScreenTransition(visible = showVoice) {
                 VoiceScreen(
                     showTips = settings.voiceTips,
                     onClose = { showVoice = false },

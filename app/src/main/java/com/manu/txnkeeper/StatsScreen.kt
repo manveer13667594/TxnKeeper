@@ -49,7 +49,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
@@ -203,7 +203,7 @@ fun StatsScreen(
             ManuTopBar(
                 title = "Stats",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.Default.ArrowBack,
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onNavigationClick = onClose,
                 actions = {
                     IconButton(onClick = { filterSheetOpen = true }) {

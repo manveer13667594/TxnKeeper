@@ -1,6 +1,7 @@
 package com.manu.txnkeeper
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -8,15 +9,17 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DeleteForever
@@ -25,13 +28,11 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,6 +51,7 @@ import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDialog
 import com.manu.manudesignsystem.components.ManuOutlineButton
+import com.manu.manudesignsystem.components.ManuSwitch
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.theme.ManuDesignSystem
@@ -102,61 +104,66 @@ fun SettingsScreen(
     // Back from a sub-page returns to the list; from the list it closes Settings (handled by the app)
     BackHandler(enabled = page != SettingsPage.MAIN) { page = SettingsPage.MAIN }
 
-    ManuScaffold(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        topBar = {
-            ManuTopBar(
-                title = page.title,
-                modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.Default.ArrowBack,
-                onNavigationClick = {
-                    if (page == SettingsPage.MAIN) onClose() else page = SettingsPage.MAIN
-                }
-            )
-        }
-    ) { _ ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            when (page) {
-                SettingsPage.MAIN -> MainSettings(
-                    settings = settings,
-                    onManageAccounts = onManageAccounts,
-                    onOpenPayment = { page = SettingsPage.PAYMENT },
-                    onOpenDefaults = { page = SettingsPage.DEFAULTS },
-                    onOpenData = { page = SettingsPage.DATA },
-                    onOpenDelete = { page = SettingsPage.DELETE },
-                    onOpenHelp = onOpenHelp,
-                    onOpenAbout = onOpenAbout
-                )
-
-                SettingsPage.PAYMENT -> PaymentMethodsPage(
-                    settings = settings,
-                    onAdd = { addingMethod = true },
-                    onRemove = { removingMethod = it }
-                )
-
-                SettingsPage.DEFAULTS -> DefaultsPage(settings = settings, accounts = accounts)
-
-                SettingsPage.DATA -> SettingsCard {
-                    Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg)) {
-                        DataTransferControls(database = database, settings = settings)
+    // Opening a page from the list slides it in over the list, and Back slides it away again, the
+    // same way every other screen of the app opens and closes (see ScreenTransitions.kt)
+    AnimatedContent(
+        targetState = page,
+        modifier = modifier.fillMaxSize(),
+        transitionSpec = {
+            if (targetState != SettingsPage.MAIN) subPageOpenTransition() else subPageCloseTransition()
+        },
+        label = "settings page"
+    ) { shown ->
+        ManuScaffold(
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            topBar = {
+                ManuTopBar(
+                    title = shown.title,
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                    onNavigationClick = {
+                        if (shown == SettingsPage.MAIN) onClose() else page = SettingsPage.MAIN
                     }
-                }
+                )
+            }
+        ) { _ ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                when (shown) {
+                    SettingsPage.MAIN -> MainSettings(
+                        settings = settings,
+                        onManageAccounts = onManageAccounts,
+                        onOpenPayment = { page = SettingsPage.PAYMENT },
+                        onOpenDefaults = { page = SettingsPage.DEFAULTS },
+                        onOpenData = { page = SettingsPage.DATA },
+                        onOpenDelete = { page = SettingsPage.DELETE },
+                        onOpenHelp = onOpenHelp,
+                        onOpenAbout = onOpenAbout
+                    )
 
-                SettingsPage.DELETE -> SettingsCard {
-                    Column(
-                        modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        DeleteDataControls(settings = settings, database = database)
+                    SettingsPage.PAYMENT -> PaymentMethodsPage(
+                        settings = settings,
+                        onAdd = { addingMethod = true },
+                        onRemove = { removingMethod = it }
+                    )
+
+                    SettingsPage.DEFAULTS -> DefaultsPage(settings = settings, accounts = accounts)
+
+                    SettingsPage.DATA -> SettingsCard {
+                        Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg)) {
+                            DataTransferControls(database = database, settings = settings)
+                        }
                     }
+
+                    // Brings its own cards, like the Payment methods and Defaults pages
+                    SettingsPage.DELETE -> DeleteDataControls(settings = settings, database = database)
                 }
+                Spacer(Modifier.height(20.dp))
             }
         }
     }
@@ -212,7 +219,7 @@ private fun MainSettings(
     onOpenHelp: () -> Unit,
     onOpenAbout: () -> Unit
 ) {
-    // Quick preferences, changed right here
+    // Look of the app: the theme, changed right here
     SettingsCard {
         Column(
             modifier = Modifier.padding(vertical = 12.dp),
@@ -238,44 +245,6 @@ private fun MainSettings(
                 }
             }
         }
-        HorizontalDivider()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SettingIcon(Icons.Default.Mic)
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Voice tips", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = "Show a tip on the voice screen",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = settings.voiceTips,
-                onCheckedChange = { settings.updateVoiceTips(it) }
-            )
-        }
-        HorizontalDivider()
-        SwitchRow(
-            icon = Icons.Default.Image,
-            title = "Include images",
-            subtitle = "Keep the scanned or attached image with a new transaction. You can still change it each time.",
-            checked = settings.includeImageByDefault,
-            onCheckedChange = { settings.updateIncludeImageByDefault(it) }
-        )
-        HorizontalDivider()
-        SwitchRow(
-            icon = Icons.Default.PhotoLibrary,
-            title = "Export with images",
-            subtitle = "Start the export screen with images included (ZIP, and PDF with images).",
-            checked = settings.exportWithImagesByDefault,
-            onCheckedChange = { settings.updateExportWithImagesByDefault(it) }
-        )
     }
 
     SettingsCard {
@@ -297,7 +266,7 @@ private fun MainSettings(
         SettingsRow(
             title = "Defaults",
             icon = Icons.Default.Tune,
-            subtitle = "Type, account and payment method for new transactions",
+            subtitle = "Type, account, payment method, images and voice tips",
             onClick = onOpenDefaults
         )
     }
@@ -461,6 +430,28 @@ private fun DefaultsPage(
             }
         }
     }
+
+    // ---- Images: whether a scanned or attached image is kept with a new transaction
+    SettingsCard {
+        SwitchRow(
+            icon = Icons.Default.Image,
+            title = "Include images",
+            subtitle = "Keep the scanned or attached image with a new transaction. You can still change it each time.",
+            checked = settings.includeImageByDefault,
+            onCheckedChange = { settings.updateIncludeImageByDefault(it) }
+        )
+    }
+
+    // ---- Voice entry
+    SettingsCard {
+        SwitchRow(
+            icon = Icons.Default.Mic,
+            title = "Voice tips",
+            subtitle = "Show a tip on the voice screen",
+            checked = settings.voiceTips,
+            onCheckedChange = { settings.updateVoiceTips(it) }
+        )
+    }
 }
 
 /** A card with an icon and title, an optional one-line note, and the controls below them. */
@@ -507,7 +498,7 @@ private fun SwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -520,7 +511,7 @@ private fun SwitchRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        ManuSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 

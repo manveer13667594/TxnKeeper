@@ -6,9 +6,14 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,16 +23,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.room.withTransaction
+import com.manu.manudesignsystem.components.ManuButton
+import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDialog
-import com.manu.manudesignsystem.components.ManuOutlineButton
 import com.manu.manudesignsystem.components.ManuTextField
+import com.manu.manudesignsystem.theme.ManuDesignSystem
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.AppDatabase
@@ -59,8 +67,9 @@ private fun plural(count: Int, noun: String): String =
     if (count == 1) "1 $noun" else "$count ${noun}s"
 
 /**
- * The "Delete data" group in Settings. One button opens a dialog where you choose what to delete
- * (all data, or one account) and type a phrase to confirm.
+ * The "Delete data" page in Settings. It is made of cards like the other Settings pages: what is
+ * stored right now, a warning that says what deleting means, and one button. The button opens a
+ * dialog where you choose what to delete (all data, or one account) and type a phrase to confirm.
  */
 @Composable
 fun DeleteDataControls(settings: AppSettings, database: AppDatabase) {
@@ -68,25 +77,68 @@ fun DeleteDataControls(settings: AppSettings, database: AppDatabase) {
     val coroutines = rememberCoroutineScope()
     val dao = remember { database.transactionDao() }
     val accounts by remember { dao.observeAccounts() }.collectAsState(initial = emptyList<AccountSummary>())
+    val imageCount by remember { dao.observeImageCount() }.collectAsState(initial = 0)
     var dialogOpen by remember { mutableStateOf(false) }
 
-    Text(
-        text = "Permanently delete what you have entered in this app: everything, or just one account. " +
-                "There is no cloud backup, so deleted data can't be recovered. " +
-                "Export a CSV first (Settings > Export & import) if you want a copy.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    Text(
-        text = "Photos taken with the in-app camera are saved in your gallery (Pictures/TxnKeeper). " +
-                "They are not deleted here.",
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-    ManuOutlineButton(
+    // What is stored right now, so it is clear what "all data" means
+    ManuCard(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
+            Text(
+                text = "Stored on this phone",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(modifier = Modifier.padding(top = 10.dp)) {
+                StoredCell("Transactions", accounts.sumOf { it.txnCount }.toString(), Alignment.Start)
+                StoredCell("Accounts", accounts.size.toString(), Alignment.CenterHorizontally)
+                StoredCell("Images", imageCount.toString(), Alignment.End)
+            }
+        }
+    }
+
+    // What deleting means
+    ManuCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error
+                )
+                Text(
+                    text = "This can't be undone",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            Text(
+                text = "Permanently delete what you have entered in this app: everything, or just one account. " +
+                        "There is no cloud backup, so deleted data can't be recovered. " +
+                        "Export a CSV first (Settings > Export & import) if you want a copy.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "Photos taken with the in-app camera are saved in your gallery (Pictures/TxnKeeper). " +
+                        "They are not deleted here.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+
+    ManuButton(
         modifier = Modifier.fillMaxWidth(),
-        onClick = { dialogOpen = true }
-    ) { Text("Delete data…", color = MaterialTheme.colorScheme.error) }
+        onClick = { dialogOpen = true },
+        containerColor = MaterialTheme.colorScheme.error,
+        contentColor = MaterialTheme.colorScheme.onError
+    ) { Text("Delete data…") }
 
     if (dialogOpen) {
         DeleteDataDialog(
@@ -96,6 +148,24 @@ fun DeleteDataControls(settings: AppSettings, database: AppDatabase) {
                 coroutines.launch { runDelete(context, settings, database, accountId) }
             },
             onDismiss = { dialogOpen = false }
+        )
+    }
+}
+
+/** One figure of the "Stored on this phone" card: a small label with the number under it. */
+@Composable
+private fun RowScope.StoredCell(label: String, value: String, align: Alignment.Horizontal) {
+    Column(modifier = Modifier.weight(1f), horizontalAlignment = align) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1
         )
     }
 }

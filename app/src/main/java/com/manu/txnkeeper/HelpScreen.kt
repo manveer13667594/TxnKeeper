@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -64,7 +64,7 @@ private val FAQS = listOf(
     ),
     Faq(
         question = "How do I manage accounts?",
-        answer = "Open the ⋮ menu, then Settings, then Manage accounts. You can add, edit or delete accounts.\n" +
+        answer = "Open the ⋮ menu, then Settings, then Accounts. You can add, edit or delete accounts.\n" +
                 "With more than one account, chips under the title let you switch between All and a single account. " +
                 "Deleting an account also deletes its transactions."
     ),
@@ -88,10 +88,11 @@ private val FAQS = listOf(
     ),
     Faq(
         question = "How do I export or import my data?",
-        answer = "Open the ⋮ menu, then Settings, then Data.\n" +
-                "Export as CSV or PDF: everything, a date range, or the latest transactions. " +
+        answer = "Open the ⋮ menu, then Settings, then Export & import.\n" +
+                "Export as CSV, PDF, or a ZIP that also holds the images: everything, a date range, or the latest transactions. " +
                 "You can narrow it down by account, payment method, income or expense, and an amount range.\n" +
-                "Import reads a CSV file, and it is all or nothing.\n" +
+                "The Include images switch there decides whether the images go into the ZIP and the PDF.\n" +
+                "Import reads a CSV file or a ZIP made by the export (a ZIP brings back the images), and it is all or nothing.\n" +
                 "Opening balances are not in the CSV, so set them again in Accounts if needed."
     ),
     Faq(
@@ -127,7 +128,7 @@ fun HelpScreen(
             ManuTopBar(
                 title = "Help",
                 modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.Default.ArrowBack,
+                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
                 onNavigationClick = onClose
             )
         }
