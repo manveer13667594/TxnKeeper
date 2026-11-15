@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -133,7 +135,7 @@ fun EditTransactionDialog(
                 ManuPickerField(
                     value = payment.ifBlank { "None" },
                     label = { Text("Payment method") },
-                    leadingIcon = AppIcons.Wallet,
+                    leadingIcon = Icons.Default.CreditCard,
                     trailingIcon = Icons.Default.KeyboardArrowDown,
                     onClick = { payMenuOpen = true }
                 )

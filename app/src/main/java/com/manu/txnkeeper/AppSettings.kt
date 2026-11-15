@@ -8,6 +8,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 
+/** The two transaction types, as they are stored in the database. */
+const val TYPE_EXPENSE = "EXPENSE"
+const val TYPE_INCOME = "INCOME"
+
 /** How the app picks light or dark colours. */
 enum class ThemeMode(val label: String) {
     SYSTEM("System default"),
@@ -86,12 +90,15 @@ class AppSettings(context: Context) {
     /** Removes it from the list. Transactions that already use it keep their label. */
     fun removePaymentMethod(name: String) {
         savePaymentMethods(paymentMethods - name)
+        // A removed method can't stay the default
+        if (chosenDefaultPayment == name) updateDefaultPayment(null)
     }
 
-    /** Puts the list back to the four built-in methods (part of "delete all data"). */
+    /** Puts the list back to the built-in methods (part of "delete all data"). */
     fun resetPaymentMethods() {
         paymentMethods = PAYMENT_METHODS
         prefs.edit().remove(KEY_PAYMENT_METHODS).apply()
+        updateDefaultPayment(null)
     }
 
     private fun savePaymentMethods(list: List<String>) {
@@ -105,8 +112,72 @@ class AppSettings(context: Context) {
         return saved.split("\n").map { it.trim() }.filter { it.isNotEmpty() }.distinct()
     }
 
+    // ------------------------------------------------------------------ defaults for a new transaction
+    // What the Add page starts with. All of it can still be changed on the page for one entry.
+
+    /** The type a new transaction starts as: [TYPE_EXPENSE] or [TYPE_INCOME]. Expense by default. */
+    var defaultType by mutableStateOf(readDefaultType())
+        private set
+
+    fun updateDefaultType(type: String) {
+        if (type != TYPE_EXPENSE && type != TYPE_INCOME) return
+        defaultType = type
+        prefs.edit().putString(KEY_DEFAULT_TYPE, type).apply()
+    }
+
+    private fun readDefaultType(): String {
+        val saved = prefs.getString(KEY_DEFAULT_TYPE, null)
+        return if (saved == TYPE_INCOME) TYPE_INCOME else TYPE_EXPENSE
+    }
+
+    /**
+     * The account a new transaction starts in, or null for "last used" (the account you are
+     * looking at, or the one you used last). It may point to an account that was deleted since,
+     * so callers check it against the real list (see [validDefaultAccountId]).
+     */
+    var defaultAccountId by mutableStateOf(readDefaultAccountId())
+        private set
+
+    fun updateDefaultAccountId(id: Long?) {
+        defaultAccountId = id
+        prefs.edit().apply {
+            if (id == null) remove(KEY_DEFAULT_ACCOUNT) else putLong(KEY_DEFAULT_ACCOUNT, id)
+        }.apply()
+    }
+
+    private fun readDefaultAccountId(): Long? =
+        if (prefs.contains(KEY_DEFAULT_ACCOUNT)) prefs.getLong(KEY_DEFAULT_ACCOUNT, 0L) else null
+
+    /** The default account if it still exists in [accountIds], otherwise null (= "last used"). */
+    fun validDefaultAccountId(accountIds: Collection<Long>): Long? =
+        defaultAccountId?.takeIf { it in accountIds }
+
+    /** The method picked in Settings, which may no longer be in the list. See [defaultPayment]. */
+    private var chosenDefaultPayment by mutableStateOf<String?>(prefs.getString(KEY_DEFAULT_PAYMENT, null))
+
+    /** Pass null to go back to the automatic choice. */
+    fun updateDefaultPayment(method: String?) {
+        chosenDefaultPayment = method
+        prefs.edit().apply {
+            if (method == null) remove(KEY_DEFAULT_PAYMENT) else putString(KEY_DEFAULT_PAYMENT, method)
+        }.apply()
+    }
+
+    /**
+     * The payment method a new transaction starts with. Your choice from Settings while it is still
+     * in the list; otherwise CASH if you have it, otherwise the first one, otherwise blank (no methods).
+     */
+    val defaultPayment: String
+        get() = chosenDefaultPayment?.takeIf { it in paymentMethods }
+            ?: paymentMethods.firstOrNull { it == "CASH" }
+            ?: paymentMethods.firstOrNull()
+            ?: ""
+
     private companion object {
         const val PREFS_NAME = "txnkeeper_settings"
+        const val KEY_DEFAULT_TYPE = "default_type"
+        const val KEY_DEFAULT_ACCOUNT = "default_account_id"
+        const val KEY_DEFAULT_PAYMENT = "default_payment"
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_PAYMENT_METHODS = "payment_methods"
         const val KEY_VOICE_TIPS = "voice_tips"

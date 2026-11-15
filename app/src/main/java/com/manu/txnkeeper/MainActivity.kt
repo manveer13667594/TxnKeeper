@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -173,6 +174,21 @@ fun TxnkeeperApp(
     // The form and the open Add page survive a screen rotation, nothing else
     val form = rememberSaveable(saver = TxnFormState.Saver) { TxnFormState() }
     var showAdd by rememberSaveable { mutableStateOf(false) }
+
+    // Settings > Defaults: what a blank form starts with. Read here (not inside the effect) so this
+    // recomposes when a default changes, and the form is told right after.
+    val defaultType = settings.defaultType
+    val defaultPayment = settings.defaultPayment
+    SideEffect {
+        form.defaultType = defaultType
+        form.defaultPayment = defaultPayment
+    }
+
+    // The account a new entry starts in: the one you are looking at, else your default account
+    // (if it still exists), else the one used last.
+    fun startingAccountId(): Long =
+        accountFilter ?: settings.validDefaultAccountId(accounts.map { it.id }) ?: form.accountId
+
     var fabVisible by remember { mutableStateOf(true) }
     var showCamera by remember { mutableStateOf(false) }
     var showVoice by remember { mutableStateOf(false) }
@@ -213,6 +229,11 @@ fun TxnkeeperApp(
                                     "(${formatMoney(d.amountPaise)}, ${formatDateLong(d.dateTime)}) " +
                                     "with the same reference number."
                         }
+                    }
+                    // A blank form starts from your defaults; the scan then fills what it found
+                    if (form.isBlank) {
+                        form.useDefaults()
+                        form.accountId = startingAccountId()
                     }
                     form.fill(outcome.parsed, message = message)
                     showAdd = true
@@ -310,8 +331,9 @@ fun TxnkeeperApp(
                     ) {
                         ManuFab(
                             onClick = {
-                                // New entries go to the account you are looking at (or the last one used)
-                                form.accountId = accountFilter ?: form.accountId
+                                // A blank form starts from your defaults (Settings > Defaults)
+                                if (form.isBlank) form.useDefaults()
+                                form.accountId = startingAccountId()
                                 showAdd = true
                             }
                         ) { Icon(Icons.Default.Add, contentDescription = "Add transaction") }
@@ -479,8 +501,9 @@ fun TxnkeeperApp(
                     showTips = settings.voiceTips,
                     onClose = { showVoice = false },
                     onHeard = { text ->
-                        // Same as the + button: new entries go to the account you are looking at
-                        form.accountId = accountFilter ?: form.accountId
+                        // Same as the + button: start from your defaults, then fill what was heard
+                        if (form.isBlank) form.useDefaults()
+                        form.accountId = startingAccountId()
                         fillFromSpeech(form, text)
                         showVoice = false
                         showAdd = true

@@ -25,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.automirrored.filled.ArrowBack as MirroredArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -88,13 +89,13 @@ data class BatchEntry(
 )
 
 /** The same defaults as the form: anything the parser was unsure about stays at its usual value. */
-private fun ParsedTransaction.toBatchEntry(): BatchEntry {
+private fun ParsedTransaction.toBatchEntry(defaultType: String, defaultPayment: String): BatchEntry {
     val now = System.currentTimeMillis()
     return BatchEntry(
         title = title ?: "",
         amount = amount?.let { formatAmount(it) } ?: "",
-        type = type ?: "EXPENSE",
-        payment = paymentMethod ?: "CASH",
+        type = type ?: defaultType,
+        payment = paymentMethod ?: defaultPayment,
         dateTime = dateMillis?.let { onDayAtTimeOf(it, now) } ?: now,
         description = description ?: ""
     )
@@ -107,10 +108,27 @@ private fun ParsedTransaction.toBatchEntry(): BatchEntry {
 class TxnFormState {
     var title by mutableStateOf("")
     var amount by mutableStateOf("")
-    var type by mutableStateOf("EXPENSE")
+    var type by mutableStateOf(TYPE_EXPENSE)
     var payment by mutableStateOf("CASH")
     var dateTime by mutableStateOf(System.currentTimeMillis())
     var description by mutableStateOf("")
+
+    /**
+     * What a blank form starts with (from Settings > Defaults; the app keeps these up to date).
+     * Not saved with the form: they are only used by [reset] and [useDefaults].
+     */
+    var defaultType: String = TYPE_EXPENSE
+    var defaultPayment: String = "CASH"
+
+    /** True when nothing has been typed, scanned or spoken yet. */
+    val isBlank: Boolean
+        get() = title.isBlank() && amount.isBlank() && description.isBlank() && notice == null && !inBatch
+
+    /** Sets the type and payment method to the defaults (the account is chosen by the app). */
+    fun useDefaults() {
+        type = defaultType
+        payment = defaultPayment
+    }
 
     /** For an entry of a batch: is it marked to be saved? (Always true outside a batch.) */
     var include by mutableStateOf(true)
@@ -139,7 +157,7 @@ class TxnFormState {
         val account = accountId
         reset()
         accountId = account
-        batch = list.map { it.toBatchEntry() }
+        batch = list.map { it.toBatchEntry(defaultType, defaultPayment) }
         batchIndex = 0
         batchSaved = 0
         load(batch[0])
@@ -274,12 +292,11 @@ class TxnFormState {
         batchSaved = 0
         title = ""
         amount = ""
-        type = "EXPENSE"
-        payment = "CASH"
         dateTime = System.currentTimeMillis()
         description = ""
         include = true
         notice = null
+        useDefaults()   // type and payment method come from Settings > Defaults
     }
 
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
@@ -490,7 +507,7 @@ fun AddTransactionScreen(
                             Box {
                                 ManuPickerField(
                                     value = form.payment.ifBlank { "Add payment method" },
-                                    leadingIcon = AppIcons.Wallet,
+                                    leadingIcon = Icons.Default.CreditCard,
                                     trailingIcon = Icons.Default.KeyboardArrowDown,
                                     onClick = { payMenuOpen = true }
                                 )
