@@ -2,6 +2,8 @@ package com.manu.txnkeeper
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.unit.dp
@@ -20,13 +22,19 @@ object AppIcons {
         icon("FilterList", "M10,18h4v-2h-4v2zM3,6v2h18V6H3zM6,13h12v-2H6v2z")
     }
 
-    /** Three sliders with round knobs: the filter button on the home screen. */
-    val Sliders: ImageVector by lazy {
-        icon(
-            "Sliders",
-            "M4,5h16a1,1 0 0 1 0,2H4a1,1 0 0 1 0,-2z M8,3.5a2.5,2.5 0 1 1 0,5a2.5,2.5 0 1 1 0,-5z " +
-                    "M4,11h16a1,1 0 0 1 0,2H4a1,1 0 0 1 0,-2z M16,9.5a2.5,2.5 0 1 1 0,5a2.5,2.5 0 1 1 0,-5z " +
-                    "M4,17h16a1,1 0 0 1 0,2H4a1,1 0 0 1 0,-2z M8,15.5a2.5,2.5 0 1 1 0,5a2.5,2.5 0 1 1 0,-5z"
+    /**
+     * An outlined funnel with three lines beside it: the filter button.
+     * Drawn as a 2dp line with round ends (not a filled shape), so it matches outlined icons.
+     * The funnel is symmetrical around x = 8.5; the lines (shorter on top) sit to its right.
+     */
+    val FilterFunnel: ImageVector by lazy {
+        strokeIcon(
+            "FilterFunnel",
+            // Funnel: flat top, rounded top corners, slanted sides, a straight stem, a slanted bottom
+            "M5.5,4.5 H11.5 C13.8,4.5 15,6.8 13.7,8.5 L10.5,12.6 V20 L6.5,16.8 V12.6 " +
+                    "L3.3,8.5 C2,6.8 3.2,4.5 5.5,4.5 Z " +
+                    // The three lines
+                    "M16.7,12.2 H21 M14,15.3 H21 M14,18.4 H21"
         )
     }
 
@@ -78,5 +86,22 @@ object AppIcons {
         ).addPath(
             pathData = PathParser().parsePathString(pathData).toNodes(),
             fill = SolidColor(Color.Black)
+        ).build()
+
+    /** Same, but for an outlined icon: the path is drawn as a 2dp line with round ends and joins. */
+    private fun strokeIcon(name: String, pathData: String): ImageVector =
+        ImageVector.Builder(
+            name = name,
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f
+        ).addPath(
+            pathData = PathParser().parsePathString(pathData).toNodes(),
+            fill = null,
+            stroke = SolidColor(Color.Black),
+            strokeLineWidth = 2f,
+            strokeLineCap = StrokeCap.Round,
+            strokeLineJoin = StrokeJoin.Round
         ).build()
 }

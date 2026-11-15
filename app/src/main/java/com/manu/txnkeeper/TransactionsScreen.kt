@@ -94,6 +94,7 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -285,13 +286,13 @@ fun TransactionsScreen(
                         if (filters.activeCount > 0) {
                             BadgedBox(badge = { Badge { Text("${filters.activeCount}") } }) {
                                 Icon(
-                                    AppIcons.Sliders,
+                                    AppIcons.FilterFunnel,
                                     contentDescription = "Filters applied: ${filters.activeCount}",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         } else {
-                            Icon(AppIcons.Sliders, contentDescription = "Filters")
+                            Icon(AppIcons.FilterFunnel, contentDescription = "Filters")
                         }
                     }
 //                    IconButton(onClick = {
@@ -324,7 +325,7 @@ fun TransactionsScreen(
                             onDismissRequest = { menuOpen = false },
                             items = listOfNotNull(
                                 ManuMenuItem(
-                                    leadingIcon = { Icon(AppIcons.Sliders, "Filters") },
+                                    leadingIcon = { Icon(AppIcons.FilterFunnel, "Filters") },
                                     label = if (filters.activeCount > 0) "Filters · ${filters.activeCount}" else "Filters",
                                     onClick = {
                                         focusManager.clearFocus()
@@ -357,7 +358,7 @@ fun TransactionsScreen(
                                 },
                                 ManuMenuItem(
                                     label = "About",
-                                    leadingIcon = { Icon(Icons.Default.AccountCircle, "About") },
+                                    leadingIcon = { Icon(Icons.Default.Info, "About") },
                                     onClick = onOpenAbout
                                 )
                             ),
@@ -853,19 +854,19 @@ private fun TransactionRow(
             }
         }
         // Three-dot menu on its own, centred on the right
-        Box {
-            IconButton(onClick = { menuOpen = true }) {
-                Icon(Icons.Default.MoreVert, contentDescription = "More")
-            }
-            ManuDropdownMenu(
-                expanded = menuOpen,
-                onDismissRequest = { menuOpen = false },
-                items = listOf(
-                    ManuMenuItem(label = "Edit", onClick = onEdit),
-                    ManuMenuItem(label = "Delete", onClick = onDelete)
-                )
-            )
-        }
+//        Box {
+//            IconButton(onClick = { menuOpen = true }) {
+//                Icon(Icons.Default.MoreVert, contentDescription = "More")
+//            }
+//            ManuDropdownMenu(
+//                expanded = menuOpen,
+//                onDismissRequest = { menuOpen = false },
+//                items = listOf(
+//                    ManuMenuItem(label = "Edit", onClick = onEdit),
+//                    ManuMenuItem(label = "Delete", onClick = onDelete)
+//                )
+//            )
+//        }
     }
 }
 

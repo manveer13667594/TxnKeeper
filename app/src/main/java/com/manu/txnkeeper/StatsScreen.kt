@@ -210,13 +210,13 @@ fun StatsScreen(
                         if (filters.activeCount > 0) {
                             BadgedBox(badge = { Badge { Text("${filters.activeCount}") } }) {
                                 Icon(
-                                    AppIcons.Sliders,
+                                    AppIcons.FilterFunnel,
                                     contentDescription = "Filters applied: ${filters.activeCount}",
                                     tint = MaterialTheme.colorScheme.primary
                                 )
                             }
                         } else {
-                            Icon(AppIcons.Sliders, contentDescription = "Filters")
+                            Icon(AppIcons.FilterFunnel, contentDescription = "Filters")
                         }
                     }
                 }
