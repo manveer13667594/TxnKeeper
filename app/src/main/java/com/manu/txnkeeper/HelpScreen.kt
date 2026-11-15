@@ -105,12 +105,6 @@ private val FAQS = listOf(
                 "This can't be undone, so export a CSV first if you want a copy. " +
                 "Photos taken with the in-app camera are saved in your gallery and are not deleted."
     ),
-    Faq(
-        question = "How do I delete my data?",
-        answer = "Open the ⋮ menu, then Settings, then Delete data. Choose All data, or one account " +
-                "(you need at least two accounts for that).\n" +
-                "Then type the phrase shown to confirm. Deleting can't be undone, so export a CSV first if you want a copy."
-    )
 )
 
 /**
