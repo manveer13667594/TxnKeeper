@@ -45,8 +45,13 @@ import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
 import com.manu.txnkeeper.data.local.DatabaseModule
 import com.manu.manudesignsystem.theme.ManuDesignSystemTheme
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.manu.manudesignsystem.components.ManuFab
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -161,6 +166,19 @@ fun TxnkeeperApp(
             if (dao.accountCount() == 0) dao.insertAccount(AccountEntity(name = DEFAULT_ACCOUNT_NAME))
         }
     }
+    // Housekeeping: delete image files that no transaction uses. Only files a day old or more, so an
+    // image in a form that is still open is never touched.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                ReceiptStore.deleteUnused(context, dao.allImageFiles().toSet(), minAgeMs = 24L * 60 * 60 * 1000)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Nothing depends on this, try again next time the app opens
+            }
+        }
+    }
     // The chosen account was deleted: go back to "all accounts"
     LaunchedEffect(accounts) {
         if (accountFilter != null && accounts.isNotEmpty() && accounts.none { it.id == accountFilter }) {
@@ -195,11 +213,29 @@ fun TxnkeeperApp(
     // Text recognition runs here, after the camera has closed
     val ocr = rememberOcrController()
 
+    // A copy of the scanned / picked photo is saved (shrunk) while its text is being read. It goes into the
+    // form when text was found, and is deleted when not.
+    var scanImage by remember { mutableStateOf<Deferred<String?>?>(null) }
+
+    fun startScan(uri: Uri) {
+        val previous = scanImage
+        scanImage = scope.async { ReceiptStore.saveFromUri(context, uri) }
+        if (previous != null) scope.launch { ReceiptStore.delete(context, previous.await()) }
+        ocr.run(uri)
+    }
+
+    /** Nothing usable was found in the photo: its saved copy is not needed. */
+    fun dropScanImage() {
+        val pending = scanImage ?: return
+        scanImage = null
+        scope.launch { ReceiptStore.delete(context, pending.await()) }
+    }
+
     // An image shared into the app: make sure the camera is closed, then read it
     LaunchedEffect(sharedImageUri) {
         sharedImageUri?.let {
             showCamera = false
-            ocr.run(it)
+            startScan(it)
             onSharedImageHandled()
         }
     }
@@ -213,11 +249,15 @@ fun TxnkeeperApp(
             if (outcome == null) return@collect
             ocr.outcome = null
             when {
-                outcome.text.isBlank() ->
+                outcome.text.isBlank() -> {
+                    dropScanImage()
                     Toast.makeText(context, "No text found in this image.", Toast.LENGTH_SHORT).show()
+                }
 
-                outcome.parsed.isEmpty ->
+                outcome.parsed.isEmpty -> {
+                    dropScanImage()
                     Toast.makeText(context, "Text detected, but no transaction details found.", Toast.LENGTH_LONG).show()
+                }
 
                 else -> {
                     var message = "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save."
@@ -234,6 +274,16 @@ fun TxnkeeperApp(
                     if (form.isBlank) {
                         form.useDefaults()
                         form.accountId = startingAccountId()
+                    }
+                    // The photo goes along with the form; "Include image" starts as set in Settings
+                    val pending = scanImage
+                    scanImage = null
+                    val savedImage = pending?.await()
+                    if (savedImage != null) {
+                        val old = form.imageFile
+                        form.imageFile = savedImage
+                        form.includeImage = settings.includeImageByDefault
+                        if (old != null) ReceiptStore.delete(context, old)
                     }
                     form.fill(outcome.parsed, message = message)
                     showAdd = true
@@ -262,6 +312,8 @@ fun TxnkeeperApp(
     LaunchedEffect(showAdd) {
         if (!showAdd) {
             delay(400)
+            // Closed without saving: the image waiting in the form is not needed
+            form.imageFile?.let { ReceiptStore.delete(context, it) }
             val account = form.accountId
             form.reset()
             form.accountId = account
@@ -381,8 +433,11 @@ fun TxnkeeperApp(
                     },
                     onSubmit = { entity, stay ->
                         scope.launch {
+                            // An image in the form that is not kept ("Include image" unticked) is deleted after saving
+                            val unusedImage = form.imageFile?.takeIf { it != entity.imageFile }
                             // If saving fails the form stays open with everything the user typed
                             if (!safeWrite(context, "save the transaction") { dao.insert(entity) }) return@launch
+                            if (unusedImage != null) ReceiptStore.delete(context, unusedImage)
                             if (stay) {
                                 // Save & next: the next spoken entry, or an empty form
                                 if (!form.nextFromBatch()) {
@@ -446,11 +501,17 @@ fun TxnkeeperApp(
                     onDelete = { id ->
                         scope.launch {
                             // Delete the transactions, then the account, as one step: either both happen or neither
-                            safeWrite(context, "delete the account") {
+                            var images = emptyList<String>()
+                            val deleted = safeWrite(context, "delete the account") {
                                 database.withTransaction {
+                                    images = dao.imageFilesOfAccount(id)
                                     dao.deleteTransactionsOfAccount(id)
                                     dao.deleteAccount(id)
                                 }
+                            }
+                            // Their images go too (after the database change worked)
+                            if (deleted && images.isNotEmpty()) {
+                                withContext(Dispatchers.IO) { ReceiptStore.deleteAll(context, images) }
                             }
                         }
                     }
@@ -486,7 +547,7 @@ fun TxnkeeperApp(
                     onPhotoSaved = { lastPhotoUri = it },
                     onImageReady = { uri ->
                         showCamera = false   // back first
-                        ocr.run(uri)         // then the Add page opens, filled in
+                        startScan(uri)       // then the Add page opens, filled in
                     }
                 )
             }

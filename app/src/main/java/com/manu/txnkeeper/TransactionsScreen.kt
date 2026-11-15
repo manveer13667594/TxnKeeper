@@ -576,7 +576,12 @@ fun TransactionsScreen(
                 }
             },
             onSave = { updated ->
-                scope.launch { safeWrite(context, "save the changes") { dao.update(updated) } }
+                scope.launch {
+                    if (safeWrite(context, "save the changes") { dao.update(updated) }) {
+                        // The image it had before is not used any more if it was removed or replaced
+                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                    }
+                }
                 editing = null
             },
             onDismiss = { editing = null }
@@ -594,7 +599,12 @@ fun TransactionsScreen(
             confirmText = "Delete",
             dismissText = "Cancel",
             onConfirm = {
-                scope.launch { safeWrite(context, "delete the transaction") { dao.delete(txn) } }
+                scope.launch {
+                    // Its image goes with it (only once the transaction is really deleted)
+                    if (safeWrite(context, "delete the transaction") { dao.delete(txn) }) {
+                        ReceiptStore.delete(context, txn.imageFile)
+                    }
+                }
                 deleting = null
             },
             onDismiss = { deleting = null }
@@ -794,6 +804,7 @@ private fun TransactionRow(
     val income = txn.type == "INCOME"
     val sign = if (income) "+" else "−"
     var menuOpen by remember { mutableStateOf(false) }
+    var viewerOpen by remember { mutableStateOf(false) }
 
     // Details under the title: payment method and account (when there is something to show)
     val details = buildString {
@@ -853,6 +864,10 @@ private fun TransactionRow(
                 )
             }
         }
+        // A small picture when the transaction has an image; tap it to see it full screen
+        if (txn.imageFile != null) {
+            ReceiptThumb(fileName = txn.imageFile, size = 36.dp, onClick = { viewerOpen = true })
+        }
         // Three-dot menu on its own, centred on the right
 //        Box {
 //            IconButton(onClick = { menuOpen = true }) {
@@ -867,6 +882,10 @@ private fun TransactionRow(
 //                )
 //            )
 //        }
+    }
+
+    if (viewerOpen && txn.imageFile != null) {
+        ReceiptImageViewer(fileName = txn.imageFile, onDismiss = { viewerOpen = false })
     }
 }
 
@@ -886,6 +905,7 @@ private fun TransactionDetailDialog(
     val income = txn.type == "INCOME"
     val sign = if (income) "+" else "−"
     val typeColor = if (income) IncomeColor else ExpenseColor
+    var viewerOpen by remember { mutableStateOf(false) }
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -982,9 +1002,24 @@ private fun TransactionDetailDialog(
                         )
                     }
                 }
+
+                // The receipt image, if there is one; tap it to see it full screen
+                if (txn.imageFile != null) {
+                    Text(
+                        text = "Receipt image",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 6.dp)
+                    )
+                    ReceiptPreview(fileName = txn.imageFile, onClick = { viewerOpen = true })
+                }
                 Spacer(Modifier.height(12.dp))
             }
         }
+    }
+
+    if (viewerOpen && txn.imageFile != null) {
+        ReceiptImageViewer(fileName = txn.imageFile, onDismiss = { viewerOpen = false })
     }
 }
 

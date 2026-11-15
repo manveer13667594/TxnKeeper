@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.manu.txnkeeper.data.local.AccountEntity
@@ -59,6 +60,14 @@ fun EditTransactionDialog(
     var addAccountOpen by remember { mutableStateOf(false) }
     var addPaymentOpen by remember { mutableStateOf(false) }
 
+    // The receipt image. "Keep image" unticked removes it from the transaction when saved. A newly picked
+    // image is a file made by this dialog ([added]); it is deleted again if the dialog is cancelled.
+    val context = LocalContext.current
+    var imageFile by remember { mutableStateOf(original.imageFile) }
+    var keepImage by remember { mutableStateOf(true) }
+    var added by remember { mutableStateOf<String?>(null) }
+    var saved by remember { mutableStateOf(false) }
+
     // Your list from Settings. If this transaction uses a method you have since removed, it stays
     // in the dropdown too, so editing the transaction doesn't force you to change it.
     val methods = settings.paymentMethods
@@ -74,6 +83,10 @@ fun EditTransactionDialog(
             if (title.isBlank() || value == null || value <= 0) {
                 error = "Enter a valid title and amount."
             } else {
+                val finalImage = if (keepImage) imageFile else null
+                saved = true
+                // A picked image that is not kept (unticked afterwards) is not needed
+                added?.takeIf { it != finalImage }?.let { ReceiptStore.delete(context, it) }
                 onSave(
                     original.copy(
                         title = title.trim(),
@@ -82,12 +95,17 @@ fun EditTransactionDialog(
                         paymentMethod = payment,
                         dateTime = dateTime,
                         description = description.trim(),
-                        accountId = accountId
+                        accountId = accountId,
+                        imageFile = finalImage
                     )
                 )
             }
         },
-        onDismiss = onDismiss
+        onDismiss = {
+            // Cancelled: an image picked in this dialog is not needed (not after Save)
+            if (!saved) added?.let { ReceiptStore.delete(context, it) }
+            onDismiss()
+        }
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             ManuTextField(
@@ -166,6 +184,20 @@ fun EditTransactionDialog(
                 onValueChange = { description = it },
                 label = { Text("Description (optional)") },
                 singleLine = false
+            )
+            ReceiptImageField(
+                imageFile = imageFile,
+                include = keepImage,
+                includeLabel = "Keep image",
+                excludedWarning = "The image will be deleted from this transaction when you save.",
+                onIncludeChange = { keepImage = it },
+                onPicked = { name ->
+                    // Replacing an image picked here earlier: the earlier one is not needed
+                    added?.let { ReceiptStore.delete(context, it) }
+                    added = name
+                    imageFile = name
+                    keepImage = true
+                }
             )
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

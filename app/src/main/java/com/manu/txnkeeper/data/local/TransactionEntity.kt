@@ -18,5 +18,9 @@ data class TransactionEntity(
 
     // Which account this belongs to. Old transactions were moved to account 1 by the migration.
     @ColumnInfo(defaultValue = "1")
-    val accountId: Long = 1
+    val accountId: Long = 1,
+
+    // File name (not a path) of the receipt image kept with this transaction, or null for none.
+    // The file lives in the app's private "receipts" folder (see ReceiptStore.kt).
+    val imageFile: String? = null
 )

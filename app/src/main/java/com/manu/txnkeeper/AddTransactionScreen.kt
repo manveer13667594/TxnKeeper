@@ -51,6 +51,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -138,6 +139,15 @@ class TxnFormState {
 
     /** A short note shown above the form (for example after scanning a receipt). */
     var notice by mutableStateOf<String?>(null)
+
+    /**
+     * The receipt image waiting in this form (a file in ReceiptStore): the photo that was scanned, or
+     * one picked with "Attach image". It becomes part of the transaction only if [includeImage] is
+     * ticked when saving; otherwise (or if the form is closed) the file is deleted.
+     */
+    var imageFile by mutableStateOf<String?>(null)
+    /** The "Include image" box. */
+    var includeImage by mutableStateOf(true)
 
     /**
      * The entries of one voice recording that held several transactions. You can move back and forth
@@ -244,6 +254,8 @@ class TxnFormState {
                     "description" to f.description,
                     "accountId" to f.accountId,
                     "notice" to f.notice,
+                    "imageFile" to f.imageFile,
+                    "includeImage" to f.includeImage,
                     "batchIndex" to f.batchIndex,
                     "batchSaved" to f.batchSaved,
                     "batch" to f.batch.map {
@@ -261,6 +273,8 @@ class TxnFormState {
                     f.description = m["description"] as String
                     f.accountId = m["accountId"] as Long
                     f.notice = m["notice"] as String?
+                    f.imageFile = m["imageFile"] as String?
+                    f.includeImage = (m["includeImage"] as Boolean?) ?: true
                     f.batchIndex = m["batchIndex"] as Int
                     f.batchSaved = m["batchSaved"] as Int
                     @Suppress("UNCHECKED_CAST")
@@ -297,6 +311,10 @@ class TxnFormState {
         include = true
         notice = null
         useDefaults()   // type and payment method come from Settings > Defaults
+        // The image file is not deleted here: after saving it belongs to the transaction.
+        // Closing the page without saving deletes it (MainActivity does that before calling reset).
+        imageFile = null
+        includeImage = true
     }
 
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
@@ -332,6 +350,7 @@ fun AddTransactionScreen(
     onScan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val scrollState = rememberScrollState()
@@ -395,8 +414,19 @@ fun AddTransactionScreen(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                form.notice?.let {
-                    Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                form.notice?.let { notice ->
+                    // The "Possible duplicate" paragraph is a warning, so it is red; the rest stays grey
+                    notice.split("\n\n").forEach { paragraph ->
+                        Text(
+                            text = paragraph,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (paragraph.startsWith("Possible duplicate")) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
                 }
 
                 // Several spoken entries: arrows to move between them
@@ -551,6 +581,22 @@ fun AddTransactionScreen(
                             singleLine = false
                         )
 
+                        // Receipt image: from a scan, or attached here. Not for the entries of a voice recording.
+                        if (!form.inBatch) {
+                            ReceiptImageField(
+                                imageFile = form.imageFile,
+                                include = form.includeImage,
+                                onIncludeChange = { form.includeImage = it },
+                                excludedWarning = "This image won't be saved. It is deleted when you save.",
+                                onPicked = { name ->
+                                    val old = form.imageFile
+                                    form.imageFile = name
+                                    form.includeImage = true
+                                    if (old != null) ReceiptStore.delete(context, old)
+                                }
+                            )
+                        }
+
                         fun toEntity(e: BatchEntry, value: Long) = TransactionEntity(
                             title = e.title.trim(),
                             amountPaise = value,
@@ -600,7 +646,8 @@ fun AddTransactionScreen(
                                         paymentMethod = form.payment,
                                         dateTime = form.dateTime,
                                         description = form.description.trim(),
-                                        accountId = account?.id ?: 1L
+                                        accountId = account?.id ?: 1L,
+                                        imageFile = if (form.includeImage) form.imageFile else null
                                     ),
                                     stay
                                 )

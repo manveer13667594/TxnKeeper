@@ -15,7 +15,7 @@ object DatabaseModule {
                 AppDatabase::class.java,
                 "txnkeeper_database"
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(SEED_DEFAULT_ACCOUNT)
                 .build().also { instance = it }
         }

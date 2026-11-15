@@ -7,7 +7,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [TransactionEntity::class, AccountEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -84,6 +84,16 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         )
         db.execSQL("DROP TABLE `transactions`")
         db.execSQL("ALTER TABLE `transactions_new` RENAME TO `transactions`")
+    }
+}
+
+/**
+ * Version 3 -> 4: a transaction can keep a receipt image. Adds one nullable column holding the image
+ * file's name; every existing transaction simply has no image (NULL). Nothing else changes.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `transactions` ADD COLUMN `imageFile` TEXT")
     }
 }
 

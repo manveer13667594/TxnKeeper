@@ -16,7 +16,12 @@ data class TxnRow(
     val type: String,            // "INCOME" or "EXPENSE"
     val paymentMethod: String,   // a payment method name (CASH when the file has none)
     val accountName: String,
-    val description: String
+    val description: String,
+    /**
+     * The name of the receipt image kept with this transaction (a file in the ZIP's images folder),
+     * or null. Only filled when an export includes images, and read back from the "Image" column.
+     */
+    val imageFile: String? = null
 )
 
 /** A CSV row that could not be turned into a transaction. [row] counts the header as row 1. */
@@ -36,6 +41,9 @@ data class CsvReadResult(
  *   Date,Title,Amount,Type,Payment Method,Account,Description
  *   2026-11-02 12:15:00,Chai,20,EXPENSE,UPI,Main account,
  *
+ * A file exported "with images" has one more last column, Image, holding the image's file name
+ * (the image itself is in the images folder of the ZIP). The column is optional when reading.
+ *
  * - Written as UTF-8 with a BOM, so Excel shows ₹ and other characters correctly.
  * - Reading is forgiving: columns can be in any order, `;` is accepted instead of `,`,
  *   and dates may be yyyy-MM-dd or dd/MM/yyyy (with or without a time).
@@ -43,6 +51,7 @@ data class CsvReadResult(
 object TxnCsv {
 
     private val HEADER = listOf("Date", "Title", "Amount", "Type", "Payment Method", "Account", "Description")
+    private const val IMAGE_HEADER = "Image"
     private val REQUIRED = listOf("date", "title", "amount", "type")
 
     private const val DATE_OUT = "yyyy-MM-dd HH:mm:ss"
@@ -59,19 +68,21 @@ object TxnCsv {
 
     // ------------------------------------------------------------------ writing
 
-    fun write(rows: List<TxnRow>): String {
+    /** [withImageColumn] adds the Image column (used by the ZIP export). */
+    fun write(rows: List<TxnRow>, withImageColumn: Boolean = false): String {
         val dateFormat = SimpleDateFormat(DATE_OUT, Locale.US)
         val sb = StringBuilder("﻿")
-        sb.append(HEADER.joinToString(",")).append("\r\n")
+        sb.append((if (withImageColumn) HEADER + IMAGE_HEADER else HEADER).joinToString(",")).append("\r\n")
         for (r in rows) {
-            val cells = listOf(
+            val cells = listOfNotNull(
                 dateFormat.format(Date(r.dateTime)),
                 guard(r.title),
                 formatAmountPaise(r.amountPaise),
                 r.type,
                 r.paymentMethod,
                 guard(r.accountName),
-                guard(r.description)
+                guard(r.description),
+                if (withImageColumn) r.imageFile.orEmpty() else null
             )
             sb.append(cells.joinToString(",") { quote(it) }).append("\r\n")
         }
@@ -150,7 +161,8 @@ object TxnCsv {
                 type = type,
                 paymentMethod = parsePayment(cell("payment")),
                 accountName = unguard(cell("account")),
-                description = unguard(cell("description"))
+                description = unguard(cell("description")),
+                imageFile = cell("image").ifBlank { null }
             )
         }
         return CsvReadResult(rows = rows, errors = errors)
@@ -166,6 +178,7 @@ object TxnCsv {
             "paymentmethod", "payment", "method", "mode" -> "payment"
             "account", "accountname" -> "account"
             "description", "note", "notes", "details" -> "description"
+            "image", "imagefile", "receipt", "attachment" -> "image"
             else -> null
         }
 

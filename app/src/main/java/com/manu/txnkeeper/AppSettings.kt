@@ -52,6 +52,30 @@ class AppSettings(context: Context) {
     }
 
     /**
+     * Receipt images. When a scanned or picked image is on the Add page, its "Include image" box starts
+     * ticked or not ticked according to this. (You can always change the box for one transaction.)
+     */
+    var includeImageByDefault by mutableStateOf(prefs.getBoolean(KEY_INCLUDE_IMAGE, true))
+        private set
+
+    fun updateIncludeImageByDefault(on: Boolean) {
+        includeImageByDefault = on
+        prefs.edit().putBoolean(KEY_INCLUDE_IMAGE, on).apply()
+    }
+
+    /**
+     * Whether the Export screen starts with "Include images" switched on (it can still be changed
+     * for one export). Only matters once some transactions have images.
+     */
+    var exportWithImagesByDefault by mutableStateOf(prefs.getBoolean(KEY_EXPORT_IMAGES, true))
+        private set
+
+    fun updateExportWithImagesByDefault(on: Boolean) {
+        exportWithImagesByDefault = on
+        prefs.edit().putBoolean(KEY_EXPORT_IMAGES, on).apply()
+    }
+
+    /**
      * The first-use hints on the home screen ("swipe left for voice", "swipe right for the camera").
      * Each is shown until it is closed or the shortcut has been used once.
      */
@@ -181,6 +205,8 @@ class AppSettings(context: Context) {
         const val KEY_THEME_MODE = "theme_mode"
         const val KEY_PAYMENT_METHODS = "payment_methods"
         const val KEY_VOICE_TIPS = "voice_tips"
+        const val KEY_INCLUDE_IMAGE = "include_image_default"
+        const val KEY_EXPORT_IMAGES = "export_with_images_default"
         const val KEY_VOICE_HINT_DONE = "voice_hint_done"
         const val KEY_CAMERA_HINT_DONE = "camera_hint_done"
     }

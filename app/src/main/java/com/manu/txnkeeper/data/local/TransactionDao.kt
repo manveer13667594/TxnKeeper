@@ -91,6 +91,20 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE description LIKE '%' || :ref || '%' LIMIT 1")
     suspend fun findByReference(ref: String): TransactionEntity?
 
+    // ------------------------------------------------------------------ receipt images
+
+    /** Every image file name in use (to clean up files nothing refers to any more). */
+    @Query("SELECT imageFile FROM transactions WHERE imageFile IS NOT NULL")
+    suspend fun allImageFiles(): List<String>
+
+    /** The image file names of one account's transactions (read before the account is deleted). */
+    @Query("SELECT imageFile FROM transactions WHERE accountId = :accountId AND imageFile IS NOT NULL")
+    suspend fun imageFilesOfAccount(accountId: Long): List<String>
+
+    /** How many transactions have an image (decides whether the export offers "include images"). */
+    @Query("SELECT COUNT(*) FROM transactions WHERE imageFile IS NOT NULL")
+    fun observeImageCount(): Flow<Int>
+
     // ------------------------------------------------------------------ payment methods
 
     /**

@@ -281,12 +281,13 @@ private fun DeleteAccountDialog(
             if (hasTransactions) {
                 Text(
                     "This will also permanently delete its ${account.txnCount} " +
-                            (if (account.txnCount == 1) "transaction" else "transactions") + "."
+                            (if (account.txnCount == 1) "transaction" else "transactions") + " (with their images).",
+                    color = MaterialTheme.colorScheme.error
                 )
             } else {
                 Text("This account has no transactions.")
             }
-            Text("This can't be undone.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("This can't be undone.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
         }
     }
 }

@@ -1,6 +1,7 @@
 package com.manu.txnkeeper
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -88,5 +89,25 @@ class TxnCsvTest {
         assertNull(TxnCsv.parseDate("2026-11-02 and more", parsers))
         assertNull(TxnCsv.parseDate("0026-11-02", parsers))
         assertNull(TxnCsv.parseDate("2026-13-45", parsers))
+    }
+
+    @Test fun image_columnIsWrittenOnlyOnRequest_andReadBack() {
+        val rows = listOf(
+            row().copy(imageFile = "r_20261102-121500_ab12cd34.jpg"),
+            row(title = "Tea")
+        )
+        val plain = TxnCsv.write(rows)
+        assertFalse(plain.contains("Image"))
+
+        val withImages = TxnCsv.write(rows, withImageColumn = true)
+        assertTrue(withImages.lineSequence().first().endsWith(",Image"))
+        val back = TxnCsv.read(withImages)
+        assertNull(back.fileError)
+        assertEquals(rows, back.rows)
+    }
+
+    @Test fun image_aFileWithoutTheColumnHasNoImages() {
+        val back = TxnCsv.read(TxnCsv.write(listOf(row().copy(imageFile = "r_x.jpg"))))
+        assertNull(back.rows.single().imageFile)
     }
 }

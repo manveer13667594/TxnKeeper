@@ -156,14 +156,15 @@ private fun DeleteDataDialog(
 
             Text(
                 text = if (account == null) {
-                    "This deletes all ${plural(accounts.sumOf { it.txnCount }, "transaction")} and all your accounts " +
+                    "This deletes all ${plural(accounts.sumOf { it.txnCount }, "transaction")} (with their images) and all your accounts " +
                             "(one empty \"$DEFAULT_ACCOUNT_NAME\" is kept so the app keeps working), " +
                             "and puts your payment methods back to the defaults."
                 } else {
-                    "This deletes the account \"${account.name}\" and its ${plural(account.txnCount, "transaction")}. " +
+                    "This deletes the account \"${account.name}\" and its ${plural(account.txnCount, "transaction")} (with their images). " +
                             "Your other accounts are not touched."
                 },
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error
             )
 
             Text(
@@ -202,9 +203,12 @@ private suspend fun runDelete(
     accountId: Long?
 ) {
     val dao = database.transactionDao()
+    // Which image files belong to what is being deleted (read inside the same database step)
+    var images = emptyList<String>()
     val saved = safeWrite(context, "delete the data") {
         database.withTransaction {
             if (accountId != null) {
+                images = dao.imageFilesOfAccount(accountId)
                 dao.deleteTransactionsOfAccount(accountId)
                 dao.deleteAccount(accountId)
             } else {
@@ -221,6 +225,11 @@ private suspend fun runDelete(
         }
     }
     if (!saved) return
+
+    // The data is gone, so the images go too (everything for "All data", else just that account's)
+    withContext(Dispatchers.IO) {
+        if (accountId == null) ReceiptStore.deleteEverything(context) else ReceiptStore.deleteAll(context, images)
+    }
 
     if (accountId == null) settings.resetPaymentMethods()
     Toast.makeText(

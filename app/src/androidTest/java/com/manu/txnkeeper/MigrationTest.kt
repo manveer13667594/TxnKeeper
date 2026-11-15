@@ -7,10 +7,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.txnkeeper.data.local.MIGRATION_1_2
 import com.manu.txnkeeper.data.local.MIGRATION_2_3
+import com.manu.txnkeeper.data.local.MIGRATION_3_4
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,7 +54,7 @@ class MigrationTest {
         raw.close()
 
         val db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
         try {
             val dao = db.transactionDao()
@@ -75,6 +77,45 @@ class MigrationTest {
             // -500.25 - 12.35 + 1250.50 = 737.90      and      1000.10 - 0.30 = 999.80
             assertEquals(73790L, accounts[1]!!.balancePaise)
             assertEquals(99980L, accounts[2]!!.balancePaise)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test fun version3_to_4_addsAnEmptyImageColumn_andKeepsEverythingElse() = runBlocking {
+        val file = context.getDatabasePath(dbName).also { it.parentFile?.mkdirs() }
+        val raw = SQLiteDatabase.openOrCreateDatabase(file, null)
+        raw.execSQL(
+            "CREATE TABLE `accounts` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, " +
+                    "`type` TEXT NOT NULL, `openingBalancePaise` INTEGER NOT NULL)"
+        )
+        raw.execSQL(
+            "CREATE TABLE `transactions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, " +
+                    "`amountPaise` INTEGER NOT NULL, `type` TEXT NOT NULL, `dateTime` INTEGER NOT NULL, " +
+                    "`paymentMethod` TEXT NOT NULL, `description` TEXT NOT NULL, " +
+                    "`accountId` INTEGER NOT NULL DEFAULT 1)"
+        )
+        raw.execSQL("INSERT INTO accounts VALUES (1, 'Main account', 'BANK', 0)")
+        raw.execSQL("INSERT INTO transactions VALUES (1, 'Chai', 1235, 'EXPENSE', 1700000000000, 'UPI', 'a note', 1)")
+        raw.version = 3
+        raw.close()
+
+        val db = Room.databaseBuilder(context, AppDatabase::class.java, dbName)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+            .build()
+        try {
+            val dao = db.transactionDao()
+            val old = dao.getAllOnce().single()
+            assertEquals("Chai", old.title)
+            assertEquals(1235L, old.amountPaise)
+            assertEquals("a note", old.description)
+            assertNull(old.imageFile)
+            assertEquals(emptyList<String>(), dao.allImageFiles())
+
+            // The new column can be written and read
+            dao.update(old.copy(imageFile = "r_test.jpg"))
+            assertEquals(listOf("r_test.jpg"), dao.allImageFiles())
+            assertEquals("r_test.jpg", dao.getAllOnce().single().imageFile)
         } finally {
             db.close()
         }

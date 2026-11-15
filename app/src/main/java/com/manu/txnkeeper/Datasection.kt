@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -57,6 +58,10 @@ private enum class ExportKind(val label: String) {
 /** Returned by [amountPaiseOrInvalid] for text that is not a usable amount. */
 private const val INVALID_AMOUNT = Long.MIN_VALUE
 
+/** "1 image", "3 images". */
+private fun plural(count: Int, noun: String): String =
+    if (count == 1) "1 $noun" else "$count ${noun}s"
+
 /**
  * Text from an amount box -> paise. Blank means "no limit" (null), a valid amount gives its paise,
  * and anything else (letters, a negative number, too large) gives [INVALID_AMOUNT].
@@ -73,18 +78,23 @@ private fun amountPaiseOrInvalid(text: String): Long? {
  *
  * Export: first choose what to export (everything, a date range, or the latest N transactions),
  * optionally narrow it down (account, payment method, income / expense, amount range), then export
- * to CSV or PDF. Import: pick a CSV file.
+ * to CSV or PDF. When some transactions have receipt images, an "Include images" switch appears:
+ * on = a ZIP (the CSV and an images folder) and a PDF that shows the images after the table.
+ * Import: pick a CSV file, or a ZIP made by this export.
  *
  * The system file picker chooses where a file is saved or which file is read, so the app needs
  * no storage permission. A short help text (and then the result of each action) is shown at the top.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun DataTransferControls(database: AppDatabase) {
+fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
     val context = LocalContext.current
     val coroutines = rememberCoroutineScope()
     var busy by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf<String?>(null) }
+    // The result of the last action, line by line; a warning line is shown in red
+    var status by remember { mutableStateOf<List<StatusLine>?>(null) }
+    fun note(text: String) = listOf(StatusLine(text))
+    fun warn(text: String) = listOf(StatusLine(text, warning = true))
 
     // What to export
     var kind by remember { mutableStateOf(ExportKind.ALL) }
@@ -93,6 +103,8 @@ fun DataTransferControls(database: AppDatabase) {
     var countText by remember { mutableStateOf("50") }
     var rangeDialogOpen by remember { mutableStateOf(false) }
     var filtersOpen by remember { mutableStateOf(false) }
+    // "Include images" starts as set in Settings; changing it here only affects this screen
+    var withImages by remember { mutableStateOf(settings.exportWithImagesByDefault) }
 
     // Optional narrowing down (null / blank = don't filter on it)
     var accountId by remember { mutableStateOf<Long?>(null) }
@@ -113,12 +125,16 @@ fun DataTransferControls(database: AppDatabase) {
     val usedMethods: List<String> by methodsFlow.collectAsState(initial = emptyList())
     // A selected method stays visible even if no transaction uses it any more, so it can be switched off
     val methodChips = (usedMethods + listOfNotNull(payment)).distinct()
+    // How many transactions have an image: the switch only matters (and only shows) when there are some
+    val imageCountFlow = remember(dao) { dao.observeImageCount() }
+    val imageCount: Int by imageCountFlow.collectAsState(initial = 0)
+    val includeImages = withImages && imageCount > 0
 
     val filtersOn = accountId != null || payment != null || txType != null ||
             minText.isNotBlank() || maxText.isNotBlank()
 
     /** Runs [work] once at a time and shows its returned message (or the error) as the status. */
-    fun runTask(work: suspend () -> String) {
+    fun runTask(work: suspend () -> List<StatusLine>) {
         if (busy) return
         busy = true
         status = null
@@ -128,7 +144,7 @@ fun DataTransferControls(database: AppDatabase) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                status = "Failed: ${e.message ?: e.javaClass.simpleName}"
+                status = warn("Failed: ${e.message ?: e.javaClass.simpleName}")
             } finally {
                 busy = false
             }
@@ -138,17 +154,26 @@ fun DataTransferControls(database: AppDatabase) {
     val csvExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
         if (uri != null) runTask {
             val n = DataTransfer.exportCsv(context, database, uri, pendingScope, pendingFilters)
-            "Exported $n transaction${if (n == 1) "" else "s"} to CSV."
+            note("Exported $n transaction${if (n == 1) "" else "s"} to CSV.")
+        }
+    }
+    val zipExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) runTask {
+            val r = DataTransfer.exportZip(context, database, uri, pendingScope, pendingFilters)
+            note("Exported ${plural(r.transactions, "transaction")} and ${plural(r.images, "image")} to ZIP.")
         }
     }
     val pdfExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
         if (uri != null) runTask {
-            val n = DataTransfer.exportPdf(context, database, uri, pendingScope, pendingFilters)
-            "Exported $n transaction${if (n == 1) "" else "s"} to PDF."
+            val r = DataTransfer.exportPdf(context, database, uri, pendingScope, pendingFilters, withImages = includeImages)
+            note(
+                "Exported ${plural(r.transactions, "transaction")} to PDF" +
+                        (if (includeImages) " with ${plural(r.images, "image")}." else ".")
+            )
         }
     }
     val csvImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) runTask { DataTransfer.importCsv(context, database, uri).summary() }
+        if (uri != null) runTask { DataTransfer.importFile(context, database, uri).summaryLines() }
     }
 
     fun fileName(extension: String): String =
@@ -161,7 +186,7 @@ fun DataTransferControls(database: AppDatabase) {
             val from = rangeFrom
             val to = rangeTo
             if (from == null || to == null) {
-                status = "Choose the dates to export first."
+                status = warn("Choose the dates to export first.")
                 null
             } else {
                 ExportScope.DateRange(from, to)
@@ -170,7 +195,7 @@ fun DataTransferControls(database: AppDatabase) {
         ExportKind.LATEST -> {
             val n = countText.trim().toIntOrNull()
             if (n == null || n <= 0) {
-                status = "Enter how many transactions to export (1 or more)."
+                status = warn("Enter how many transactions to export (1 or more).")
                 null
             } else {
                 ExportScope.Latest(n)
@@ -183,11 +208,11 @@ fun DataTransferControls(database: AppDatabase) {
         val min = amountPaiseOrInvalid(minText)
         val max = amountPaiseOrInvalid(maxText)
         if (min == INVALID_AMOUNT || max == INVALID_AMOUNT) {
-            status = "Type the amounts as plain numbers, like 500 or 1250.50."
+            status = warn("Type the amounts as plain numbers, like 500 or 1250.50.")
             return null
         }
         if (min != null && max != null && min > max) {
-            status = "The minimum amount is higher than the maximum."
+            status = warn("The minimum amount is higher than the maximum.")
             return null
         }
         return ExportFilters(
@@ -207,7 +232,7 @@ fun DataTransferControls(database: AppDatabase) {
         val filters = chosenFilters() ?: return
         coroutines.launch {
             if (DataTransfer.countFor(database, scope, filters) == 0) {
-                status = "No transactions match those choices, so there is nothing to export."
+                status = warn("No transactions match those choices, so there is nothing to export.")
             } else {
                 pendingScope = scope
                 pendingFilters = filters
@@ -218,13 +243,17 @@ fun DataTransferControls(database: AppDatabase) {
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         // ------------------------------------------------ result of the last action (only when there is one)
-        val message = if (busy) "Working..." else status
-        if (message != null) {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary
-            )
+        val lines = if (busy) note("Working...") else status
+        if (!lines.isNullOrEmpty()) {
+            Column {
+                lines.forEach { line ->
+                    Text(
+                        text = line.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (line.warning) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
         }
 
         // ------------------------------------------------ export
@@ -394,12 +423,44 @@ fun DataTransferControls(database: AppDatabase) {
             }
         }
 
-        // CSV and PDF side by side
+        // Images: only offered when some transactions have one
+        if (imageCount > 0) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Include images", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = if (withImages) {
+                            "ZIP with the CSV and an images folder. PDF shows the images after the table."
+                        } else {
+                            "Transactions only, no images."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = withImages,
+                    onCheckedChange = {
+                        withImages = it
+                        status = null
+                    }
+                )
+            }
+        }
+
+        // CSV (or ZIP with images) and PDF side by side
         Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
             ManuButton(
                 modifier = Modifier.weight(1f),
-                onClick = { exportClicked { csvExport.launch(fileName("csv")) } }
-            ) { Text("Export CSV", maxLines = 1) }
+                onClick = {
+                    if (includeImages) exportClicked { zipExport.launch(fileName("zip")) }
+                    else exportClicked { csvExport.launch(fileName("csv")) }
+                }
+            ) { Text(if (includeImages) "Export ZIP" else "Export CSV", maxLines = 1) }
             ManuOutlineButton(
                 modifier = Modifier.weight(1f),
                 onClick = { exportClicked { pdfExport.launch(fileName("pdf")) } }
@@ -417,13 +478,16 @@ fun DataTransferControls(database: AppDatabase) {
                 if (!busy) {
                     status = null
                     csvImport.launch(
-                        arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")
+                        arrayOf(
+                            "text/*", "application/csv", "application/vnd.ms-excel",
+                            "application/zip", "application/x-zip-compressed", "application/octet-stream"
+                        )
                     )
                 }
             }
-        ) { Text("Import from CSV") }
+        ) { Text("Import from CSV or ZIP") }
         Text(
-            text = "Importing the same file again never adds a transaction twice.",
+            text = "Importing the same file again never adds a transaction twice. A ZIP also brings back the images.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )

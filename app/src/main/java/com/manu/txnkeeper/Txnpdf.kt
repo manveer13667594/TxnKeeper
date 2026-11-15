@@ -1,7 +1,9 @@
 package com.manu.txnkeeper
 
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RectF
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.text.TextPaint
@@ -14,6 +16,9 @@ import java.io.OutputStream
  * pages as needed (the header row repeats on every page).
  *
  * The description is left out to keep rows to one line; the CSV export has everything.
+ *
+ * With an image loader, the receipt images of the transactions follow the table, one per page with a
+ * line saying which transaction it belongs to.
  */
 object TxnPdf {
 
@@ -51,13 +56,18 @@ object TxnPdf {
     /**
      * Writes the PDF to [out]. [generatedAt] is shown under the title, and [scopeLabel] (for example
      * the date range and filters) on the line below it when the PDF holds only some of the transactions.
+     *
+     * [imageLoader] turns an image name (a row's [TxnRow.imageFile]) into a bitmap, already shrunk to a
+     * sensible size; each bitmap is recycled right after it is drawn. null = no image pages.
+     * Returns how many images were drawn.
      */
     fun write(
         rows: List<TxnRow>,
         out: OutputStream,
         generatedAt: Long = System.currentTimeMillis(),
-        scopeLabel: String? = null
-    ) {
+        scopeLabel: String? = null,
+        imageLoader: ((String) -> Bitmap?)? = null
+    ): Int {
         val titlePaint = text(18f, INK, bold = true)
         val metaPaint = text(9f, MUTED)
         val summaryPaint = text(10.5f, INK, bold = true)
@@ -69,6 +79,9 @@ object TxnPdf {
         val expenseRight = text(8.5f, RED, bold = true, right = true)
         val footerPaint = text(8f, MUTED, right = true)
         val rulePaint = Paint().apply { color = RULE; strokeWidth = 0.6f }
+        val captionPaint = text(9f, INK, bold = true)
+        val bitmapPaint = Paint(Paint.FILTER_BITMAP_FLAG or Paint.ANTI_ALIAS_FLAG)
+        var imagesDrawn = 0
 
         val income = rows.filter { it.type == "INCOME" }.sumOf { it.amountPaise }
         val expense = rows.filter { it.type == "EXPENSE" }.sumOf { it.amountPaise }
@@ -158,10 +171,38 @@ object TxnPdf {
                 y += ROW_H
             }
 
+            // ---------------- receipt images: one per page, below a line naming the transaction
+            if (imageLoader != null) {
+                for (r in rows) {
+                    val name = r.imageFile ?: continue
+                    val bitmap = imageLoader(name) ?: continue
+                    try {
+                        startPage(withTableHeader = false)
+                        val c = canvas!!
+                        val signed = if (r.type == "INCOME") r.amountPaise else -r.amountPaise
+                        val caption = "${formatDateLong(r.dateTime)}, ${formatTime(r.dateTime)}  ·  " +
+                                "${r.title}  ·  ${formatSignedMoney(signed)}"
+                        c.drawText(fit(caption, captionPaint, RIGHT_EDGE - MARGIN), MARGIN, y + 12f, captionPaint)
+                        y += 26f
+                        val availW = RIGHT_EDGE - MARGIN
+                        val availH = PAGE_H - MARGIN - FOOTER_H - y
+                        // As large as fits, but never enlarged beyond its own size (that only blurs it)
+                        val scale = minOf(availW / bitmap.width, availH / bitmap.height, 1f)
+                        val w = bitmap.width * scale
+                        val h = bitmap.height * scale
+                        c.drawBitmap(bitmap, null, RectF(MARGIN, y, MARGIN + w, y + h), bitmapPaint)
+                        imagesDrawn++
+                    } finally {
+                        bitmap.recycle()
+                    }
+                }
+            }
+
             finishPage()
             doc.writeTo(out)
         } finally {
             doc.close()
         }
+        return imagesDrawn
     }
 }

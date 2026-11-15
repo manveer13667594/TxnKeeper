@@ -21,9 +21,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.ImportExport
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -143,7 +145,7 @@ fun SettingsScreen(
 
                 SettingsPage.DATA -> SettingsCard {
                     Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg)) {
-                        DataTransferControls(database = database)
+                        DataTransferControls(database = database, settings = settings)
                     }
                 }
 
@@ -258,6 +260,22 @@ private fun MainSettings(
                 onCheckedChange = { settings.updateVoiceTips(it) }
             )
         }
+        HorizontalDivider()
+        SwitchRow(
+            icon = Icons.Default.Image,
+            title = "Include images",
+            subtitle = "Keep the scanned or attached image with a new transaction. You can still change it each time.",
+            checked = settings.includeImageByDefault,
+            onCheckedChange = { settings.updateIncludeImageByDefault(it) }
+        )
+        HorizontalDivider()
+        SwitchRow(
+            icon = Icons.Default.PhotoLibrary,
+            title = "Export with images",
+            subtitle = "Start the export screen with images included (ZIP, and PDF with images).",
+            checked = settings.exportWithImagesByDefault,
+            onCheckedChange = { settings.updateExportWithImagesByDefault(it) }
+        )
     }
 
     SettingsCard {
@@ -288,7 +306,7 @@ private fun MainSettings(
         SettingsRow(
             title = "Export & import",
             icon = Icons.Default.ImportExport,
-            subtitle = "CSV and PDF",
+            subtitle = "CSV, ZIP with images, and PDF",
             onClick = onOpenData
         )
         HorizontalDivider()
@@ -474,6 +492,35 @@ private fun DefaultsSection(
             }
             content()
         }
+    }
+}
+
+/** A title with a one-line explanation and an on / off switch at the right. */
+@Composable
+private fun SwitchRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        SettingIcon(icon)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }
 
