@@ -8,8 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -40,8 +43,23 @@ import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionTagCrossRef
 import kotlinx.coroutines.delay
 
-/** Longest tag name (short names keep the chips tidy). */
-const val MAX_TAG_NAME = 20
+/** Longest tag name (short names keep the chips tidy). Room is left for an emoji at the start. */
+const val MAX_TAG_NAME = 24
+
+/**
+ * Ready-made tags offered in the "New tag" dialog (name with its emoji, colour number). Tapping one
+ * fills in the name and colour. Ones you already have are not shown again.
+ */
+val SUGGESTED_TAGS = listOf(
+    "🛒 Groceries" to 0, "🍔 Food" to 1, "☕ Coffee" to 8, "🍕 Eating out" to 1,
+    "🧾 Bills" to 2, "💡 Electricity" to 6, "📶 Internet" to 2, "📱 Recharge" to 5,
+    "🏠 Rent" to 9, "🔧 Repairs" to 8, "🚗 Transport" to 7, "⛽ Fuel" to 8,
+    "✈️ Travel" to 5, "🏨 Stay" to 5, "🎬 Entertainment" to 3, "🎮 Games" to 3,
+    "🛍️ Shopping" to 4, "👕 Clothes" to 4, "🎁 Gifts" to 4, "💄 Beauty" to 4,
+    "💊 Health" to 0, "🏋️ Fitness" to 0, "📚 Education" to 2, "👶 Kids" to 6,
+    "🐶 Pets" to 1, "💰 Savings" to 6, "📈 Investment" to 0, "💼 Salary" to 0,
+    "💸 Loan / EMI" to 7, "🛡️ Insurance" to 8, "🙏 Donation" to 3, "🎉 Party" to 3
+)
 
 /** The colours a tag can have. A tag stores only the number of its colour (TagEntity.colorIndex). */
 val TAG_COLORS = listOf(
@@ -60,8 +78,13 @@ val TAG_COLORS = listOf(
 fun tagColor(index: Int): Color = TAG_COLORS[index.mod(TAG_COLORS.size)]
 
 /** Tidies a tag name: no extra spaces, not too long. A blank name stays blank. */
-fun cleanTagName(raw: String): String =
-    raw.trim().replace(Regex("\\s+"), " ").take(MAX_TAG_NAME).trim()
+fun cleanTagName(raw: String): String {
+    val spaced = raw.trim().replace(Regex("\\s+"), " ")
+    var end = minOf(spaced.length, MAX_TAG_NAME)
+    // Do not cut an emoji in half (an emoji can be two characters long)
+    if (end < spaced.length && end > 0 && Character.isHighSurrogate(spaced[end - 1])) end--
+    return spaced.substring(0, end).trim()
+}
 
 /**
  * Joins the tag list with the "transaction has tag" pairs: transaction id -> its tags (by name).
@@ -195,12 +218,45 @@ fun TagDialog(
                         error = null
                     }
                 },
-                placeholder = { Text("e.g. Groceries, Rent") },
+                placeholder = { Text("e.g. 🛒 Groceries, 🏠 Rent") },
                 modifier = Modifier.focusRequester(focus),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
             )
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            // Quick picks: only when adding, and only the ones you do not have yet
+            val suggestions = if (initial == null) {
+                SUGGESTED_TAGS.filter { it.first.lowercase() !in takenNames }
+            } else emptyList()
+            if (suggestions.isNotEmpty()) {
+                Text(
+                    text = "Quick picks",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 150.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        suggestions.forEach { (label, color) ->
+                            ManuChip(
+                                label = label,
+                                selected = name == label,
+                                onClick = {
+                                    name = label
+                                    colorIndex = color
+                                    error = null
+                                }
+                            )
+                        }
+                    }
+                }
             }
             Text(
                 text = "Colour",

@@ -50,13 +50,21 @@ data class TransactionTagCrossRef(
 
 /** The tags a new install starts with (name, colour number). They can be renamed or deleted. */
 val DEFAULT_TAGS = listOf(
-    "Groceries" to 0,
-    "Food" to 1,
-    "Bills" to 2,
-    "Entertainment" to 3,
-    "Shopping" to 4,
-    "Travel" to 5,
-    "Savings" to 6
+    "🛒 Groceries" to 0,
+    "🍔 Food" to 1,
+    "🧾 Bills" to 2,
+    "🎬 Entertainment" to 3,
+    "🛍️ Shopping" to 4,
+    "✈️ Travel" to 5,
+    "💰 Savings" to 6,
+    "🚗 Transport" to 7,
+    "⛽ Fuel" to 8,
+    "🏠 Rent" to 9,
+    "💊 Health" to 0,
+    "📚 Education" to 2,
+    "🎁 Gifts" to 4,
+    "💼 Salary" to 0,
+    "📱 Recharge" to 5
 )
 
 /** Saves a new transaction together with its tags. */
