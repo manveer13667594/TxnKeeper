@@ -50,7 +50,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
 import com.manu.manudesignsystem.components.ManuDialog
 import com.manu.manudesignsystem.components.ManuFab
-import com.manu.manudesignsystem.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.ExpenseColor
 import io.whisperkit.TranscribeOptions
 import io.whisperkit.WhisperKit
 import io.whisperkit.WhisperModel

@@ -1,6 +1,7 @@
 package com.manu.txnkeeper
 
 import com.manu.txnkeeper.data.local.TransactionEntity
+import java.util.Calendar
 import kotlin.math.abs
 
 /*
@@ -157,4 +158,186 @@ fun defaultRangeDays(series: ChartSeries, minPoints: Int = 25): Int {
         if (pts.count { it.x >= from } >= minPoints) return days
     }
     return 0
+}
+
+// ------------------------------------------------------------------ more chart types
+//
+// Everything below is for the extra Stats charts (bars, pie, top spends, weekday). Pure Kotlin like the
+// rest of this file. All of it works on a list of transactions, already cut to the time window.
+
+/** The charts the Stats screen can show. [label] is the chip text. */
+enum class StatsChartType(val label: String) {
+    BALANCE("Balance"),
+    INCOME_EXPENSE("In vs Out"),
+    BREAKDOWN("Breakdown"),
+    TOP_SPENDS("Top spends"),
+    WEEKDAY("By weekday")
+}
+
+/** What the breakdown (pie) chart splits spending by. */
+enum class BreakdownBy(val label: String) {
+    PAYMENT("Payment method"),
+    ACCOUNT("Account")
+}
+
+/** How wide one bar of the income-vs-expense chart is. */
+enum class Bucket { DAY, WEEK, MONTH }
+
+/** Income and expense of one [Bucket], [startMillis] is local midnight of its first day. */
+data class PeriodTotals(val startMillis: Long, val incomePaise: Long, val expensePaise: Long)
+
+/** One labelled amount: a pie slice or a bar. [isOther] marks the "everything else" slice. */
+data class Slice(val label: String, val paise: Long, val isOther: Boolean = false)
+
+private const val MILLIS_PER_DAY = 86_400_000L
+
+/** Up to this span the bars are days, up to the next one weeks, beyond that months. */
+private const val DAY_BARS_MAX_DAYS = 14
+private const val WEEK_BARS_MAX_DAYS = 100
+
+/** Pie / bar charts show this many slices at most; the rest are added up into one "Other". */
+private const val MAX_SLICES = 7
+
+/**
+ * Only the transactions from the last [days] days, counted back from the newest one (the same window
+ * the balance chart's 1W / 1M / ... chips show). 0 = everything.
+ */
+fun withinDays(txns: List<TransactionEntity>, days: Int): List<TransactionEntity> {
+    if (days <= 0 || txns.isEmpty()) return txns
+    val from = txns.maxOf { it.dateTime } - days * MILLIS_PER_DAY
+    return txns.filter { it.dateTime >= from }
+}
+
+/** Bar width that suits how much time [txns] cover, so there are roughly 4 to 30 bars. */
+fun bucketFor(txns: List<TransactionEntity>): Bucket {
+    if (txns.isEmpty()) return Bucket.DAY
+    val span = txns.maxOf { it.dateTime } - txns.minOf { it.dateTime }
+    return when {
+        span <= DAY_BARS_MAX_DAYS * MILLIS_PER_DAY -> Bucket.DAY
+        span <= WEEK_BARS_MAX_DAYS * MILLIS_PER_DAY -> Bucket.WEEK
+        else -> Bucket.MONTH
+    }
+}
+
+/** Local midnight of the first day of the bucket that holds [millis]; weeks start on Monday. */
+private fun Calendar.bucketStart(millis: Long, bucket: Bucket): Long {
+    firstDayOfWeek = Calendar.MONDAY
+    timeInMillis = millis
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+    when (bucket) {
+        Bucket.DAY -> Unit
+        Bucket.WEEK -> set(Calendar.DAY_OF_WEEK, Calendar.MONDAY)
+        Bucket.MONTH -> set(Calendar.DAY_OF_MONTH, 1)
+    }
+    return timeInMillis
+}
+
+private fun Calendar.nextBucketStart(start: Long, bucket: Bucket): Long {
+    timeInMillis = start
+    when (bucket) {
+        Bucket.DAY -> add(Calendar.DAY_OF_MONTH, 1)
+        Bucket.WEEK -> add(Calendar.DAY_OF_MONTH, 7)
+        Bucket.MONTH -> add(Calendar.MONTH, 1)
+    }
+    return timeInMillis
+}
+
+/**
+ * Income and expense added up per [bucket], oldest first. Buckets with nothing in them are still
+ * included (as zeros) so a quiet week shows as a gap instead of being skipped.
+ */
+fun incomeExpenseByPeriod(txns: List<TransactionEntity>, bucket: Bucket): List<PeriodTotals> {
+    if (txns.isEmpty()) return emptyList()
+    val cal = Calendar.getInstance()
+    val income = HashMap<Long, Long>()
+    val expense = HashMap<Long, Long>()
+    var first = Long.MAX_VALUE
+    var last = Long.MIN_VALUE
+    for (t in txns) {
+        val key = cal.bucketStart(t.dateTime, bucket)
+        if (key < first) first = key
+        if (key > last) last = key
+        when (t.type) {
+            "INCOME" -> income.merge(key, t.amountPaise) { a, b -> a + b }
+            "EXPENSE" -> expense.merge(key, t.amountPaise) { a, b -> a + b }
+        }
+    }
+    val out = ArrayList<PeriodTotals>()
+    var start = first
+    while (start <= last) {
+        out += PeriodTotals(start, income[start] ?: 0L, expense[start] ?: 0L)
+        val next = cal.nextBucketStart(start, bucket)
+        if (next <= start) break
+        start = next
+    }
+    return out
+}
+
+/** Biggest first; anything past [maxSlices] is folded into one "Other" slice at the end. */
+private fun topSlices(totals: Map<String, Long>, maxSlices: Int): List<Slice> {
+    val sorted = totals.entries
+        .sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key })
+        .map { Slice(it.key, it.value) }
+    if (sorted.size <= maxSlices) return sorted
+    val head = sorted.take(maxSlices - 1)
+    val rest = sorted.drop(maxSlices - 1).sumOf { it.paise }
+    return head + Slice("Other", rest, isOther = true)
+}
+
+/**
+ * Expenses (income is ignored) added up per payment method or per account, for the pie chart.
+ * [accountNames] maps an account id to its name.
+ */
+fun spendBreakdown(
+    txns: List<TransactionEntity>,
+    by: BreakdownBy,
+    accountNames: Map<Long, String>,
+    maxSlices: Int = MAX_SLICES
+): List<Slice> {
+    val totals = LinkedHashMap<String, Long>()
+    for (t in txns) {
+        if (t.type != "EXPENSE") continue
+        val key = when (by) {
+            BreakdownBy.PAYMENT -> t.paymentMethod.ifBlank { "Unspecified" }
+            BreakdownBy.ACCOUNT -> accountNames[t.accountId] ?: "Account ${t.accountId}"
+        }
+        totals.merge(key, t.amountPaise) { a, b -> a + b }
+    }
+    return topSlices(totals, maxSlices)
+}
+
+/**
+ * The titles you spent the most on, biggest first. "Coffee" and " coffee " count as the same title;
+ * a blank title shows as "No title".
+ */
+fun topSpendTitles(txns: List<TransactionEntity>, limit: Int = 8): List<Slice> {
+    val totals = LinkedHashMap<String, Long>()
+    val shownAs = HashMap<String, String>()
+    for (t in txns) {
+        if (t.type != "EXPENSE") continue
+        val shown = t.title.trim().ifEmpty { "No title" }
+        val key = shown.lowercase()
+        shownAs.putIfAbsent(key, shown)
+        totals.merge(key, t.amountPaise) { a, b -> a + b }
+    }
+    return totals.entries
+        .sortedWith(compareByDescending<Map.Entry<String, Long>> { it.value }.thenBy { it.key })
+        .take(limit)
+        .map { Slice(shownAs.getValue(it.key), it.value) }
+}
+
+/** Total expense for each day of the week, Monday first (index 0) to Sunday (index 6). */
+fun spendByWeekday(txns: List<TransactionEntity>): List<Long> {
+    val totals = LongArray(7)
+    val cal = Calendar.getInstance()
+    for (t in txns) {
+        if (t.type != "EXPENSE") continue
+        cal.timeInMillis = t.dateTime
+        // Calendar: Sunday = 1, Monday = 2 ... Saturday = 7  ->  Monday = 0 ... Sunday = 6
+        totals[(cal.get(Calendar.DAY_OF_WEEK) + 5) % 7] += t.amountPaise
+    }
+    return totals.toList()
 }

@@ -68,7 +68,7 @@ import app.rive.runtime.kotlin.core.Rive
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuFab
 import com.manu.manudesignsystem.theme.ManuDesignSystem
-import com.manu.manudesignsystem.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.ExpenseColor
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

@@ -87,8 +87,8 @@ import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuDropdownMenu
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuTextButton
-import com.manu.manudesignsystem.theme.ExpenseColor
-import com.manu.manudesignsystem.theme.IncomeColor
+import com.manu.txnkeeper.ui.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.IncomeColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons

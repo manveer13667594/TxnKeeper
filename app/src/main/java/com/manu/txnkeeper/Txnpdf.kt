@@ -8,6 +8,9 @@ import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import android.text.TextPaint
 import android.text.TextUtils
+import androidx.compose.ui.graphics.toArgb
+import com.manu.txnkeeper.ui.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.IncomeColor
 import java.io.OutputStream
 
 /**
@@ -39,10 +42,13 @@ object TxnPdf {
     // Built once: it was being compiled again for every cell of every row
     private val WHITESPACE = Regex("\\s+")
 
+    // Income / expense use the same design-system colours as the app, so the PDF never drifts from the screens
+    private val INCOME = IncomeColor.toArgb()
+    private val EXPENSE = ExpenseColor.toArgb()
+
+    // Neutral print colours: the PDF is always on white paper, so these ignore the light / dark theme
     private const val INK = 0xFF1C1B1F.toInt()
     private const val MUTED = 0xFF625B71.toInt()
-    private const val GREEN = 0xFF1B7F3B.toInt()
-    private const val RED = 0xFFB3261E.toInt()
     private const val RULE = 0xFFCAC4D0.toInt()
 
     private fun text(size: Float, color: Int, bold: Boolean = false, right: Boolean = false) =
@@ -75,8 +81,8 @@ object TxnPdf {
         val headRight = text(8.5f, MUTED, bold = true, right = true)
         val cellPaint = text(8.5f, INK)
         val mutedCell = text(8.5f, MUTED)
-        val incomeRight = text(8.5f, GREEN, bold = true, right = true)
-        val expenseRight = text(8.5f, RED, bold = true, right = true)
+        val incomeRight = text(8.5f, INCOME, bold = true, right = true)
+        val expenseRight = text(8.5f, EXPENSE, bold = true, right = true)
         val footerPaint = text(8f, MUTED, right = true)
         val rulePaint = Paint().apply { color = RULE; strokeWidth = 0.6f }
         val captionPaint = text(9f, INK, bold = true)

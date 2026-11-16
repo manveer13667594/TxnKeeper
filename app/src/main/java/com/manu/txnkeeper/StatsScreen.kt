@@ -87,8 +87,8 @@ import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTopBar
-import com.manu.manudesignsystem.theme.ExpenseColor
-import com.manu.manudesignsystem.theme.IncomeColor
+import com.manu.txnkeeper.ui.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.IncomeColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.TransactionDao
@@ -144,6 +144,15 @@ private const val INITIAL_VISIBLE_POINTS = 40
 /** Above this many points the dots get smaller so a long history stays readable. */
 private const val SMALL_DOT_THRESHOLD = 120
 
+// Chart fill opacities. The colours themselves are the design-system IncomeColor / ExpenseColor;
+// only how strongly they are drawn is set here.
+/** Under-the-line fill: strong at the top and bottom edge of the chart (0x70 of 0xFF)... */
+private const val FILL_ALPHA_EDGE = 0x70
+/** ...fading to almost nothing right at the zero line. */
+private const val FILL_ALPHA_ZERO = 0x0C
+/** Home-card sparkline: fill under the line starts at this opacity and fades to 0. */
+private const val SPARKLINE_FILL_ALPHA = 0.30f
+
 /**
  * Opened by tapping the balance card on the home screen. One chart point per transaction (exact
  * date and time, not averaged per day): an income lifts the line, an expense drops it. Pinch to
@@ -182,6 +191,11 @@ fun StatsScreen(
     val series = remember(txns, startPaise) { txns?.let { buildChartSeries(it, startPaise) } }
 
     var stepped by rememberSaveable { mutableStateOf(false) }
+    // Which chart is shown (Balance = the line chart below, the others are in StatsCharts.kt)
+    var chartType by rememberSaveable { mutableStateOf(StatsChartType.BALANCE) }
+    var breakdownBy by rememberSaveable { mutableStateOf(BreakdownBy.PAYMENT) }
+    val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }
+    val allTxns = remember(series) { series?.points?.map { it.txn } ?: emptyList() }
     // The chosen quick window (null = the default "latest points" view); the tick makes a repeat tap re-apply it
     var rangeDays by rememberSaveable { mutableStateOf<Int?>(null) }
     var rangeTick by rememberSaveable { mutableIntStateOf(0) }
@@ -247,10 +261,15 @@ fun StatsScreen(
                         )
                     }
                 } else {
+                    ChartTypeChips(
+                        selected = chartType,
+                        onSelect = { chartType = it },
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 12.dp)
+                            .padding(top = 8.dp)
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
                         verticalAlignment = Alignment.CenterVertically
@@ -262,40 +281,58 @@ fun StatsScreen(
                                 onClick = { rangeDays = days; rangeTick++ }
                             )
                         }
-                        Box(Modifier.width(8.dp))
-                        ManuChip(label = "Line", selected = !stepped, onClick = { stepped = false })
-                        ManuChip(label = "Step", selected = stepped, onClick = { stepped = true })
+                        // Line / Step only means something for the balance line
+                        if (chartType == StatsChartType.BALANCE) {
+                            Box(Modifier.width(8.dp))
+                            ManuChip(label = "Line", selected = !stepped, onClick = { stepped = false })
+                            ManuChip(label = "Step", selected = stepped, onClick = { stepped = true })
+                        }
                     }
 
-                    TxnChart(
-                        series = s,
-                        stepped = stepped,
-                        rangeDays = effectiveDays,
-                        rangeTick = rangeTick,
-                        onSelected = { selected = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                    )
+                    if (chartType == StatsChartType.BALANCE) {
+                        TxnChart(
+                            series = s,
+                            stepped = stepped,
+                            rangeDays = effectiveDays,
+                            rangeTick = rangeTick,
+                            onSelected = { selected = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        )
 
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        LegendDot("Income", IncomeColor)
-                        LegendDot("Expense", ExpenseColor)
-                        Text(
-                            text = "Pinch · drag · tap a point",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            LegendDot("Income", IncomeColor)
+                            LegendDot("Expense", ExpenseColor)
+                            Text(
+                                text = "Pinch · drag · tap a point",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1
+                            )
+                        }
+                        insights?.let { InsightsRow(it, modifier = Modifier.padding(bottom = 12.dp)) }
+                    } else {
+                        // The other charts use the same 1W / 1M / ... chips as a time filter
+                        MoreChartsPanel(
+                            type = chartType,
+                            txns = allTxns,
+                            rangeDays = effectiveDays,
+                            accountNames = accountNames,
+                            breakdownBy = breakdownBy,
+                            onBreakdownBy = { breakdownBy = it },
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
                         )
                     }
-                    insights?.let { InsightsRow(it, modifier = Modifier.padding(bottom = 12.dp)) }
                 }
             }
         }
@@ -425,7 +462,7 @@ private fun RowScope.Cell(label: String, value: String, color: Color, align: Ali
 }
 
 @Composable
-private fun LegendDot(label: String, color: Color) {
+internal fun LegendDot(label: String, color: Color) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier
@@ -459,8 +496,9 @@ private class TxnLineRenderer(chart: LineChart) : LineChartRenderer(chart, chart
 
 /** A line chart whose line is green above the zero line and red below it. */
 private class TxnLineChart(context: Context) : LineChart(context) {
-    var positiveColor: Int = android.graphics.Color.GREEN
-    var negativeColor: Int = android.graphics.Color.RED
+    // Defaults come from the design system; the chart's update block sets them again on every theme change
+    var positiveColor: Int = IncomeColor.toArgb()
+    var negativeColor: Int = ExpenseColor.toArgb()
     private val lineRenderer = TxnLineRenderer(this)
 
     init {
@@ -511,7 +549,7 @@ private class TimeAxisFormatter(var series: ChartSeries?, private val chart: Lin
     }
 }
 
-private class MoneyAxisFormatter : ValueFormatter() {
+internal class MoneyAxisFormatter : ValueFormatter() {
     // Chart y values are rupees (Float); back to paise for the label
     override fun getFormattedValue(value: Float): String = compactMoney((value * 100.0).toLong())
 }
@@ -777,7 +815,10 @@ private fun TxnChart(
                 set.fillDrawable = GradientDrawable().apply {
                     orientation = GradientDrawable.Orientation.TOP_BOTTOM
                     setColors(
-                        intArrayOf(alpha(income, 0x70), alpha(income, 0x0C), alpha(expense, 0x0C), alpha(expense, 0x70)),
+                        intArrayOf(
+                            alpha(income, FILL_ALPHA_EDGE), alpha(income, FILL_ALPHA_ZERO),
+                            alpha(expense, FILL_ALPHA_ZERO), alpha(expense, FILL_ALPHA_EDGE)
+                        ),
                         floatArrayOf(0f, zero, zero, 1f)
                     )
                 }
@@ -871,7 +912,7 @@ internal fun Sparkline(values: List<Long>, modifier: Modifier = Modifier) {
         }
         drawPath(
             fill,
-            Brush.verticalGradient(listOf(color.copy(alpha = 0.30f), color.copy(alpha = 0f)))
+            Brush.verticalGradient(listOf(color.copy(alpha = SPARKLINE_FILL_ALPHA), color.copy(alpha = 0f)))
         )
         drawPath(line, color, style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
         drawCircle(color, radius = 3.dp.toPx(), center = Offset(x(values.size - 1), y(values.last())))

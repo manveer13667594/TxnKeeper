@@ -45,7 +45,7 @@ import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.components.ManuTopBar
-import com.manu.manudesignsystem.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.ExpenseColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary

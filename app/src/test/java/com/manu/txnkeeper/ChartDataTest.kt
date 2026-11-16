@@ -1,6 +1,7 @@
 package com.manu.txnkeeper
 
 import com.manu.txnkeeper.data.local.TransactionEntity
+import java.util.Calendar
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -112,5 +113,153 @@ class ChartDataTest {
         val s = buildChartSeries(old + recent, 0L)
         assertEquals(7, defaultRangeDays(s))
         assertEquals(0, defaultRangeDays(buildChartSeries(recent.take(5), 0L)))
+    }
+
+    // ------------------------------------------------------------ more chart types
+
+    /** A moment on a given day in the phone's own time zone, like the real data. Months: Calendar.NOVEMBER ... */
+    private fun day(year: Int, month: Int, dayOfMonth: Int, hour: Int = 12): Long =
+        Calendar.getInstance().apply { clear(); set(year, month, dayOfMonth, hour, 0, 0) }.timeInMillis
+
+    private fun e(
+        id: Int, type: String, rupees: Long, time: Long,
+        title: String = "t$id", method: String = "CASH", account: Long = 1L
+    ) = TransactionEntity(
+        id = id, title = title, amountPaise = rupees * 100, type = type, dateTime = time,
+        paymentMethod = method, accountId = account
+    )
+
+    @Test
+    fun withinDaysCountsBackFromTheNewestTransaction() {
+        val list = listOf(
+            e(1, "EXPENSE", 1, day(2023, Calendar.NOVEMBER, 1)),
+            e(2, "EXPENSE", 1, day(2023, Calendar.NOVEMBER, 20)),
+            e(3, "EXPENSE", 1, day(2023, Calendar.NOVEMBER, 30))
+        )
+        assertEquals(listOf(2, 3), withinDays(list, 10).map { it.id })
+        assertEquals(3, withinDays(list, 0).size)
+        assertTrue(withinDays(emptyList(), 7).isEmpty())
+    }
+
+    @Test
+    fun barWidthFollowsTheTimeSpan() {
+        fun span(days: Int) = listOf(
+            e(1, "INCOME", 1, day(2023, Calendar.JANUARY, 1)),
+            e(2, "INCOME", 1, day(2023, Calendar.JANUARY, 1) + days * 86_400_000L)
+        )
+        assertEquals(Bucket.DAY, bucketFor(span(7)))
+        assertEquals(Bucket.WEEK, bucketFor(span(30)))
+        assertEquals(Bucket.MONTH, bucketFor(span(200)))
+    }
+
+    @Test
+    fun dayBarsKeepQuietDaysAsZeros() {
+        val p = incomeExpenseByPeriod(
+            listOf(
+                e(1, "INCOME", 100, day(2023, Calendar.NOVEMBER, 13, 9)),
+                e(2, "EXPENSE", 40, day(2023, Calendar.NOVEMBER, 15, 18)),
+                e(3, "EXPENSE", 10, day(2023, Calendar.NOVEMBER, 15, 8))
+            ),
+            Bucket.DAY
+        )
+        assertEquals(listOf(10_000L, 0L, 0L), p.map { it.incomePaise })
+        assertEquals(listOf(0L, 0L, 5_000L), p.map { it.expensePaise })
+        assertEquals(day(2023, Calendar.NOVEMBER, 13, 0), p.first().startMillis)
+    }
+
+    @Test
+    fun weeksStartOnMonday() {
+        // Sunday 12 Nov belongs to the week of Monday 6 Nov; Monday 13 Nov starts a new week
+        val p = incomeExpenseByPeriod(
+            listOf(
+                e(1, "EXPENSE", 5, day(2023, Calendar.NOVEMBER, 12)),
+                e(2, "EXPENSE", 7, day(2023, Calendar.NOVEMBER, 13))
+            ),
+            Bucket.WEEK
+        )
+        assertEquals(
+            listOf(day(2023, Calendar.NOVEMBER, 6, 0), day(2023, Calendar.NOVEMBER, 13, 0)),
+            p.map { it.startMillis }
+        )
+        assertEquals(listOf(500L, 700L), p.map { it.expensePaise })
+    }
+
+    @Test
+    fun monthBarsCrossTheYearEnd() {
+        val p = incomeExpenseByPeriod(
+            listOf(
+                e(1, "INCOME", 1, day(2023, Calendar.DECEMBER, 31)),
+                e(2, "INCOME", 1, day(2024, Calendar.JANUARY, 1))
+            ),
+            Bucket.MONTH
+        )
+        assertEquals(2, p.size)
+        assertEquals(day(2024, Calendar.JANUARY, 1, 0), p.last().startMillis)
+    }
+
+    @Test
+    fun periodsOfNothing() {
+        assertTrue(incomeExpenseByPeriod(emptyList(), Bucket.WEEK).isEmpty())
+    }
+
+    @Test
+    fun breakdownIgnoresIncomeAndFoldsTheTailIntoOther() {
+        val t = day(2023, Calendar.NOVEMBER, 13)
+        val list = listOf(
+            e(1, "EXPENSE", 500, t, method = "UPI"),
+            e(2, "EXPENSE", 300, t, method = "CASH"),
+            e(3, "EXPENSE", 100, t, method = "CARD"),
+            e(4, "EXPENSE", 50, t, method = "WALLET"),
+            e(5, "INCOME", 9_999, t, method = "UPI")
+        )
+        val s = spendBreakdown(list, BreakdownBy.PAYMENT, emptyMap(), maxSlices = 3)
+        assertEquals(listOf("UPI", "CASH", "Other"), s.map { it.label })
+        assertEquals(listOf(50_000L, 30_000L, 15_000L), s.map { it.paise })
+        assertTrue(s.last().isOther && !s.first().isOther)
+        // Fewer slices than the limit: nothing is folded
+        assertEquals(4, spendBreakdown(list, BreakdownBy.PAYMENT, emptyMap()).size)
+    }
+
+    @Test
+    fun breakdownByAccountUsesTheNames() {
+        val t = day(2023, Calendar.NOVEMBER, 13)
+        val list = listOf(
+            e(1, "EXPENSE", 200, t, account = 1),
+            e(2, "EXPENSE", 100, t, account = 2),
+            e(3, "EXPENSE", 50, t, account = 9)
+        )
+        val s = spendBreakdown(list, BreakdownBy.ACCOUNT, mapOf(1L to "Bank", 2L to "Wallet"))
+        assertEquals(listOf("Bank", "Wallet", "Account 9"), s.map { it.label })
+    }
+
+    @Test
+    fun topTitlesAddUpTheSameTitle() {
+        val t = day(2023, Calendar.NOVEMBER, 13)
+        val list = listOf(
+            e(1, "EXPENSE", 100, t, title = "Coffee"),
+            e(2, "EXPENSE", 50, t, title = " coffee "),
+            e(3, "EXPENSE", 120, t, title = "Rent"),
+            e(4, "EXPENSE", 10, t, title = ""),
+            e(5, "INCOME", 999, t, title = "Salary")
+        )
+        val top = topSpendTitles(list, limit = 2)
+        assertEquals(listOf("Coffee", "Rent"), top.map { it.label })
+        assertEquals(listOf(15_000L, 12_000L), top.map { it.paise })
+        assertEquals("No title", topSpendTitles(list).last().label)
+    }
+
+    @Test
+    fun weekdayTotalsRunMondayToSunday() {
+        val list = listOf(
+            e(1, "EXPENSE", 10, day(2023, Calendar.NOVEMBER, 13)),   // Monday
+            e(2, "EXPENSE", 7, day(2023, Calendar.NOVEMBER, 12)),    // Sunday
+            e(3, "EXPENSE", 5, day(2023, Calendar.NOVEMBER, 20)),    // Monday
+            e(4, "INCOME", 99, day(2023, Calendar.NOVEMBER, 13))
+        )
+        val w = spendByWeekday(list)
+        assertEquals(7, w.size)
+        assertEquals(1_500L, w[0])
+        assertEquals(700L, w[6])
+        assertEquals(0L, w[3])
     }
 }

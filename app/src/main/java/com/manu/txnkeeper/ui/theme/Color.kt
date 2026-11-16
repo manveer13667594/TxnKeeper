@@ -29,3 +29,21 @@ val DarkInk = Color(0xFFF2F2F4)            // buttons / selected pills (near whi
 // ---- Error (same in both)
 val ErrorLight = Color(0xFFC62828)
 val ErrorDark = Color(0xFFFF6B6B)
+
+// ---- Income / expense (edit these two to change the colour everywhere in the app:
+// amounts, totals, chart line and fill, sparkline, popup, PDF export)
+val IncomeColor = Color(0xFF23834A)
+val ExpenseColor = Color(0xFFCF3434)
+
+// ---- Chart categories (pie slices in Stats > Breakdown). Handed out in this order, biggest slice first.
+// No green or red here, so a slice is never mistaken for income or expense.
+val ChartCategoryColors = listOf(
+    Color(0xFF3D7EDB),   // blue
+    Color(0xFFE69F00),   // amber
+    Color(0xFF9B5DE5),   // violet
+    Color(0xFF2AA6A0),   // teal
+    Color(0xFFE0709F),   // pink
+    Color(0xFF8D6E4F),   // brown
+    Color(0xFF56B4E9)    // sky
+)
+val ChartOtherColor = Color(0xFF8E8E93)   // the grouped "Other" slice
