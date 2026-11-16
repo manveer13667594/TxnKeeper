@@ -1,6 +1,7 @@
 package com.manu.txnkeeper
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -23,29 +24,44 @@ import androidx.compose.ui.input.pointer.pointerInput
 val ScreenEnter: EnterTransition = slideInHorizontally(initialOffsetX = { it }) + fadeIn()
 val ScreenExit: ExitTransition = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
 
+/*
+ * The camera is opened by swiping left to right and closed by swiping right to left, so it moves the
+ * same way as the finger: it comes in from the LEFT edge and goes back out to the left. (Voice entry
+ * opens with the opposite swipe and keeps the normal right-hand animation above.)
+ */
+val CameraEnter: EnterTransition = slideInHorizontally(initialOffsetX = { -it }) + fadeIn()
+val CameraExit: ExitTransition = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut()
+
 /**
- * Shows a full-screen page over what is behind it, with [ScreenEnter] and [ScreenExit].
+ * Shows a full-screen page over what is behind it, with [enter] and [exit] (the standard
+ * [ScreenEnter] / [ScreenExit] unless a page asks for its own).
  *
  * The page also catches every touch that lands on it. Without that, a tap or swipe on an empty part
  * of the page (the top bar, the gap between two cards) fell through to whatever is underneath, for
  * example the home screen's icons or its swipe-to-open-camera gesture.
+ *
+ * [content] runs inside the animation, so a page that needs to know when it has finished sliding in
+ * can read `transition.currentState == EnterExitState.Visible`. Pages that don't care just ignore it.
  */
 @Composable
 fun ScreenTransition(
     visible: Boolean,
-    content: @Composable () -> Unit
+    enter: EnterTransition = ScreenEnter,
+    exit: ExitTransition = ScreenExit,
+    content: @Composable AnimatedVisibilityScope.() -> Unit
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = ScreenEnter,
-        exit = ScreenExit
+        enter = enter,
+        exit = exit
     ) {
+        val animationScope = this
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) { detectTapGestures { } }
         ) {
-            content()
+            animationScope.content()
         }
     }
 }

@@ -11,6 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -509,9 +510,13 @@ fun TxnkeeperApp(
                 AboutScreen(onClose = { showAbout = false })
             }
 
-            // ---------------- Camera slides in over everything, like the other pages
-            ScreenTransition(visible = showCamera) {
+            // ---------------- Camera slides in over everything from the left (the swipe that opens it
+            // goes left to right) and leaves the same way. The camera itself starts only once the
+            // slide has finished, so starting it never makes the animation stutter.
+            ScreenTransition(visible = showCamera, enter = CameraEnter, exit = CameraExit) {
                 CameraScreen(
+                    isOpen = showCamera,
+                    enterFinished = transition.currentState == EnterExitState.Visible,
                     onClose = { showCamera = false },
                     onPhotoSaved = { lastPhotoUri = it },
                     onImageReady = { uri ->

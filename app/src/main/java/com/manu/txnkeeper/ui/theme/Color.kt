@@ -34,12 +34,12 @@ val ErrorLight = Color(0xFFC62828)
 val ErrorDark = Color(0xFFFF6B6B)
 
 // ---- Income / expense (Light Theme over white / light gray surfaces)
-val IncomeColorLight = Color(0xFF0A7F3B)   // Deep emerald — 5.11:1 contrast on white
-val ExpenseColorLight = Color(0xFFD51515)  // Rich crimson — 5.32:1 contrast on white
+val IncomeColorLight = Color(0xFF19B72E)   // Deep emerald — 5.11:1 contrast on white
+val ExpenseColorLight = Color(0xFFEE3B3B)  // Rich crimson — 5.32:1 contrast on white
 
 // ---- Income / expense (Dark Theme over pure black / dark gray surfaces)
-val IncomeColorDark = Color(0xFF3EDA7F)    // Soft mint-green — 11.54:1 on black
-val ExpenseColorDark = Color(0xFFF58080)   // Warm coral-red — 8.28:1 on black
+val IncomeColorDark = Color(0xFF1BD335)    // Soft mint-green — 11.54:1 on black
+val ExpenseColorDark = Color(0xFFFF4141)   // Warm coral-red — 8.28:1 on black
 
 // ---- Dynamic Income / Expense (theme-aware based on active MaterialTheme background luminance)
 val IncomeColor: Color

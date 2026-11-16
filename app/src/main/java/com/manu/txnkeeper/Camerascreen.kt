@@ -1,32 +1,54 @@
 package com.manu.txnkeeper
 
 import android.Manifest
+import android.app.Activity
 import android.content.ContentValues
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
+import androidx.camera.core.UseCase
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,6 +56,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Cameraswitch
+import androidx.compose.material.icons.filled.FlashAuto
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,95 +68,271 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.Observer
+import com.manu.manudesignsystem.components.ManuButton
+import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Locale
-import com.manu.manudesignsystem.components.ManuButton
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+/** The flash choices: off, automatic (fires when it is dark) or torch (a steady light while the camera is open). */
+private enum class FlashSetting(val label: String) {
+    Off("Off"),
+    Auto("Auto"),
+    Torch("Torch");
+
+    fun next(): FlashSetting = when (this) {
+        Off -> Auto
+        Auto -> Torch
+        Torch -> Off
+    }
+}
+
+/** Where the screen was tapped to focus (id makes two taps in the same spot count as two). */
+private class FocusTap(val offset: Offset, val id: Long)
 
 /**
- * Full-screen camera: preview, shutter (bottom-center), "Gallery" button (bottom-right, opens the
- * system photo picker, no storage permission needed), lens flip (bottom-left).
+ * Full-screen camera for scanning receipts.
+ *
+ *  - Top: back arrow, and the flash button (Off / Auto / Torch) when the lens has a flash.
+ *  - Bottom: lens flip (bottom-left, only when the phone has both lenses), shutter (bottom-center),
+ *    "Gallery" (bottom-right, opens the system photo picker, no storage permission needed).
+ *  - On the preview: tap to focus, pinch to zoom (tap the zoom label to go back to 1x).
+ *
  * Photos are saved to Pictures/TxnKeeper and reported via onPhotoSaved.
  * Swipe right-to-left, the back arrow or the system back closes it.
+ *
+ * [isOpen] is false while the screen is sliding out, and [enterFinished] turns true once it has
+ * finished sliding in. The camera is only started after that, so opening it never makes the
+ * slide-in stutter.
  */
 @Composable
 fun CameraScreen(
     onClose: () -> Unit,
     onPhotoSaved: (Uri) -> Unit,
     // A photo was taken or picked: the caller closes the camera and reads its text
-    onImageReady: (Uri) -> Unit
+    onImageReady: (Uri) -> Unit,
+    isOpen: Boolean = true,
+    enterFinished: Boolean = true
 ) {
     val context = LocalContext.current
     val lifecycleOwner = context as LifecycleOwner
     val mainExecutor = remember { ContextCompat.getMainExecutor(context) }
+    val haptics = LocalHapticFeedback.current
+    val view = LocalView.current
 
-    BackHandler(onBack = onClose)
+    // Only handle "back" while the camera is really open (not while it is sliding away)
+    BackHandler(enabled = isOpen, onBack = onClose)
+
+    // The camera is black: make the clock / battery icons white while it is open
+    DisposableEffect(isOpen) {
+        val window = context.findActivity()?.window
+        if (!isOpen || window == null) return@DisposableEffect onDispose { }
+        val controller = WindowCompat.getInsetsController(window, view)
+        val lightStatusIcons = controller.isAppearanceLightStatusBars
+        val lightNavIcons = controller.isAppearanceLightNavigationBars
+        controller.isAppearanceLightStatusBars = false
+        controller.isAppearanceLightNavigationBars = false
+        onDispose {
+            controller.isAppearanceLightStatusBars = lightStatusIcons
+            controller.isAppearanceLightNavigationBars = lightNavIcons
+        }
+    }
 
     fun isGranted(permission: String) =
         ContextCompat.checkSelfPermission(context, permission) ==
                 PackageManager.PERMISSION_GRANTED
 
     var hasCamera by remember { mutableStateOf(isGranted(Manifest.permission.CAMERA)) }
+    // The permission was refused with "don't ask again": only the phone's Settings can turn it on now
+    var permissionBlocked by remember { mutableStateOf(false) }
+    var askedForPermission by remember { mutableStateOf(false) }
     var lensFacing by remember { mutableStateOf(CameraSelector.LENS_FACING_BACK) }
+
+    // Camera state
+    var camera by remember { mutableStateOf<Camera?>(null) }
+    var cameraAllowed by remember { mutableStateOf(false) }   // set once the slide-in is done
+    var streaming by remember { mutableStateOf(false) }       // true once the first frame shows
+    var canFlip by remember { mutableStateOf(false) }
+    var hasFlash by remember { mutableStateOf(false) }
+    var flashSetting by remember { mutableStateOf(FlashSetting.Off) }
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+    var zoomRange by remember { mutableStateOf(1f..1f) }
+    var capturing by remember { mutableStateOf(false) }
+    var shutterBlink by remember { mutableStateOf(false) }
+    var focusTap by remember { mutableStateOf<FocusTap?>(null) }
+
+    LaunchedEffect(enterFinished) { if (enterFinished) cameraAllowed = true }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
         hasCamera = result[Manifest.permission.CAMERA] ?: hasCamera
+        if (!hasCamera) {
+            val activity = context.findActivity()
+            permissionBlocked = activity != null &&
+                    !ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity, Manifest.permission.CAMERA
+                    )
+        }
     }
 
-    // Ask once when the camera opens (the camera is the only permission the app needs here;
-    // picking from the gallery uses the system photo picker, which needs none)
-    LaunchedEffect(Unit) {
-        if (!hasCamera) permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+    // Ask once, after the screen has finished sliding in (the camera is the only permission the app
+    // needs here; picking from the gallery uses the system photo picker, which needs none)
+    LaunchedEffect(enterFinished) {
+        if (enterFinished && !hasCamera && !askedForPermission) {
+            askedForPermission = true
+            permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+        }
+    }
+
+    // Back from the phone's Settings: pick up a permission that was just turned on.
+    // The camera stops itself when the app is stopped and takes its light with it, so show the torch as off.
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    hasCamera = isGranted(Manifest.permission.CAMERA)
+                    if (hasCamera) permissionBlocked = false
+                }
+
+                Lifecycle.Event.ON_STOP -> {
+                    if (flashSetting == FlashSetting.Torch) flashSetting = FlashSetting.Off
+                }
+
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // CameraX
     val previewView = remember {
-        PreviewView(context).apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
+        PreviewView(context).apply {
+            // Compatible mode (a TextureView): unlike the default SurfaceView, it slides and fades
+            // together with the screen instead of staying behind while the screen animates
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+        }
     }
+    // Receipts are all small text: favour a sharp photo over the fastest shutter
     val imageCapture = remember {
         ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
             .build()
     }
 
-    DisposableEffect(hasCamera, lensFacing) {
+    // The preview fades in when the first frame arrives, so there is no black-to-picture jump
+    DisposableEffect(previewView, lifecycleOwner) {
+        val observer = Observer<PreviewView.StreamState> {
+            streaming = it == PreviewView.StreamState.STREAMING
+        }
+        previewView.previewStreamState.observe(lifecycleOwner, observer)
+        onDispose { previewView.previewStreamState.removeObserver(observer) }
+    }
+    val previewAlpha by animateFloatAsState(
+        targetValue = if (streaming) 1f else 0f,
+        animationSpec = tween(250),
+        label = "previewAlpha"
+    )
+
+    DisposableEffect(hasCamera, cameraAllowed, lensFacing) {
+        if (!hasCamera || !cameraAllowed) return@DisposableEffect onDispose { }
+        var disposed = false
         var provider: ProcessCameraProvider? = null
-        if (hasCamera) {
-            val future = ProcessCameraProvider.getInstance(context)
-            future.addListener({
-                provider = future.get()
-                val preview = Preview.Builder().build().also {
+        var preview: Preview? = null
+        val future = ProcessCameraProvider.getInstance(context)
+        future.addListener({
+            // The screen may have been closed before the camera finished starting: then do nothing
+            if (disposed) return@addListener
+            try {
+                val p = future.get()
+                provider = p
+                canFlip = try {
+                    p.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA) &&
+                            p.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA)
+                } catch (e: Exception) {
+                    false
+                }
+                val newPreview = Preview.Builder().build().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
-                try {
-                    provider?.unbindAll()
-                    provider?.bindToLifecycle(
-                        lifecycleOwner,
-                        CameraSelector.Builder().requireLensFacing(lensFacing).build(),
-                        preview,
-                        imageCapture
-                    )
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Camera not available", Toast.LENGTH_SHORT).show()
-                }
-            }, mainExecutor)
+                preview = newPreview
+                p.unbind(imageCapture)
+                val bound = p.bindToLifecycle(
+                    lifecycleOwner,
+                    CameraSelector.Builder().requireLensFacing(lensFacing).build(),
+                    newPreview,
+                    imageCapture
+                )
+                val zoom = bound.cameraInfo.zoomState.value
+                zoomRange = (zoom?.minZoomRatio ?: 1f)..(zoom?.maxZoomRatio ?: 1f)
+                zoomRatio = zoom?.zoomRatio ?: 1f
+                camera = bound
+            } catch (e: Exception) {
+                Toast.makeText(context, "Camera not available", Toast.LENGTH_SHORT).show()
+            }
+        }, mainExecutor)
+        onDispose {
+            disposed = true
+            camera = null
+            streaming = false
+            provider?.unbind(*listOfNotNull<UseCase>(preview, imageCapture).toTypedArray())
         }
-        onDispose { provider?.unbindAll() }
+    }
+
+    // Apply the flash choice to the running camera (also again after the lens is flipped)
+    LaunchedEffect(camera, flashSetting) {
+        val cam = camera
+        if (cam == null) {
+            hasFlash = false
+            return@LaunchedEffect
+        }
+        val flashAvailable = cam.cameraInfo.hasFlashUnit()
+        hasFlash = flashAvailable
+        if (!flashAvailable) {
+            // For example the front lens: nothing to light with
+            if (flashSetting != FlashSetting.Off) flashSetting = FlashSetting.Off
+            return@LaunchedEffect
+        }
+        cam.cameraControl.enableTorch(flashSetting == FlashSetting.Torch)
+        imageCapture.flashMode =
+            if (flashSetting == FlashSetting.Auto) ImageCapture.FLASH_MODE_AUTO
+            else ImageCapture.FLASH_MODE_OFF
     }
 
     // Pick any photo from the gallery (system photo picker, no permission needed)
@@ -139,6 +341,11 @@ fun CameraScreen(
     ) { uri -> if (uri != null) onImageReady(uri) }
 
     fun takePhoto() {
+        if (capturing || camera == null) return   // one photo at a time
+        capturing = true
+        shutterBlink = true
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
             .format(System.currentTimeMillis())
         val values = ContentValues().apply {
@@ -154,28 +361,81 @@ fun CameraScreen(
             values
         ).build()
 
-        imageCapture.takePicture(
-            options,
-            mainExecutor,
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    output.savedUri?.let {
-                        onPhotoSaved(it)
-                        onImageReady(it)
+        try {
+            imageCapture.takePicture(
+                options,
+                mainExecutor,
+                object : ImageCapture.OnImageSavedCallback {
+                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                        val uri = output.savedUri
+                        if (uri != null) {
+                            onPhotoSaved(uri)
+                            onImageReady(uri)
+                        } else {
+                            capturing = false
+                            Toast.makeText(context, "Couldn't save photo", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    override fun onError(exception: ImageCaptureException) {
+                        capturing = false
+                        Toast.makeText(context, "Couldn't save photo", Toast.LENGTH_SHORT).show()
                     }
                 }
+            )
+        } catch (e: Exception) {
+            capturing = false
+            Toast.makeText(context, "Couldn't take photo", Toast.LENGTH_SHORT).show()
+        }
+    }
 
-                override fun onError(exception: ImageCaptureException) {
-                    Toast.makeText(context, "Couldn't save photo", Toast.LENGTH_SHORT).show()
-                }
-            }
+    fun focusAt(offset: Offset) {
+        val cam = camera ?: return
+        val point = previewView.meteringPointFactory.createPoint(offset.x, offset.y)
+        val action = FocusMeteringAction.Builder(
+            point,
+            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+        ).setAutoCancelDuration(4, TimeUnit.SECONDS).build()
+        cam.cameraControl.startFocusAndMetering(action)
+        focusTap = FocusTap(offset, System.nanoTime())
+    }
+
+    fun applyZoom(factor: Float) {
+        val cam = camera ?: return
+        val target = (zoomRatio * factor).coerceIn(zoomRange)
+        cam.cameraControl.setZoomRatio(target)
+        zoomRatio = target
+    }
+
+    fun resetZoom() {
+        val cam = camera ?: return
+        val target = 1f.coerceIn(zoomRange)
+        cam.cameraControl.setZoomRatio(target)
+        zoomRatio = target
+    }
+
+    fun openAppSettings() {
+        context.startActivity(
+            Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", context.packageName, null)
+            )
         )
     }
+
+    // A quick dark blink when the photo is taken
+    val blinkAlpha by animateFloatAsState(
+        targetValue = if (shutterBlink) 0.55f else 0f,
+        animationSpec = tween(80),
+        label = "shutterBlink",
+        finishedListener = { shutterBlink = false }
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            // Swipe right to left closes
             .pointerInput(Unit) {
                 var total = 0f
                 detectHorizontalDragGestures(
@@ -185,38 +445,140 @@ fun CameraScreen(
                     onHorizontalDrag = { _, amount -> total += amount }
                 )
             }
+            // Tap to focus
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusAt(it) })
+            }
+            // Pinch to zoom. Last in the chain so it sees touches first: while two fingers are
+            // down it takes them, which keeps a pinch from also counting as a swipe.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    do {
+                        val event = awaitPointerEvent()
+                        val zoomChange = event.calculateZoom()
+                        if (zoomChange != 1f) {
+                            applyZoom(zoomChange)
+                            event.changes.forEach { if (it.positionChanged()) it.consume() }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
     ) {
         if (hasCamera) {
-            AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
+            AndroidView(
+                factory = { previewView },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = previewAlpha }
+            )
         } else {
             Column(
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("Camera permission is needed", color = Color.White)
+                Text(
+                    text = if (permissionBlocked)
+                        "Camera access is turned off for TxnKeeper. Turn it on in Settings to scan receipts."
+                    else "Camera permission is needed",
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
                 ManuButton(
                     onClick = {
-                        permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
+                        if (permissionBlocked) openAppSettings()
+                        else permissionLauncher.launch(arrayOf(Manifest.permission.CAMERA))
                     },
                     modifier = Modifier.padding(top = 12.dp)
                 ) {
-                    Text("Allow camera")
+                    Text(if (permissionBlocked) "Open settings" else "Allow camera")
                 }
             }
         }
 
-        // Back
-        IconButton(
-            onClick = onClose,
+        // Focus ring where the screen was tapped
+        focusTap?.let { tap ->
+            key(tap.id) { FocusRing(center = tap.offset, onDone = { focusTap = null }) }
+        }
+
+        // Shutter blink
+        Box(
             modifier = Modifier
-                .align(Alignment.TopStart)
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = blinkAlpha))
+        )
+
+        // Top bar: back on the left, flash on the right
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(8.dp)
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Default.ArrowBack,
-                contentDescription = "Close camera",
-                tint = Color.White
+            IconButton(
+                onClick = onClose,
+                modifier = Modifier
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.35f))
+            ) {
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Close camera",
+                    tint = Color.White
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            AnimatedVisibility(visible = hasFlash, enter = fadeIn(), exit = fadeOut()) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.45f))
+                        .semantics(mergeDescendants = true) {
+                            contentDescription =
+                                "Flash ${flashSetting.label}. Tap to change."
+                        }
+                        .clickable { flashSetting = flashSetting.next() }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = when (flashSetting) {
+                            FlashSetting.Off -> Icons.Default.FlashOff
+                            FlashSetting.Auto -> Icons.Default.FlashAuto
+                            FlashSetting.Torch -> Icons.Default.FlashOn
+                        },
+                        contentDescription = null,
+                        tint = if (flashSetting == FlashSetting.Torch) Color(0xFFFFD54F) else Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = flashSetting.label,
+                        color = Color.White,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+            }
+        }
+
+        // Zoom level (tap it to go back to 1x)
+        if (abs(zoomRatio - 1f) > 0.05f) {
+            Text(
+                text = String.format(Locale.US, "%.1fx", zoomRatio),
+                color = Color.White,
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(bottom = 140.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable { resetZoom() }
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
             )
         }
 
@@ -229,33 +591,56 @@ fun CameraScreen(
                 .padding(bottom = 32.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Lens flip (only when the phone has a front and a back lens)
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.2f))
-                        .clickable {
-                            lensFacing =
-                                if (lensFacing == CameraSelector.LENS_FACING_BACK)
-                                    CameraSelector.LENS_FACING_FRONT
-                                else CameraSelector.LENS_FACING_BACK
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Flip", color = Color.White)
+                if (hasCamera && canFlip) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.2f))
+                            .clickable {
+                                lensFacing =
+                                    if (lensFacing == CameraSelector.LENS_FACING_BACK)
+                                        CameraSelector.LENS_FACING_FRONT
+                                    else CameraSelector.LENS_FACING_BACK
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Cameraswitch,
+                            contentDescription = "Switch camera",
+                            tint = Color.White
+                        )
+                    }
                 }
             }
 
+            // Shutter: shrinks a little while pressed, dims while the photo is being saved
             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                val shutterSource = remember { MutableInteractionSource() }
+                val shutterPressed by shutterSource.collectIsPressedAsState()
+                val shutterScale by animateFloatAsState(
+                    targetValue = if (shutterPressed) 0.9f else 1f,
+                    label = "shutterScale"
+                )
                 Box(
                     modifier = Modifier
+                        .graphicsLayer {
+                            scaleX = shutterScale
+                            scaleY = shutterScale
+                        }
                         .size(76.dp)
                         .border(4.dp, Color.White, CircleShape)
                         .padding(7.dp)
                         .clip(CircleShape)
-                        .background(Color.White)
-                        .clickable(enabled = hasCamera) { takePhoto() }
+                        .background(Color.White.copy(alpha = if (capturing) 0.5f else 1f))
+                        .semantics { contentDescription = "Take photo" }
+                        .clickable(
+                            interactionSource = shutterSource,
+                            indication = null,
+                            enabled = hasCamera && camera != null && !capturing
+                        ) { takePhoto() }
                 )
             }
 
@@ -296,4 +681,44 @@ fun CameraScreen(
             }
         }
     }
+}
+
+/** The ring that pops in where the screen was tapped to focus, then fades away. */
+@Composable
+private fun FocusRing(center: Offset, onDone: () -> Unit) {
+    val ringSize = 68.dp
+    val ringPx = with(LocalDensity.current) { ringSize.toPx() }
+    val scaleAnim = remember { Animatable(1.35f) }
+    val alphaAnim = remember { Animatable(1f) }
+
+    LaunchedEffect(Unit) {
+        scaleAnim.animateTo(1f, tween(160))
+        delay(700)
+        alphaAnim.animateTo(0f, tween(200))
+        onDone()
+    }
+
+    Box(
+        modifier = Modifier
+            .offset {
+                IntOffset(
+                    (center.x - ringPx / 2).roundToInt(),
+                    (center.y - ringPx / 2).roundToInt()
+                )
+            }
+            .size(ringSize)
+            .graphicsLayer {
+                scaleX = scaleAnim.value
+                scaleY = scaleAnim.value
+                alpha = alphaAnim.value
+            }
+            .border(2.dp, Color.White, CircleShape)
+    )
+}
+
+/** The Activity behind this context (Compose can hand us a wrapped one). */
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
