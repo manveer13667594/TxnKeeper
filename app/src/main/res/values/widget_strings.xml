@@ -1,0 +1,5 @@
+<resources>
+    <string name="widget_add_transaction">Add transaction</string>
+    <string name="widget_voice_entry">Voice entry</string>
+    <string name="widget_description">Quick add and voice entry for TxnKeeper</string>
+</resources>
