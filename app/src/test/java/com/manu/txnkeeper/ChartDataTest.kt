@@ -43,6 +43,18 @@ class ChartDataTest {
     }
 
     @Test
+    fun pointsStayStrictlyOrderedOnALongHistory() {
+        // One transaction, then three in the very same minute about 5.7 years later. At that distance
+        // two Floats are 0.25 apart, so a fixed gap of 0.1 would collapse them onto the same x.
+        val s = buildChartSeries(
+            listOf(txn(1, "EXPENSE", 1, 0), txn(2, "EXPENSE", 1, 3_000_000), txn(3, "EXPENSE", 1, 3_000_000), txn(4, "EXPENSE", 1, 3_000_000)),
+            startPaise = 0L
+        )
+        val xs = s.points.map { it.x }
+        assertTrue(xs.zipWithNext().all { (a, b) -> b > a })
+    }
+
+    @Test
     fun unsortedInputIsOrderedByTime() {
         val s = buildChartSeries(listOf(txn(2, "EXPENSE", 100, 30), txn(1, "INCOME", 500, 0)), 0L)
         assertEquals(listOf(1, 2), s.points.map { it.txn.id })
@@ -96,6 +108,9 @@ class ChartDataTest {
         assertEquals(20_000L, i.avgDailyExpensePaise)
         assertEquals(100_000L, i.highest!!.paise)
         assertEquals(60_000L, i.lowest!!.paise)
+        // 1000 earned, 400 spent: 60% kept
+        assertEquals(60, i.savingsRatePercent)
+        assertEquals(3, i.txnCount)
     }
 
     @Test
@@ -103,6 +118,18 @@ class ChartDataTest {
         val i = computeInsights(buildChartSeries(emptyList(), 0L))
         assertEquals(0L, i.avgDailyExpensePaise)
         assertTrue(i.biggestIncome == null && i.highest == null)
+        assertTrue(i.savingsRatePercent == null)
+        assertEquals(0, i.txnCount)
+    }
+
+    @Test
+    fun savingsRate() {
+        assertEquals(75, savingsRatePercent(100_000L, 25_000L))
+        assertEquals(0, savingsRatePercent(100_000L, 100_000L))
+        // Spent more than earned: negative
+        assertEquals(-50, savingsRatePercent(10_000L, 15_000L))
+        // No income to compare with
+        assertTrue(savingsRatePercent(0L, 5_000L) == null)
     }
 
     @Test
@@ -261,5 +288,15 @@ class ChartDataTest {
         assertEquals(1_500L, w[0])
         assertEquals(700L, w[6])
         assertEquals(0L, w[3])
+    }
+
+    @Test
+    fun busiestWeekdayIsTheBiggestTotal() {
+        assertEquals(2, busiestWeekday(listOf(0L, 500L, 900L, 300L, 0L, 0L, 100L)))
+        // A tie goes to the earlier day
+        assertEquals(1, busiestWeekday(listOf(0L, 900L, 900L, 0L, 0L, 0L, 0L)))
+        // Nothing spent: no busiest day
+        assertTrue(busiestWeekday(listOf(0L, 0L, 0L, 0L, 0L, 0L, 0L)) == null)
+        assertTrue(busiestWeekday(emptyList()) == null)
     }
 }

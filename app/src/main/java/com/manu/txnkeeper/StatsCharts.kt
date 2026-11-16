@@ -2,11 +2,14 @@ package com.manu.txnkeeper
 
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -14,7 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,7 +38,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.github.mikephil.charting.charts.BarChart
-import com.github.mikephil.charting.charts.HorizontalBarChart
 import com.github.mikephil.charting.charts.PieChart
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.BarData
@@ -64,10 +66,16 @@ import kotlin.math.roundToInt
 
 /*
  * The extra charts of the Stats screen (everything except the balance line, which is in StatsScreen.kt):
- *   In vs Out   grouped bars, income next to expense per day / week / month
- *   Breakdown   donut of expenses by payment method or by account, with a legend list
- *   Top spends  horizontal bars of the titles you spent the most on
- *   By weekday  bars of expense per day of the week, the busiest day in full colour
+ *   In vs Out   grouped bars, income next to expense per day / week / month (drag sideways, tap a bar)
+ *   Breakdown   donut of expenses by payment method or by account, with a legend that shows each share
+ *   Top spends  ranked rows with a share bar: the titles you spent the most on
+ *   By weekday  seven columns, the busiest day in full colour (tap a day for its amount)
+ *
+ * Top spends and By weekday are plain Compose (no chart library): text always fits, nothing is
+ * clipped at large font sizes, and they sit fine inside the scrolling Stats page.
+ *
+ * Every panel has a fixed height (or is just a list), because the Stats page scrolls. Nothing here uses
+ * weight(1f) or a nested vertical scroll.
  *
  * Colours: income / expense and the pie slice colours come from ui/theme/Color.kt; text and grid
  * colours from MaterialTheme, so light and dark follow the app.
@@ -76,18 +84,18 @@ import kotlin.math.roundToInt
  */
 
 private val WEEKDAY_LABELS = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-
-/** Value labels on top of bars only when there are this few bars; more would overlap. */
-private const val MAX_BAR_VALUE_LABELS = 6
+private val FULL_WEEKDAYS = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 /** Income-vs-expense bars: this many groups on screen, scroll sideways for the rest. */
 private const val VISIBLE_BAR_GROUPS = 8
 
-/** Weekday bars that are not the busiest day are drawn at this opacity. */
-private const val DIMMED_BAR_ALPHA = 0.55f
+/** Fixed chart heights (the page scrolls, so charts do not stretch to fill what is left). */
+private val BAR_CHART_HEIGHT = 250.dp
+private val DONUT_HEIGHT = 200.dp
+private val WEEKDAY_HEIGHT = 170.dp
 
-/** Top-spends titles are cut to this many characters on the axis. */
-private const val MAX_TITLE_CHARS = 16
+/** The tallest weekday column, in dp. */
+private const val WEEKDAY_BAR_MAX_DP = 110f
 
 // ------------------------------------------------------------------ chips and the panel
 
@@ -146,17 +154,22 @@ private fun <T> rememberComputed(vararg keys: Any?, block: () -> T): T? {
     return state.value
 }
 
+/**
+ * One or two lines above a chart. It always reserves two lines, so the chart below does not jump up
+ * and down when the text changes between one line and two.
+ */
 @Composable
-private fun ChartCaption(text: String, modifier: Modifier = Modifier) {
+internal fun ChartCaption(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = MaterialTheme.typography.labelSmall,
+        style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        minLines = 2,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .fillMaxWidth()
-            .padding(top = 10.dp, bottom = 4.dp)
+            .padding(top = 12.dp, bottom = 8.dp)
     )
 }
 
@@ -169,6 +182,32 @@ private fun EmptyNote(text: String, modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
+}
+
+/** A thin bar showing [fraction] (0..1) of its full width. Used under legend and ranking rows. */
+@Composable
+private fun ShareBar(fraction: Float, color: Color, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(5.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth(fraction.coerceIn(0.02f, 1f))
+                .height(5.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(color)
+        )
+    }
+}
+
+private fun percentText(part: Long, total: Long): String {
+    if (total <= 0L) return "0%"
+    val share = part * 100.0 / total
+    return if (share < 1.0) "<1%" else "${share.roundToInt()}%"
 }
 
 // ------------------------------------------------------------------ In vs Out
@@ -210,26 +249,35 @@ private fun IncomeExpensePanel(txns: List<TransactionEntity>, rangeDays: Int, mo
         ChartCaption(
             when {
                 c == null -> " "
-                p != null -> "${periodFullLabel(p.startMillis, c.bucket)} · In ${formatMoney(p.incomePaise)} · Out ${formatMoney(p.expensePaise)}"
-                else -> "Income and expense per ${c.bucket.noun} · tap a bar"
+                p != null -> {
+                    val net = p.incomePaise - p.expensePaise
+                    "${periodFullLabel(p.startMillis, c.bucket)}\n" +
+                            "In ${formatMoney(p.incomePaise)} · Out ${formatMoney(p.expensePaise)} · Net ${formatSignedMoney(net)}"
+                }
+                else -> {
+                    val income = c.periods.sumOf { it.incomePaise }
+                    val expense = c.periods.sumOf { it.expensePaise }
+                    "In ${formatMoney(income)} · Out ${formatMoney(expense)} · Net ${formatSignedMoney(income - expense)}\n" +
+                            "Tap a bar to see one ${c.bucket.noun}"
+                }
             }
         )
-        if (c == null) {
-            Box(Modifier.weight(1f))
-        } else {
-            IncomeExpenseBars(
+        when {
+            c == null -> Spacer(Modifier.height(BAR_CHART_HEIGHT))
+            c.periods.isEmpty() -> EmptyNote("No transactions in this range.", Modifier.height(BAR_CHART_HEIGHT))
+            else -> IncomeExpenseBars(
                 periods = c.periods,
                 bucket = c.bucket,
                 onPick = { picked = it },
                 modifier = Modifier
-                    .weight(1f)
                     .fillMaxWidth()
+                    .height(BAR_CHART_HEIGHT)
             )
         }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 10.dp),
+                .padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -252,6 +300,7 @@ private fun IncomeExpenseBars(
     val scheme = MaterialTheme.colorScheme
     val textColor = scheme.onSurfaceVariant.toArgb()
     val gridColor = scheme.outlineVariant.toArgb()
+    val highlightColor = scheme.onSurface.toArgb()
     val income = IncomeColor.toArgb()
     val expense = ExpenseColor.toArgb()
     val latestOnPick by rememberUpdatedState(onPick)
@@ -266,9 +315,10 @@ private fun IncomeExpenseBars(
                 setDrawGridBackground(false)
                 setExtraOffsets(4f, 6f, 12f, 4f)
 
-                // Drag sideways to scroll; no zoom
+                // Drag sideways to scroll; no zoom. Vertical drags are left to the page, which scrolls.
                 setTouchEnabled(true)
                 isDragEnabled = true
+                setDragYEnabled(false)
                 setScaleXEnabled(false)
                 setScaleYEnabled(false)
                 setPinchZoom(false)
@@ -278,6 +328,7 @@ private fun IncomeExpenseBars(
                 axisLeft.axisMinimum = 0f
                 axisLeft.setDrawAxisLine(false)
                 axisLeft.setLabelCount(5, false)
+                axisLeft.gridLineWidth = 0.6f
                 axisLeft.valueFormatter = MoneyAxisFormatter()
                 xAxis.position = XAxis.XAxisPosition.BOTTOM
                 xAxis.setDrawGridLines(false)
@@ -285,6 +336,7 @@ private fun IncomeExpenseBars(
                 xAxis.granularity = 1f
                 xAxis.isGranularityEnabled = true
                 xAxis.setCenterAxisLabels(true)
+                xAxis.setAvoidFirstLastClipping(true)
 
                 setOnChartValueSelectedListener(object : OnChartValueSelectedListener {
                     override fun onValueSelected(e: Entry?, h: Highlight?) {
@@ -309,20 +361,21 @@ private fun IncomeExpenseBars(
             val n = periods.size
             val labels = periods.map { periodAxisLabel(it.startMillis, bucket) }
             chart.xAxis.valueFormatter = IndexLabels(labels)
-            chart.xAxis.setLabelCount(if (n <= 7) n else 6, false)
+            // About five date labels at most; more would run into each other
+            chart.xAxis.setLabelCount(5, false)
 
-            val showValues = n <= MAX_BAR_VALUE_LABELS
-            fun set(label: String, color: Int, y: (PeriodTotals) -> Long) = BarDataSet(
+            // No value text on the bars: with two bars per group it overlapped. Tap a bar for the numbers.
+            fun barSet(label: String, color: Int, y: (PeriodTotals) -> Long) = BarDataSet(
                 periods.mapIndexed { i, p -> BarEntry(i.toFloat(), y(p) / 100f, p) }, label
             ).apply {
                 this.color = color
-                setDrawValues(showValues)
-                valueTextSize = 9f
-                valueTextColor = textColor
-                valueFormatter = CompactBarLabels()
+                setDrawValues(false)
+                // The library's default tap highlight is orange; use the text colour, lightly
+                highLightColor = highlightColor
+                highLightAlpha = 50
             }
 
-            val data = BarData(set("Income", income) { it.incomePaise }, set("Expense", expense) { it.expensePaise })
+            val data = BarData(barSet("Income", income) { it.incomePaise }, barSet("Expense", expense) { it.expensePaise })
             // Two bars plus a gap make one group of width 1:  (0.38 + 0.04) * 2 + 0.16 = 1
             data.barWidth = 0.38f
             chart.data = data
@@ -360,9 +413,9 @@ private fun BreakdownPanel(
         BreakdownResult(slices, slices.sumOf { it.paise })
     }
 
-    Column(modifier = modifier.verticalScroll(rememberScrollState())) {
+    Column(modifier = modifier) {
         Row(
-            modifier = Modifier.padding(top = 4.dp),
+            modifier = Modifier.padding(top = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
         ) {
             BreakdownBy.entries.forEach { by ->
@@ -373,11 +426,11 @@ private fun BreakdownPanel(
         val what = breakdownBy.label.lowercase()
         ChartCaption(
             if (r == null || r.totalPaise == 0L) "Expenses by $what"
-            else "Expenses by $what · ${formatMoney(r.totalPaise)} in total"
+            else "Expenses by $what\n${formatMoney(r.totalPaise)} in total"
         )
         if (r != null) {
             if (r.slices.isEmpty()) {
-                EmptyNote("No expenses in this range.", Modifier.padding(top = 32.dp))
+                EmptyNote("No expenses in this range.", Modifier.padding(vertical = 32.dp))
             } else {
                 val colors = remember(r) {
                     r.slices.mapIndexed { i, s ->
@@ -390,7 +443,7 @@ private fun BreakdownPanel(
                     totalPaise = r.totalPaise,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
+                        .height(DONUT_HEIGHT)
                 )
                 SliceLegend(r.slices, colors, r.totalPaise)
             }
@@ -431,45 +484,51 @@ private fun DonutChart(slices: List<Slice>, colors: List<Color>, totalPaise: Lon
     )
 }
 
-/** One row per slice: colour dot, name, amount, share of the total. */
+/** One row per slice: colour dot, name, amount, share of the total, and a share bar underneath. */
 @Composable
 private fun SliceLegend(slices: List<Slice>, colors: List<Color>, totalPaise: Long) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 8.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(top = 12.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         slices.forEachIndexed { i, s ->
-            val share = if (totalPaise > 0) s.paise * 100.0 / totalPaise else 0.0
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(colors[i])
-                )
-                Text(
-                    text = s.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(start = 8.dp, end = 8.dp)
-                )
-                Text(
-                    text = formatMoney(s.paise),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
-                )
-                Text(
-                    text = if (share < 1.0) "<1%" else "${share.roundToInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.width(40.dp)
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(colors[i])
+                    )
+                    Text(
+                        text = s.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 8.dp, end = 8.dp)
+                    )
+                    Text(
+                        text = formatMoney(s.paise),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
+                    )
+                    Text(
+                        text = percentText(s.paise, totalPaise),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.width(40.dp)
+                    )
+                }
+                ShareBar(
+                    fraction = if (totalPaise > 0) s.paise.toFloat() / totalPaise else 0f,
+                    color = colors[i],
+                    modifier = Modifier.padding(start = 18.dp, top = 5.dp)
                 )
             }
         }
@@ -478,74 +537,76 @@ private fun SliceLegend(slices: List<Slice>, colors: List<Color>, totalPaise: Lo
 
 // ------------------------------------------------------------------ Top spends
 
+private class TopSpendsResult(val slices: List<Slice>, val totalExpensePaise: Long)
+
 @Composable
 private fun TopSpendsPanel(txns: List<TransactionEntity>, rangeDays: Int, modifier: Modifier) {
-    val slices = rememberComputed(txns, rangeDays) { topSpendTitles(withinDays(txns, rangeDays)) }
+    val result = rememberComputed(txns, rangeDays) {
+        val inRange = withinDays(txns, rangeDays)
+        TopSpendsResult(
+            slices = topSpendTitles(inRange),
+            totalExpensePaise = inRange.filter { it.type == "EXPENSE" }.sumOf { it.amountPaise }
+        )
+    }
 
     Column(modifier = modifier) {
-        ChartCaption("Titles you spent the most on, added up")
+        val r = result
+        ChartCaption(
+            if (r == null || r.slices.isEmpty() || r.totalExpensePaise <= 0L) "Titles you spent the most on, added up"
+            else {
+                val top = r.slices.sumOf { it.paise }
+                "Top ${r.slices.size} titles are ${percentText(top, r.totalExpensePaise)} of your spending\n" +
+                        "${formatMoney(top)} of ${formatMoney(r.totalExpensePaise)}"
+            }
+        )
         when {
-            slices == null -> Box(Modifier.weight(1f))
-            slices.isEmpty() -> EmptyNote("No expenses in this range.", Modifier.weight(1f))
-            else -> TopSpendBars(
-                slices = slices,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
-            )
+            r == null -> Spacer(Modifier.height(120.dp))
+            r.slices.isEmpty() -> EmptyNote("No expenses in this range.", Modifier.padding(vertical = 32.dp))
+            else -> {
+                val biggest = r.slices.first().paise.coerceAtLeast(1L)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    r.slices.forEachIndexed { i, s ->
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${i + 1}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.width(22.dp)
+                                )
+                                Text(
+                                    text = s.label,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .padding(end = 8.dp)
+                                )
+                                Text(
+                                    text = formatMoney(s.paise),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                            }
+                            // Bars are measured against the biggest title, so the ranking is easy to compare
+                            ShareBar(
+                                fraction = s.paise.toFloat() / biggest,
+                                color = ExpenseColor,
+                                modifier = Modifier.padding(start = 22.dp, top = 5.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
-}
-
-@Composable
-private fun TopSpendBars(slices: List<Slice>, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val labelColor = scheme.onSurface.toArgb()
-    val valueColor = scheme.onSurfaceVariant.toArgb()
-    val expense = ExpenseColor.toArgb()
-
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            HorizontalBarChart(ctx).apply {
-                description.isEnabled = false
-                legend.isEnabled = false
-                setNoDataText("")
-                setTouchEnabled(false)
-                setDrawGridBackground(false)
-                // Value labels sit on the bars, so the money axes are not needed. They still set the scale.
-                axisLeft.isEnabled = false
-                axisRight.isEnabled = false
-                axisLeft.axisMinimum = 0f
-                axisRight.axisMinimum = 0f
-                xAxis.position = XAxis.XAxisPosition.BOTTOM   // titles, on the left in a horizontal chart
-                xAxis.setDrawGridLines(false)
-                xAxis.setDrawAxisLine(false)
-                xAxis.granularity = 1f
-                xAxis.isGranularityEnabled = true
-                setExtraOffsets(0f, 4f, 56f, 4f)              // room on the right for the amount
-            }
-        },
-        update = { chart ->
-            // A horizontal chart draws the first entry at the bottom, so feed it smallest first
-            val ordered = slices.asReversed()
-            chart.xAxis.textColor = labelColor
-            chart.xAxis.valueFormatter = IndexLabels(ordered.map { ellipsize(it.label, MAX_TITLE_CHARS) })
-            chart.xAxis.setLabelCount(ordered.size, false)
-
-            val set = BarDataSet(ordered.mapIndexed { i, s -> BarEntry(i.toFloat(), s.paise / 100f, s) }, "Top spends")
-            set.color = expense
-            set.valueTextColor = valueColor
-            set.valueTextSize = 10f
-            set.valueFormatter = CompactBarLabels()
-            val data = BarData(set)
-            data.barWidth = 0.6f
-            chart.data = data
-            chart.notifyDataSetChanged()
-            chart.invalidate()
-        }
-    )
 }
 
 // ------------------------------------------------------------------ By weekday
@@ -553,78 +614,83 @@ private fun TopSpendBars(slices: List<Slice>, modifier: Modifier = Modifier) {
 @Composable
 private fun WeekdayPanel(txns: List<TransactionEntity>, rangeDays: Int, modifier: Modifier) {
     val totals = rememberComputed(txns, rangeDays) { spendByWeekday(withinDays(txns, rangeDays)) }
+    // The day that was tapped (cleared whenever the data changes); tapping it again clears it
+    var picked by remember(totals) { mutableStateOf<Int?>(null) }
 
     Column(modifier = modifier) {
-        val busiest = totals?.withIndex()?.maxByOrNull { it.value }?.takeIf { it.value > 0L }
+        val sum = totals?.sum() ?: 0L
+        val busiest = totals?.let { busiestWeekday(it) }
+        val shown = picked ?: busiest
         ChartCaption(
-            if (busiest != null) "Expenses by day of week · most on ${WEEKDAY_LABELS[busiest.index]}"
-            else "Expenses by day of week"
+            when {
+                totals == null -> " "
+                shown == null -> "Expenses by day of week"
+                else -> {
+                    val v = totals[shown]
+                    (if (picked == null) "Busiest day: " else "") +
+                            "${FULL_WEEKDAYS[shown]}\n${formatMoney(v)} · ${percentText(v, sum)} of your spending"
+                }
+            }
         )
         when {
-            totals == null -> Box(Modifier.weight(1f))
-            totals.all { it == 0L } -> EmptyNote("No expenses in this range.", Modifier.weight(1f))
+            totals == null -> Spacer(Modifier.height(WEEKDAY_HEIGHT))
+            sum == 0L -> EmptyNote("No expenses in this range.", Modifier.height(WEEKDAY_HEIGHT))
             else -> WeekdayBars(
                 totals = totals,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp)
+                emphasised = shown,
+                onPick = { picked = if (picked == it) null else it }
             )
         }
     }
 }
 
+/** Seven columns, Monday to Sunday. The [emphasised] day is drawn in full colour and labelled. */
 @Composable
-private fun WeekdayBars(totals: List<Long>, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val textColor = scheme.onSurfaceVariant.toArgb()
-    val gridColor = scheme.outlineVariant.toArgb()
-    val strong = ExpenseColor.toArgb()
-    val dimmed = ExpenseColor.copy(alpha = DIMMED_BAR_ALPHA).toArgb()
-
-    AndroidView(
-        modifier = modifier,
-        factory = { ctx ->
-            BarChart(ctx).apply {
-                description.isEnabled = false
-                legend.isEnabled = false
-                setNoDataText("")
-                setTouchEnabled(false)
-                setDrawGridBackground(false)
-                setFitBars(true)
-                setExtraOffsets(4f, 14f, 12f, 4f)
-                axisRight.isEnabled = false
-                axisLeft.axisMinimum = 0f
-                axisLeft.setDrawAxisLine(false)
-                axisLeft.setLabelCount(5, false)
-                axisLeft.valueFormatter = MoneyAxisFormatter()
-                xAxis.position = XAxis.XAxisPosition.BOTTOM
-                xAxis.setDrawGridLines(false)
-                xAxis.setDrawAxisLine(false)
-                xAxis.granularity = 1f
-                xAxis.isGranularityEnabled = true
-                xAxis.valueFormatter = IndexLabels(WEEKDAY_LABELS)
-                xAxis.setLabelCount(WEEKDAY_LABELS.size, false)
+private fun WeekdayBars(totals: List<Long>, emphasised: Int?, onPick: (Int) -> Unit) {
+    val biggest = totals.max().coerceAtLeast(1L)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(WEEKDAY_HEIGHT),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        totals.forEachIndexed { i, v ->
+            val strong = i == emphasised
+            val barDp = if (v <= 0L) 0f else maxOf(4f, WEEKDAY_BAR_MAX_DP * v / biggest)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onPick(i) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                Text(
+                    text = if (strong && v > 0L) compactMoney(v) else " ",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    softWrap = false
+                )
+                Box(
+                    Modifier
+                        .padding(top = 3.dp)
+                        .fillMaxWidth(0.7f)
+                        .height(barDp.dp)
+                        .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
+                        .background(if (strong) ExpenseColor else ExpenseColor.copy(alpha = 0.35f))
+                )
+                Text(
+                    text = WEEKDAY_LABELS[i],
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (strong) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = if (strong) FontWeight.SemiBold else FontWeight.Normal,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 4.dp)
+                )
             }
-        },
-        update = { chart ->
-            chart.xAxis.textColor = textColor
-            chart.axisLeft.textColor = textColor
-            chart.axisLeft.gridColor = gridColor
-
-            val busiest = totals.max()
-            val set = BarDataSet(totals.mapIndexed { i, v -> BarEntry(i.toFloat(), v / 100f) }, "Expense")
-            set.setColors(totals.map { if (it == busiest) strong else dimmed })
-            set.valueTextColor = textColor
-            set.valueTextSize = 9f
-            set.valueFormatter = CompactBarLabels()
-            val data = BarData(set)
-            data.barWidth = 0.6f
-            chart.data = data
-            chart.notifyDataSetChanged()
-            chart.invalidate()
         }
-    )
+    }
 }
 
 // ------------------------------------------------------------------ small shared pieces
@@ -633,14 +699,3 @@ private fun WeekdayBars(totals: List<Long>, modifier: Modifier = Modifier) {
 private class IndexLabels(private val labels: List<String>) : ValueFormatter() {
     override fun getFormattedValue(value: Float): String = labels.getOrNull(value.roundToInt()) ?: ""
 }
-
-/** Bar tops: short money (₹1.5K), and nothing at all for an empty bar. */
-private class CompactBarLabels : ValueFormatter() {
-    override fun getBarLabel(barEntry: BarEntry?): String {
-        val y = barEntry?.y ?: return ""
-        return if (y <= 0f) "" else compactMoney((y * 100.0).toLong())
-    }
-}
-
-private fun ellipsize(text: String, max: Int): String =
-    if (text.length <= max) text else text.take(max - 1).trimEnd() + "…"

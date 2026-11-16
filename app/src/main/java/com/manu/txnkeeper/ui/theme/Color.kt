@@ -1,6 +1,9 @@
 package com.manu.txnkeeper.ui.theme
 
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 
 // Black-and-white palette (light and dark), taken from the two design samples.
 // Light: white / soft grey surfaces, near-black text and buttons.
@@ -30,10 +33,22 @@ val DarkInk = Color(0xFFF2F2F4)            // buttons / selected pills (near whi
 val ErrorLight = Color(0xFFC62828)
 val ErrorDark = Color(0xFFFF6B6B)
 
-// ---- Income / expense (edit these two to change the colour everywhere in the app:
-// amounts, totals, chart line and fill, sparkline, popup, PDF export)
-val IncomeColor = Color(0xFF23834A)
-val ExpenseColor = Color(0xFFCF3434)
+// ---- Income / expense (Light Theme over white / light gray surfaces)
+val IncomeColorLight = Color(0xFF0A7F3B)   // Deep emerald — 5.11:1 contrast on white
+val ExpenseColorLight = Color(0xFFD51515)  // Rich crimson — 5.32:1 contrast on white
+
+// ---- Income / expense (Dark Theme over pure black / dark gray surfaces)
+val IncomeColorDark = Color(0xFF3EDA7F)    // Soft mint-green — 11.54:1 on black
+val ExpenseColorDark = Color(0xFFF58080)   // Warm coral-red — 8.28:1 on black
+
+// ---- Dynamic Income / Expense (theme-aware based on active MaterialTheme background luminance)
+val IncomeColor: Color
+    @Composable
+    get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) IncomeColorDark else IncomeColorLight
+
+val ExpenseColor: Color
+    @Composable
+    get() = if (MaterialTheme.colorScheme.background.luminance() < 0.5f) ExpenseColorDark else ExpenseColorLight
 
 // ---- Chart categories (pie slices in Stats > Breakdown). Handed out in this order, biggest slice first.
 // No green or red here, so a slice is never mistaken for income or expense.

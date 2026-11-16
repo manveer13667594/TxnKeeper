@@ -3,6 +3,7 @@ package com.manu.txnkeeper
 import com.manu.txnkeeper.data.local.TransactionEntity
 import java.util.Calendar
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /*
  * Turns transactions into chart points. Pure Kotlin (no Android, no chart library) so it can be
@@ -57,7 +58,11 @@ fun buildChartSeries(txns: List<TransactionEntity>, startPaise: Long): ChartSeri
             "EXPENSE" -> { balance -= t.amountPaise; expense += t.amountPaise }
         }
         val rawX = ((t.dateTime - base) / MILLIS_PER_MINUTE).toFloat()
-        val x = if (rawX > lastX + MIN_X_GAP) rawX else lastX + MIN_X_GAP
+        // A Float loses precision as x grows (after about 2 years of minutes a step of 0.1 is smaller
+        // than the gap between two Floats), so the minimum gap grows with x. This keeps every x
+        // strictly greater than the one before, however long the history is.
+        val gap = maxOf(MIN_X_GAP, Math.ulp(lastX) * 2f)
+        val x = if (rawX > lastX + gap) rawX else lastX + gap
         lastX = x
         points += ChartPoint(x, balance, t)
     }
@@ -117,15 +122,24 @@ fun sparklineFromBuckets(buckets: List<com.manu.txnkeeper.data.local.SparkBucket
 /** A balance at a moment (for "peak" and "lowest"). */
 data class BalanceMark(val paise: Long, val millis: Long)
 
-/** The numbers shown in the strip under the chart. */
+/** The numbers shown in the insight tiles under the chart. */
 data class ChartInsights(
     val biggestIncome: ChartPoint?,
     val biggestExpense: ChartPoint?,
     /** Total expense divided by the days the transactions span (at least one day). */
     val avgDailyExpensePaise: Long,
     val highest: BalanceMark?,
-    val lowest: BalanceMark?
+    val lowest: BalanceMark?,
+    /** Share of the income that was kept, in whole percent (negative when more was spent than earned). Null when there is no income. */
+    val savingsRatePercent: Int? = null,
+    val txnCount: Int = 0
 )
+
+/** (income − expense) / income as a whole percent, or null when there is no income to compare with. */
+fun savingsRatePercent(incomePaise: Long, expensePaise: Long): Int? {
+    if (incomePaise <= 0L) return null
+    return ((incomePaise - expensePaise) * 100.0 / incomePaise).roundToInt()
+}
 
 fun computeInsights(series: ChartSeries): ChartInsights {
     if (series.isEmpty) return ChartInsights(null, null, 0L, null, null)
@@ -141,7 +155,9 @@ fun computeInsights(series: ChartSeries): ChartInsights {
         biggestExpense = expense,
         avgDailyExpensePaise = (series.expensePaise / days).toLong(),
         highest = hi?.let { BalanceMark(it.balancePaise, it.txn.dateTime) },
-        lowest = lo?.let { BalanceMark(it.balancePaise, it.txn.dateTime) }
+        lowest = lo?.let { BalanceMark(it.balancePaise, it.txn.dateTime) },
+        savingsRatePercent = savingsRatePercent(series.incomePaise, series.expensePaise),
+        txnCount = pts.size
     )
 }
 
@@ -340,4 +356,17 @@ fun spendByWeekday(txns: List<TransactionEntity>): List<Long> {
         totals[(cal.get(Calendar.DAY_OF_WEEK) + 5) % 7] += t.amountPaise
     }
     return totals.toList()
+}
+
+/** Index (Monday = 0) of the day with the most spending, or null when nothing was spent. A tie goes to the earlier day. */
+fun busiestWeekday(totals: List<Long>): Int? {
+    var best = -1
+    var bestValue = 0L
+    for (i in totals.indices) {
+        if (totals[i] > bestValue) {
+            best = i
+            bestValue = totals[i]
+        }
+    }
+    return if (best >= 0) best else null
 }

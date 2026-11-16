@@ -1,53 +1,37 @@
 package com.manu.txnkeeper
 
-import android.graphics.Canvas
 import android.content.Context
+import android.graphics.Canvas
 import android.graphics.LinearGradient
 import android.graphics.Matrix
-import android.graphics.Shader
-import android.view.MotionEvent
-import android.view.View
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.Saver
-import androidx.compose.ui.text.style.TextOverflow
-import com.github.mikephil.charting.listener.ChartTouchListener
-import com.github.mikephil.charting.renderer.LineChartRenderer
-import com.github.mikephil.charting.listener.OnChartGestureListener
-import com.github.mikephil.charting.listener.OnChartValueSelectedListener
-import com.github.mikephil.charting.utils.MPPointD
 import android.graphics.Paint
 import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
-import androidx.core.view.doOnLayout
+import android.view.MotionEvent
+import android.view.View
 import androidx.compose.foundation.Canvas
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Badge
@@ -57,21 +41,34 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.doOnLayout
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.components.IMarker
 import com.github.mikephil.charting.components.XAxis
@@ -82,16 +79,23 @@ import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.formatter.IFillFormatter
 import com.github.mikephil.charting.formatter.ValueFormatter
 import com.github.mikephil.charting.highlight.Highlight
+import com.github.mikephil.charting.listener.ChartTouchListener
+import com.github.mikephil.charting.listener.OnChartGestureListener
+import com.github.mikephil.charting.listener.OnChartValueSelectedListener
+import com.github.mikephil.charting.renderer.LineChartRenderer
+import com.github.mikephil.charting.utils.MPPointD
 import com.github.mikephil.charting.utils.MPPointF
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTopBar
-import com.manu.txnkeeper.ui.theme.ExpenseColor
-import com.manu.txnkeeper.ui.theme.IncomeColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.TransactionDao
+import com.manu.txnkeeper.ui.theme.ExpenseColor
+import com.manu.txnkeeper.ui.theme.ExpenseColorLight
+import com.manu.txnkeeper.ui.theme.IncomeColor
+import com.manu.txnkeeper.ui.theme.IncomeColorLight
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -138,18 +142,15 @@ internal val StatsRequestSaver: Saver<StatsRequest, java.io.Serializable> = Save
 /** Quick time windows: label and days (0 = everything). */
 private val RANGES = listOf("1W" to 7, "1M" to 30, "3M" to 90, "6M" to 180, "1Y" to 365, "All" to 0)
 
-/** Show the last this-many points at first when there are more; zoom out or scroll for the rest. */
-private const val INITIAL_VISIBLE_POINTS = 40
+/** The balance chart's height. The page scrolls, so the chart keeps this size on every screen. */
+private val BALANCE_CHART_HEIGHT = 280.dp
 
-/** Above this many points the dots get smaller so a long history stays readable. */
-private const val SMALL_DOT_THRESHOLD = 120
+/** Dots (one per transaction) are drawn only while this few are on screen; more would be clutter. */
+private const val MAX_VISIBLE_DOTS = 30
 
-// Chart fill opacities. The colours themselves are the design-system IncomeColor / ExpenseColor;
-// only how strongly they are drawn is set here.
-/** Under-the-line fill: strong at the top and bottom edge of the chart (0x70 of 0xFF)... */
-private const val FILL_ALPHA_EDGE = 0x70
-/** ...fading to almost nothing right at the zero line. */
-private const val FILL_ALPHA_ZERO = 0x0C
+/** Under-the-line fill: this opaque (of 0xFF) at the top of the chart, fading to nothing at the bottom. */
+private const val FILL_ALPHA_TOP = 0x38
+
 /** Home-card sparkline: fill under the line starts at this opacity and fades to 0. */
 private const val SPARKLINE_FILL_ALPHA = 0.30f
 
@@ -157,6 +158,9 @@ private const val SPARKLINE_FILL_ALPHA = 0.30f
  * Opened by tapping the balance card on the home screen. One chart point per transaction (exact
  * date and time, not averaged per day): an income lifts the line, an expense drops it. Pinch to
  * zoom, drag to scroll, double-tap to zoom in, tap a point for its details.
+ *
+ * The page scrolls: summary card, then one card holding the chart (chips, caption, chart), then the
+ * insight tiles. Charts have fixed heights, so a small screen or a large font never squeezes one flat.
  */
 @Composable
 fun StatsScreen(
@@ -201,7 +205,8 @@ fun StatsScreen(
     var rangeTick by rememberSaveable { mutableIntStateOf(0) }
     // The point being touched on the chart (shown in the card at the top)
     var selected by remember { mutableStateOf<ChartPoint?>(null) }
-    LaunchedEffect(series) { selected = null }
+    // New data, or another chart: whatever was tapped no longer exists on screen
+    LaunchedEffect(series, chartType) { selected = null }
     val insights = remember(series) { series?.let { computeInsights(it) } }
     // Until a chip is tapped, open on the smallest window with enough points, and show that chip as selected
     val effectiveDays = rangeDays ?: remember(series) { series?.let { defaultRangeDays(it) } ?: 0 }
@@ -240,6 +245,7 @@ fun StatsScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
         ) {
             AccountChips(accounts = accounts, selectedId = accountId, onSelect = { accountId = it })
@@ -248,12 +254,19 @@ fun StatsScreen(
             val s = series
             if (s == null) {
                 // Still loading
-                Box(Modifier.fillMaxSize())
+                Box(Modifier
+                    .fillMaxWidth()
+                    .height(240.dp))
             } else {
                 SummaryCard(s, anchored, title, selected)
 
                 if (s.isEmpty) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 64.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
                         Text(
                             text = "No transactions to chart yet.",
                             style = MaterialTheme.typography.bodyMedium,
@@ -261,78 +274,86 @@ fun StatsScreen(
                         )
                     }
                 } else {
-                    ChartTypeChips(
-                        selected = chartType,
-                        onSelect = { chartType = it },
-                        modifier = Modifier.padding(top = 12.dp)
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp)
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RANGES.forEach { (label, days) ->
-                            ManuChip(
-                                label = label,
-                                selected = effectiveDays == days,
-                                onClick = { rangeDays = days; rangeTick++ }
-                            )
-                        }
-                        // Line / Step only means something for the balance line
-                        if (chartType == StatsChartType.BALANCE) {
-                            Box(Modifier.width(8.dp))
-                            ManuChip(label = "Line", selected = !stepped, onClick = { stepped = false })
-                            ManuChip(label = "Step", selected = stepped, onClick = { stepped = true })
+                    // One card holds everything that belongs to the chart: type chips, time chips, the chart
+                    ManuCard(modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)) {
+                        Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
+                            ChartTypeChips(selected = chartType, onSelect = { chartType = it })
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 8.dp)
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RANGES.forEach { (label, days) ->
+                                    ManuChip(
+                                        label = label,
+                                        selected = effectiveDays == days,
+                                        onClick = { rangeDays = days; rangeTick++ }
+                                    )
+                                }
+                                // Line / Step only means something for the balance line
+                                if (chartType == StatsChartType.BALANCE) {
+                                    Box(Modifier.width(8.dp))
+                                    ManuChip(label = "Line", selected = !stepped, onClick = { stepped = false })
+                                    ManuChip(label = "Step", selected = stepped, onClick = { stepped = true })
+                                }
+                            }
+
+                            if (chartType == StatsChartType.BALANCE) {
+                                ChartCaption(
+                                    if (anchored) "Balance after each transaction\nPinch to zoom in · tap a point for details"
+                                    else "Running net of the filtered transactions\nPinch to zoom in · tap a point for details"
+                                )
+                                TxnChart(
+                                    series = s,
+                                    stepped = stepped,
+                                    rangeDays = effectiveDays,
+                                    rangeTick = rangeTick,
+                                    onSelected = { selected = it },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(BALANCE_CHART_HEIGHT)
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    LegendDot("Income", IncomeColor)
+                                    LegendDot("Expense", ExpenseColor)
+                                    Text(
+                                        text = "dots show when zoomed in",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            } else {
+                                // The other charts use the same 1W / 1M / ... chips as a time filter
+                                MoreChartsPanel(
+                                    type = chartType,
+                                    txns = allTxns,
+                                    rangeDays = effectiveDays,
+                                    accountNames = accountNames,
+                                    breakdownBy = breakdownBy,
+                                    onBreakdownBy = { breakdownBy = it },
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
                     }
 
                     if (chartType == StatsChartType.BALANCE) {
-                        TxnChart(
-                            series = s,
-                            stepped = stepped,
-                            rangeDays = effectiveDays,
-                            rangeTick = rangeTick,
-                            onSelected = { selected = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .padding(top = 8.dp)
-                        )
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            LegendDot("Income", IncomeColor)
-                            LegendDot("Expense", ExpenseColor)
-                            Text(
-                                text = "Pinch · drag · tap a point",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1
-                            )
-                        }
-                        insights?.let { InsightsRow(it, modifier = Modifier.padding(bottom = 12.dp)) }
-                    } else {
-                        // The other charts use the same 1W / 1M / ... chips as a time filter
-                        MoreChartsPanel(
-                            type = chartType,
-                            txns = allTxns,
-                            rangeDays = effectiveDays,
-                            accountNames = accountNames,
-                            breakdownBy = breakdownBy,
-                            onBreakdownBy = { breakdownBy = it },
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                        )
+                        insights?.let { InsightsGrid(it, anchored, modifier = Modifier.padding(top = 20.dp)) }
                     }
+                    Spacer(Modifier.height(32.dp))
                 }
             }
         }
@@ -390,55 +411,86 @@ private fun SummaryCard(series: ChartSeries, anchored: Boolean, title: String, s
     }
 }
 
-/** Scrollable strip of small facts about the plotted transactions. */
+private class InsightTileData(val label: String, val value: String, val sub: String?, val color: Color?)
+
+/** Small facts about the plotted transactions, two tiles to a row, so none of them is hidden off screen. */
 @Composable
-private fun InsightsRow(i: ChartInsights, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-    ) {
-        InsightTile("Avg spend / day", formatMoney(i.avgDailyExpensePaise), null, ExpenseColor)
+private fun InsightsGrid(i: ChartInsights, anchored: Boolean, modifier: Modifier = Modifier) {
+    val money: (Long) -> String = { if (anchored) formatBalance(it) else formatSignedMoney(it) }
+    val tiles = buildList {
+        add(InsightTileData("Avg spend / day", formatMoney(i.avgDailyExpensePaise), "${i.txnCount} transactions", ExpenseColor))
+        i.savingsRatePercent?.let {
+            add(
+                InsightTileData(
+                    "Savings rate", "$it%", "of income kept",
+                    if (it >= 0) IncomeColor else ExpenseColor
+                )
+            )
+        }
         i.biggestExpense?.let {
-            InsightTile("Biggest expense", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, ExpenseColor)
+            add(InsightTileData("Biggest expense", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, ExpenseColor))
         }
         i.biggestIncome?.let {
-            InsightTile("Biggest income", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, IncomeColor)
+            add(InsightTileData("Biggest income", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, IncomeColor))
         }
-        i.highest?.let { InsightTile("Peak balance", formatBalance(it.paise), formatDateLong(it.millis), null) }
-        i.lowest?.let { InsightTile("Lowest balance", formatBalance(it.paise), formatDateLong(it.millis), null) }
+        i.highest?.let {
+            add(InsightTileData(if (anchored) "Peak balance" else "Peak net", money(it.paise), formatDateLong(it.millis), null))
+        }
+        i.lowest?.let {
+            add(InsightTileData(if (anchored) "Lowest balance" else "Lowest net", money(it.paise), formatDateLong(it.millis), null))
+        }
+    }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = "Insights",
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        Column(verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+            tiles.chunked(2).forEach { pair ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
+                ) {
+                    pair.forEach { InsightTile(it, Modifier.weight(1f)) }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
     }
 }
 
 @Composable
-private fun InsightTile(label: String, value: String, sub: String?, color: Color?) {
+private fun InsightTile(tile: InsightTileData, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
         Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = color ?: MaterialTheme.colorScheme.onSurface,
-            maxLines = 1
-        )
-        Text(
-            text = sub ?: " ",
+            text = tile.label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 130.dp)
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = tile.value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = tile.color ?: MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = tile.sub ?: " ",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -483,44 +535,82 @@ internal fun LegendDot(label: String, color: Color) {
 /** What the chart currently shows, kept on the view so zoom survives recomposition. */
 private class ChartState(val series: ChartSeries, val rangeTick: Int)
 
-/** Draws the line with a green / red shader, but leaves the dots and labels in their own colours. */
-private class TxnLineRenderer(chart: LineChart) : LineChartRenderer(chart, chart.animator, chart.viewPortHandler) {
-    var lineShader: Shader? = null
-
-    override fun drawData(c: Canvas) {
-        paintRender.shader = lineShader
-        super.drawData(c)
-        paintRender.shader = null   // the dots (drawn after the line) use paintRender too
+/** First index in [xs] (sorted) whose value is >= [v]. */
+private fun lowerBound(xs: FloatArray, v: Float): Int {
+    var lo = 0
+    var hi = xs.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (xs[mid] < v) lo = mid + 1 else hi = mid
     }
+    return lo
 }
 
-/** A line chart whose line is green above the zero line and red below it. */
-private class TxnLineChart(context: Context) : LineChart(context) {
-    // Defaults come from the design system; the chart's update block sets them again on every theme change
-    var positiveColor: Int = IncomeColor.toArgb()
-    var negativeColor: Int = ExpenseColor.toArgb()
-    private val lineRenderer = TxnLineRenderer(this)
+/** First index in [xs] (sorted) whose value is > [v]. */
+private fun upperBound(xs: FloatArray, v: Float): Int {
+    var lo = 0
+    var hi = xs.size
+    while (lo < hi) {
+        val mid = (lo + hi) ushr 1
+        if (xs[mid] <= v) lo = mid + 1 else hi = mid
+    }
+    return lo
+}
 
-    init {
-        renderer = lineRenderer
+/**
+ * Draws the line with a two-colour shader (one colour above the zero line, another below it), but
+ * leaves the dots and labels in their own colours. It also switches the per-transaction dots on only
+ * while few enough are on screen.
+ *
+ * Both are worked out here, inside drawData, because this runs after the chart has fitted its y axis to
+ * what is on screen. Doing it earlier would use the previous frame's scale.
+ */
+private class TxnLineRenderer(private val lineChart: LineChart) :
+    LineChartRenderer(lineChart, lineChart.animator, lineChart.viewPortHandler) {
+    var positiveColor: Int = IncomeColorLight.toArgb()
+    var negativeColor: Int = ExpenseColorLight.toArgb()
+
+    /** x of every point, in order, to count how many are on screen. */
+    var pointXs: FloatArray = FloatArray(0)
+
+    private fun visiblePoints(): Int {
+        val xs = pointXs
+        if (xs.isEmpty()) return 0
+        return upperBound(xs, lineChart.highestVisibleX) - lowerBound(xs, lineChart.lowestVisibleX)
     }
 
-    override fun onDraw(canvas: Canvas) {
-        val top = viewPortHandler.contentTop()
-        val bottom = viewPortHandler.contentBottom()
+    override fun drawData(c: Canvas) {
+        val vp = lineChart.viewPortHandler
+        val top = vp.contentTop()
+        val bottom = vp.contentBottom()
         if (bottom > top) {
             // Where y = 0 is on screen, as a fraction of the plot height: the colour switches exactly there
-            val zero = getTransformer(YAxis.AxisDependency.LEFT).getPixelForValues(0f, 0f)
+            val zero = lineChart.getTransformer(YAxis.AxisDependency.LEFT).getPixelForValues(0f, 0f)
             val z = ((zero.y.toFloat() - top) / (bottom - top)).coerceIn(0f, 1f)
             MPPointD.recycleInstance(zero)
-            lineRenderer.lineShader = LinearGradient(
+            paintRender.shader = LinearGradient(
                 0f, top, 0f, bottom,
                 intArrayOf(positiveColor, positiveColor, negativeColor, negativeColor),
                 floatArrayOf(0f, z, z, 1f),
                 Shader.TileMode.CLAMP
             )
         }
-        super.onDraw(canvas)
+        (lineChart.data?.getDataSetByIndex(0) as? LineDataSet)
+            ?.setDrawCircles(visiblePoints() <= MAX_VISIBLE_DOTS)
+        super.drawData(c)
+        paintRender.shader = null   // the dots (drawn after the line) use paintRender too
+    }
+}
+
+/**
+ * A line chart whose line is one colour while the balance is above zero and another while it is
+ * below. The y axis fits itself to the part of the history on screen (see autoscale in TxnChart).
+ */
+private class TxnLineChart(context: Context) : LineChart(context) {
+    val lineRenderer = TxnLineRenderer(this)
+
+    init {
+        renderer = lineRenderer
     }
 }
 
@@ -552,6 +642,15 @@ private class TimeAxisFormatter(var series: ChartSeries?, private val chart: Lin
 internal class MoneyAxisFormatter : ValueFormatter() {
     // Chart y values are rupees (Float); back to paise for the label
     override fun getFormattedValue(value: Float): String = compactMoney((value * 100.0).toLong())
+}
+
+/** [text] cut with "…" so it is at most [maxWidth] pixels wide when drawn with [paint]. */
+private fun fitText(text: String, paint: Paint, maxWidth: Float): String {
+    if (maxWidth <= 0f || paint.measureText(text) <= maxWidth) return text
+    val room = maxWidth - paint.measureText("…")
+    if (room <= 0f) return "…"
+    val count = paint.breakText(text, true, room, null)
+    return text.take(count).trimEnd() + "…"
 }
 
 /** The popup shown when a point is tapped. Drawn by hand, so no layout file is needed. */
@@ -602,8 +701,11 @@ private class PointMarker(private val chart: LineChart, density: Float) : IMarke
         val lineGap = 4f * d
         val titleLine = titlePaint.fontSpacing
         val bodyLine = bodyPaint.fontSpacing
-        val width = lines.indices.maxOf { if (it == 0) titlePaint.measureText(lines[it]) else bodyPaint.measureText(lines[it]) } + pad * 2
-        val height = pad * 2 + titleLine + bodyLine * (lines.size - 1) + lineGap * (lines.size - 1)
+        // A long title is cut with "…" instead of running off the edge of the chart
+        val maxText = chart.width - pad * 2 - 8f * d
+        val shown = lines.mapIndexed { i, s -> fitText(s, if (i == 0) titlePaint else bodyPaint, maxText) }
+        val width = shown.indices.maxOf { if (it == 0) titlePaint.measureText(shown[it]) else bodyPaint.measureText(shown[it]) } + pad * 2
+        val height = pad * 2 + titleLine + bodyLine * (shown.size - 1) + lineGap * (shown.size - 1)
 
         // Above the point if there is room, otherwise below; kept inside the chart horizontally
         val gap = 12f * d
@@ -615,11 +717,11 @@ private class PointMarker(private val chart: LineChart, density: Float) : IMarke
         box.set(left, top, left + width, top + height)
         canvas.drawRoundRect(box, 10f * d, 10f * d, boxPaint)
         var y = top + pad - titlePaint.ascent()
-        canvas.drawText(lines[0], left + pad, y, titlePaint)
-        for (i in 1 until lines.size) {
+        canvas.drawText(shown[0], left + pad, y, titlePaint)
+        for (i in 1 until shown.size) {
             y += (if (i == 1) titleLine else bodyLine) + lineGap
             bodyPaint.color = if (i == 1) amountColor else textColor
-            canvas.drawText(lines[i], left + pad, y, bodyPaint)
+            canvas.drawText(shown[i], left + pad, y, bodyPaint)
         }
         bodyPaint.color = textColor
     }
@@ -671,16 +773,15 @@ private fun TxnChart(
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
     val scheme = MaterialTheme.colorScheme
-    val lineColor = scheme.primary.toArgb()
+    val lineColor = scheme.primary.toArgb()          // neutral ink: green / red are kept for income / expense
     val textColor = scheme.onSurfaceVariant.toArgb()
     val gridColor = scheme.outlineVariant.toArgb()
+    val zeroColor = scheme.outline.toArgb()
     val markerBg = scheme.inverseSurface.toArgb()
     val markerText = scheme.inverseOnSurface.toArgb()
     val income = IncomeColor.toArgb()
     val expense = ExpenseColor.toArgb()
     val latestOnSelected by rememberUpdatedState(onSelected)
-    // The one biggest transaction gets a label on the chart
-    val largest = remember(series) { series.points.maxByOrNull { it.txn.amountPaise } }
 
     AndroidView(
         modifier = modifier,
@@ -692,9 +793,11 @@ private fun TxnChart(
                 setDrawGridBackground(false)
                 setExtraOffsets(4f, 6f, 12f, 4f)
 
-                // Touch: drag to scroll, pinch / double-tap to zoom along time only
+                // Touch: drag sideways to scroll, pinch / double-tap to zoom along time only.
+                // No vertical dragging: the y axis fits itself, and vertical swipes belong to the page.
                 setTouchEnabled(true)
                 isDragEnabled = true
+                setDragYEnabled(false)
                 setScaleXEnabled(true)
                 setScaleYEnabled(false)
                 setPinchZoom(false)
@@ -702,6 +805,10 @@ private fun TxnChart(
                 isHighlightPerDragEnabled = false
                 isDragDecelerationEnabled = true
                 dragDecelerationFrictionCoef = 0.88f
+
+                // The y axis always fits what is on screen, so a 1W window of a long history is not
+                // flattened by the biggest and smallest balance of the whole history
+                setAutoScaleMinMaxEnabled(true)
 
                 // Taps are handled by TapHandler (open / close the popup). Only a point within ~30dp counts.
                 isHighlightPerTapEnabled = false
@@ -724,12 +831,15 @@ private fun TxnChart(
                 xAxis.setLabelCount(3, false)
                 xAxis.granularity = 1f
                 xAxis.isGranularityEnabled = true
+                xAxis.setAvoidFirstLastClipping(true)   // the first / last label stays inside the chart
                 xAxis.valueFormatter = TimeAxisFormatter(null, this)
 
                 axisLeft.setDrawGridLines(true)
-                axisLeft.setLabelCount(5, false)
-                axisLeft.setDrawZeroLine(true)
-                axisLeft.zeroLineWidth = 1.2f
+                axisLeft.setLabelCount(4, false)
+                axisLeft.spaceTop = 12f                  // air above the highest and below the lowest point
+                axisLeft.spaceBottom = 12f
+                axisLeft.setDrawZeroLine(true)           // only visible while 0 is inside the y range
+                axisLeft.zeroLineWidth = 1f
                 axisLeft.valueFormatter = MoneyAxisFormatter()
                 axisLeft.setDrawAxisLine(false)
                 xAxis.setDrawAxisLine(false)
@@ -737,13 +847,13 @@ private fun TxnChart(
         },
         update = { chart ->
             // Colours follow the theme every time (light / dark can change while open)
-            chart.positiveColor = income
-            chart.negativeColor = expense
+            chart.lineRenderer.positiveColor = lineColor
+            chart.lineRenderer.negativeColor = expense
             chart.xAxis.textColor = textColor
             chart.axisLeft.textColor = textColor
             chart.axisLeft.gridColor = gridColor
             chart.axisLeft.gridLineWidth = 0.6f
-            chart.axisLeft.zeroLineColor = textColor
+            chart.axisLeft.zeroLineColor = zeroColor
             (chart.marker as? PointMarker)?.setColors(markerBg, markerText, income, expense)
             (chart.xAxis.valueFormatter as? TimeAxisFormatter)?.series = series
 
@@ -754,15 +864,9 @@ private fun TxnChart(
             if (dataChanged) {
                 val entries = series.points.map { Entry(it.x, it.balancePaise / 100f, it) }
                 val set = LineDataSet(entries, "Balance")
+                set.setCircleColors(series.points.map { if (it.isIncome) income else expense })
                 chart.data = LineData(set)
-
-                // Y range always includes 0 (the baseline the colours split on), with some air around
-                val ys = series.points.map { it.balancePaise / 100f }
-                val lo = minOf(0f, ys.min())
-                val hi = maxOf(0f, ys.max())
-                val margin = ((hi - lo) * 0.08f).coerceAtLeast(1f)
-                chart.axisLeft.axisMinimum = lo - margin
-                chart.axisLeft.axisMaximum = hi + margin
+                chart.lineRenderer.pointXs = FloatArray(series.points.size) { series.points[it].x }
 
                 val minX = series.points.first().x
                 val maxX = series.points.last().x
@@ -783,44 +887,22 @@ private fun TxnChart(
             // Look of the line: refreshed on every update, so Line / Step and theme changes apply at once
             val set = chart.data?.getDataSetByIndex(0) as? LineDataSet
             if (set != null) {
-                val n = series.points.size
-                set.color = lineColor            // the real colour comes from the green / red shader in TxnLineChart
+                set.color = lineColor            // the real colour comes from the shader in TxnLineRenderer
                 set.lineWidth = 2f
                 set.mode = if (stepped) LineDataSet.Mode.STEPPED else LineDataSet.Mode.LINEAR
-                set.setDrawCircles(true)
-                set.setCircleColors(series.points.map { if (it.isIncome) income else expense })
-                set.circleRadius = if (n > SMALL_DOT_THRESHOLD) 2f else 4.5f
+                // Dots are switched on and off by TxnLineRenderer, depending on how many are on screen
+                set.circleRadius = 3.5f
                 set.setDrawCircleHole(false)
+                set.setDrawValues(false)
 
-                // Only the biggest transaction gets a text label
-                set.setDrawValues(true)
-                set.valueTextSize = 10f
-                set.valueTextColor = textColor
-                set.valueFormatter = object : ValueFormatter() {
-                    override fun getPointLabel(entry: Entry?): String {
-                        val p = entry?.data as? ChartPoint ?: return ""
-                        if (p !== largest) return ""
-                        return "Largest " + (if (p.isIncome) "+" else "−") + formatMoney(p.txn.amountPaise)
-                    }
-                }
-
-                // Fill between the line and the zero line: green where the balance is above 0, red below.
-                // One vertical gradient with a hard colour change exactly at 0, fading towards the zero line.
-                val top = chart.axisLeft.axisMaximum
-                val bottom = chart.axisLeft.axisMinimum
-                val zero = (top / (top - bottom)).coerceIn(0.01f, 0.99f)
-                fun alpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a shl 24)
+                // Soft fill from the line down to the bottom of the chart, fading out. One colour only:
+                // green and red mean income and expense, and are not used for the area as well.
+                fun withAlpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a shl 24)
                 set.setDrawFilled(true)
-                set.fillFormatter = IFillFormatter { _, _ -> 0f }
+                set.fillFormatter = IFillFormatter { _, _ -> chart.axisLeft.axisMinimum }
                 set.fillDrawable = GradientDrawable().apply {
                     orientation = GradientDrawable.Orientation.TOP_BOTTOM
-                    setColors(
-                        intArrayOf(
-                            alpha(income, FILL_ALPHA_EDGE), alpha(income, FILL_ALPHA_ZERO),
-                            alpha(expense, FILL_ALPHA_ZERO), alpha(expense, FILL_ALPHA_EDGE)
-                        ),
-                        floatArrayOf(0f, zero, zero, 1f)
-                    )
+                    setColors(intArrayOf(withAlpha(lineColor, FILL_ALPHA_TOP), withAlpha(lineColor, 0)))
                 }
                 set.highLightColor = textColor
                 set.highlightLineWidth = 1f
@@ -854,9 +936,9 @@ private fun showWindow(chart: LineChart, series: ChartSeries, days: Int?) {
         val span: Float? = when {
             days == 0 -> null
             days != null -> days * 24f * 60f
-            n > INITIAL_VISIBLE_POINTS ->
-                // The last N points, never narrower than ~2 hours so a burst stays readable
-                (pts.last().x - pts[n - INITIAL_VISIBLE_POINTS].x).coerceAtLeast(120f)
+            n > 40 ->
+                // The last 40 points, never narrower than ~2 hours so a burst stays readable
+                (pts.last().x - pts[n - 40].x).coerceAtLeast(120f)
             else -> null
         }
         // Pinch limits: fully zoomed out up to ~10 minutes across

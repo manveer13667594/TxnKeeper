@@ -9,8 +9,8 @@ import android.graphics.pdf.PdfDocument
 import android.text.TextPaint
 import android.text.TextUtils
 import androidx.compose.ui.graphics.toArgb
-import com.manu.txnkeeper.ui.theme.ExpenseColor
-import com.manu.txnkeeper.ui.theme.IncomeColor
+import com.manu.txnkeeper.ui.theme.ExpenseColorLight
+import com.manu.txnkeeper.ui.theme.IncomeColorLight
 import java.io.OutputStream
 
 /**
@@ -43,8 +43,8 @@ object TxnPdf {
     private val WHITESPACE = Regex("\\s+")
 
     // Income / expense use the same design-system colours as the app, so the PDF never drifts from the screens
-    private val INCOME = IncomeColor.toArgb()
-    private val EXPENSE = ExpenseColor.toArgb()
+    private val INCOME = IncomeColorLight.toArgb()
+    private val EXPENSE = ExpenseColorLight.toArgb()
 
     // Neutral print colours: the PDF is always on white paper, so these ignore the light / dark theme
     private const val INK = 0xFF1C1B1F.toInt()
