@@ -145,11 +145,15 @@ private val RANGES = listOf("1W" to 7, "1M" to 30, "3M" to 90, "6M" to 180, "1Y"
 /** The balance chart's height. The page scrolls, so the chart keeps this size on every screen. */
 private val BALANCE_CHART_HEIGHT = 280.dp
 
-/** Dots (one per transaction) are drawn only while this few are on screen; more would be clutter. */
-private const val MAX_VISIBLE_DOTS = 30
+/** Above this many points the dots get smaller so a long history stays readable. */
+private const val SMALL_DOT_THRESHOLD = 120
 
-/** Under-the-line fill: this opaque (of 0xFF) at the top of the chart, fading to nothing at the bottom. */
-private const val FILL_ALPHA_TOP = 0x38
+// Chart fill opacities. The colours themselves are the design-system IncomeColor / ExpenseColor;
+// only how strongly they are drawn is set here.
+/** Under-the-line fill: strong at the top and bottom edge of the chart (0x70 of 0xFF)... */
+private const val FILL_ALPHA_EDGE = 0x70
+/** ...fading to almost nothing right at the zero line. */
+private const val FILL_ALPHA_ZERO = 0x0C
 
 /** Home-card sparkline: fill under the line starts at this opacity and fades to 0. */
 private const val SPARKLINE_FILL_ALPHA = 0.30f
@@ -304,10 +308,6 @@ fun StatsScreen(
                             }
 
                             if (chartType == StatsChartType.BALANCE) {
-                                ChartCaption(
-                                    if (anchored) "Balance after each transaction\nPinch to zoom in · tap a point for details"
-                                    else "Running net of the filtered transactions\nPinch to zoom in · tap a point for details"
-                                )
                                 TxnChart(
                                     series = s,
                                     stepped = stepped,
@@ -317,22 +317,22 @@ fun StatsScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(BALANCE_CHART_HEIGHT)
+                                        .padding(top = 8.dp)
                                 )
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(top = 12.dp),
+                                        .padding(top = 10.dp),
                                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     LegendDot("Income", IncomeColor)
                                     LegendDot("Expense", ExpenseColor)
                                     Text(
-                                        text = "dots show when zoomed in",
+                                        text = "Pinch · drag · tap a point",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+                                        maxLines = 1
                                     )
                                 }
                             } else {
@@ -535,82 +535,44 @@ internal fun LegendDot(label: String, color: Color) {
 /** What the chart currently shows, kept on the view so zoom survives recomposition. */
 private class ChartState(val series: ChartSeries, val rangeTick: Int)
 
-/** First index in [xs] (sorted) whose value is >= [v]. */
-private fun lowerBound(xs: FloatArray, v: Float): Int {
-    var lo = 0
-    var hi = xs.size
-    while (lo < hi) {
-        val mid = (lo + hi) ushr 1
-        if (xs[mid] < v) lo = mid + 1 else hi = mid
-    }
-    return lo
-}
-
-/** First index in [xs] (sorted) whose value is > [v]. */
-private fun upperBound(xs: FloatArray, v: Float): Int {
-    var lo = 0
-    var hi = xs.size
-    while (lo < hi) {
-        val mid = (lo + hi) ushr 1
-        if (xs[mid] <= v) lo = mid + 1 else hi = mid
-    }
-    return lo
-}
-
-/**
- * Draws the line with a two-colour shader (one colour above the zero line, another below it), but
- * leaves the dots and labels in their own colours. It also switches the per-transaction dots on only
- * while few enough are on screen.
- *
- * Both are worked out here, inside drawData, because this runs after the chart has fitted its y axis to
- * what is on screen. Doing it earlier would use the previous frame's scale.
- */
-private class TxnLineRenderer(private val lineChart: LineChart) :
-    LineChartRenderer(lineChart, lineChart.animator, lineChart.viewPortHandler) {
-    var positiveColor: Int = IncomeColorLight.toArgb()
-    var negativeColor: Int = ExpenseColorLight.toArgb()
-
-    /** x of every point, in order, to count how many are on screen. */
-    var pointXs: FloatArray = FloatArray(0)
-
-    private fun visiblePoints(): Int {
-        val xs = pointXs
-        if (xs.isEmpty()) return 0
-        return upperBound(xs, lineChart.highestVisibleX) - lowerBound(xs, lineChart.lowestVisibleX)
-    }
+/** Draws the line with a green / red shader, but leaves the dots and labels in their own colours. */
+private class TxnLineRenderer(chart: LineChart) : LineChartRenderer(chart, chart.animator, chart.viewPortHandler) {
+    var lineShader: Shader? = null
 
     override fun drawData(c: Canvas) {
-        val vp = lineChart.viewPortHandler
-        val top = vp.contentTop()
-        val bottom = vp.contentBottom()
+        paintRender.shader = lineShader
+        super.drawData(c)
+        paintRender.shader = null   // the dots (drawn after the line) use paintRender too
+    }
+}
+
+/** A line chart whose line is green above the zero line and red below it. */
+private class TxnLineChart(context: Context) : LineChart(context) {
+    // Defaults come from the design system; the chart's update block sets them again on every theme change
+    var positiveColor: Int = IncomeColorLight.toArgb()
+    var negativeColor: Int = ExpenseColorLight.toArgb()
+    private val lineRenderer = TxnLineRenderer(this)
+
+    init {
+        renderer = lineRenderer
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val top = viewPortHandler.contentTop()
+        val bottom = viewPortHandler.contentBottom()
         if (bottom > top) {
             // Where y = 0 is on screen, as a fraction of the plot height: the colour switches exactly there
-            val zero = lineChart.getTransformer(YAxis.AxisDependency.LEFT).getPixelForValues(0f, 0f)
+            val zero = getTransformer(YAxis.AxisDependency.LEFT).getPixelForValues(0f, 0f)
             val z = ((zero.y.toFloat() - top) / (bottom - top)).coerceIn(0f, 1f)
             MPPointD.recycleInstance(zero)
-            paintRender.shader = LinearGradient(
+            lineRenderer.lineShader = LinearGradient(
                 0f, top, 0f, bottom,
                 intArrayOf(positiveColor, positiveColor, negativeColor, negativeColor),
                 floatArrayOf(0f, z, z, 1f),
                 Shader.TileMode.CLAMP
             )
         }
-        (lineChart.data?.getDataSetByIndex(0) as? LineDataSet)
-            ?.setDrawCircles(visiblePoints() <= MAX_VISIBLE_DOTS)
-        super.drawData(c)
-        paintRender.shader = null   // the dots (drawn after the line) use paintRender too
-    }
-}
-
-/**
- * A line chart whose line is one colour while the balance is above zero and another while it is
- * below. The y axis fits itself to the part of the history on screen (see autoscale in TxnChart).
- */
-private class TxnLineChart(context: Context) : LineChart(context) {
-    val lineRenderer = TxnLineRenderer(this)
-
-    init {
-        renderer = lineRenderer
+        super.onDraw(canvas)
     }
 }
 
@@ -642,15 +604,6 @@ private class TimeAxisFormatter(var series: ChartSeries?, private val chart: Lin
 internal class MoneyAxisFormatter : ValueFormatter() {
     // Chart y values are rupees (Float); back to paise for the label
     override fun getFormattedValue(value: Float): String = compactMoney((value * 100.0).toLong())
-}
-
-/** [text] cut with "…" so it is at most [maxWidth] pixels wide when drawn with [paint]. */
-private fun fitText(text: String, paint: Paint, maxWidth: Float): String {
-    if (maxWidth <= 0f || paint.measureText(text) <= maxWidth) return text
-    val room = maxWidth - paint.measureText("…")
-    if (room <= 0f) return "…"
-    val count = paint.breakText(text, true, room, null)
-    return text.take(count).trimEnd() + "…"
 }
 
 /** The popup shown when a point is tapped. Drawn by hand, so no layout file is needed. */
@@ -701,11 +654,8 @@ private class PointMarker(private val chart: LineChart, density: Float) : IMarke
         val lineGap = 4f * d
         val titleLine = titlePaint.fontSpacing
         val bodyLine = bodyPaint.fontSpacing
-        // A long title is cut with "…" instead of running off the edge of the chart
-        val maxText = chart.width - pad * 2 - 8f * d
-        val shown = lines.mapIndexed { i, s -> fitText(s, if (i == 0) titlePaint else bodyPaint, maxText) }
-        val width = shown.indices.maxOf { if (it == 0) titlePaint.measureText(shown[it]) else bodyPaint.measureText(shown[it]) } + pad * 2
-        val height = pad * 2 + titleLine + bodyLine * (shown.size - 1) + lineGap * (shown.size - 1)
+        val width = lines.indices.maxOf { if (it == 0) titlePaint.measureText(lines[it]) else bodyPaint.measureText(lines[it]) } + pad * 2
+        val height = pad * 2 + titleLine + bodyLine * (lines.size - 1) + lineGap * (lines.size - 1)
 
         // Above the point if there is room, otherwise below; kept inside the chart horizontally
         val gap = 12f * d
@@ -717,11 +667,11 @@ private class PointMarker(private val chart: LineChart, density: Float) : IMarke
         box.set(left, top, left + width, top + height)
         canvas.drawRoundRect(box, 10f * d, 10f * d, boxPaint)
         var y = top + pad - titlePaint.ascent()
-        canvas.drawText(shown[0], left + pad, y, titlePaint)
-        for (i in 1 until shown.size) {
+        canvas.drawText(lines[0], left + pad, y, titlePaint)
+        for (i in 1 until lines.size) {
             y += (if (i == 1) titleLine else bodyLine) + lineGap
             bodyPaint.color = if (i == 1) amountColor else textColor
-            canvas.drawText(shown[i], left + pad, y, bodyPaint)
+            canvas.drawText(lines[i], left + pad, y, bodyPaint)
         }
         bodyPaint.color = textColor
     }
@@ -773,15 +723,16 @@ private fun TxnChart(
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
     val scheme = MaterialTheme.colorScheme
-    val lineColor = scheme.primary.toArgb()          // neutral ink: green / red are kept for income / expense
+    val lineColor = scheme.primary.toArgb()
     val textColor = scheme.onSurfaceVariant.toArgb()
     val gridColor = scheme.outlineVariant.toArgb()
-    val zeroColor = scheme.outline.toArgb()
     val markerBg = scheme.inverseSurface.toArgb()
     val markerText = scheme.inverseOnSurface.toArgb()
     val income = IncomeColor.toArgb()
     val expense = ExpenseColor.toArgb()
     val latestOnSelected by rememberUpdatedState(onSelected)
+    // The one biggest transaction gets a label on the chart
+    val largest = remember(series) { series.points.maxByOrNull { it.txn.amountPaise } }
 
     AndroidView(
         modifier = modifier,
@@ -793,11 +744,9 @@ private fun TxnChart(
                 setDrawGridBackground(false)
                 setExtraOffsets(4f, 6f, 12f, 4f)
 
-                // Touch: drag sideways to scroll, pinch / double-tap to zoom along time only.
-                // No vertical dragging: the y axis fits itself, and vertical swipes belong to the page.
+                // Touch: drag to scroll, pinch / double-tap to zoom along time only
                 setTouchEnabled(true)
                 isDragEnabled = true
-                setDragYEnabled(false)
                 setScaleXEnabled(true)
                 setScaleYEnabled(false)
                 setPinchZoom(false)
@@ -805,10 +754,6 @@ private fun TxnChart(
                 isHighlightPerDragEnabled = false
                 isDragDecelerationEnabled = true
                 dragDecelerationFrictionCoef = 0.88f
-
-                // The y axis always fits what is on screen, so a 1W window of a long history is not
-                // flattened by the biggest and smallest balance of the whole history
-                setAutoScaleMinMaxEnabled(true)
 
                 // Taps are handled by TapHandler (open / close the popup). Only a point within ~30dp counts.
                 isHighlightPerTapEnabled = false
@@ -831,15 +776,12 @@ private fun TxnChart(
                 xAxis.setLabelCount(3, false)
                 xAxis.granularity = 1f
                 xAxis.isGranularityEnabled = true
-                xAxis.setAvoidFirstLastClipping(true)   // the first / last label stays inside the chart
                 xAxis.valueFormatter = TimeAxisFormatter(null, this)
 
                 axisLeft.setDrawGridLines(true)
-                axisLeft.setLabelCount(4, false)
-                axisLeft.spaceTop = 12f                  // air above the highest and below the lowest point
-                axisLeft.spaceBottom = 12f
-                axisLeft.setDrawZeroLine(true)           // only visible while 0 is inside the y range
-                axisLeft.zeroLineWidth = 1f
+                axisLeft.setLabelCount(5, false)
+                axisLeft.setDrawZeroLine(true)
+                axisLeft.zeroLineWidth = 1.2f
                 axisLeft.valueFormatter = MoneyAxisFormatter()
                 axisLeft.setDrawAxisLine(false)
                 xAxis.setDrawAxisLine(false)
@@ -847,13 +789,13 @@ private fun TxnChart(
         },
         update = { chart ->
             // Colours follow the theme every time (light / dark can change while open)
-            chart.lineRenderer.positiveColor = lineColor
-            chart.lineRenderer.negativeColor = expense
+            chart.positiveColor = income
+            chart.negativeColor = expense
             chart.xAxis.textColor = textColor
             chart.axisLeft.textColor = textColor
             chart.axisLeft.gridColor = gridColor
             chart.axisLeft.gridLineWidth = 0.6f
-            chart.axisLeft.zeroLineColor = zeroColor
+            chart.axisLeft.zeroLineColor = textColor
             (chart.marker as? PointMarker)?.setColors(markerBg, markerText, income, expense)
             (chart.xAxis.valueFormatter as? TimeAxisFormatter)?.series = series
 
@@ -864,9 +806,15 @@ private fun TxnChart(
             if (dataChanged) {
                 val entries = series.points.map { Entry(it.x, it.balancePaise / 100f, it) }
                 val set = LineDataSet(entries, "Balance")
-                set.setCircleColors(series.points.map { if (it.isIncome) income else expense })
                 chart.data = LineData(set)
-                chart.lineRenderer.pointXs = FloatArray(series.points.size) { series.points[it].x }
+
+                // Y range always includes 0 (the baseline the colours split on), with some air around
+                val ys = series.points.map { it.balancePaise / 100f }
+                val lo = minOf(0f, ys.min())
+                val hi = maxOf(0f, ys.max())
+                val margin = ((hi - lo) * 0.08f).coerceAtLeast(1f)
+                chart.axisLeft.axisMinimum = lo - margin
+                chart.axisLeft.axisMaximum = hi + margin
 
                 val minX = series.points.first().x
                 val maxX = series.points.last().x
@@ -887,22 +835,44 @@ private fun TxnChart(
             // Look of the line: refreshed on every update, so Line / Step and theme changes apply at once
             val set = chart.data?.getDataSetByIndex(0) as? LineDataSet
             if (set != null) {
-                set.color = lineColor            // the real colour comes from the shader in TxnLineRenderer
+                val n = series.points.size
+                set.color = lineColor            // the real colour comes from the green / red shader in TxnLineChart
                 set.lineWidth = 2f
                 set.mode = if (stepped) LineDataSet.Mode.STEPPED else LineDataSet.Mode.LINEAR
-                // Dots are switched on and off by TxnLineRenderer, depending on how many are on screen
-                set.circleRadius = 3.5f
+                set.setDrawCircles(true)
+                set.setCircleColors(series.points.map { if (it.isIncome) income else expense })
+                set.circleRadius = if (n > SMALL_DOT_THRESHOLD) 2f else 4.5f
                 set.setDrawCircleHole(false)
-                set.setDrawValues(false)
 
-                // Soft fill from the line down to the bottom of the chart, fading out. One colour only:
-                // green and red mean income and expense, and are not used for the area as well.
-                fun withAlpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a shl 24)
+                // Only the biggest transaction gets a text label
+                set.setDrawValues(true)
+                set.valueTextSize = 10f
+                set.valueTextColor = textColor
+                set.valueFormatter = object : ValueFormatter() {
+                    override fun getPointLabel(entry: Entry?): String {
+                        val p = entry?.data as? ChartPoint ?: return ""
+                        if (p !== largest) return ""
+                        return "Largest " + (if (p.isIncome) "+" else "−") + formatMoney(p.txn.amountPaise)
+                    }
+                }
+
+                // Fill between the line and the zero line: green where the balance is above 0, red below.
+                // One vertical gradient with a hard colour change exactly at 0, fading towards the zero line.
+                val top = chart.axisLeft.axisMaximum
+                val bottom = chart.axisLeft.axisMinimum
+                val zero = (top / (top - bottom)).coerceIn(0.01f, 0.99f)
+                fun alpha(c: Int, a: Int) = (c and 0x00FFFFFF) or (a shl 24)
                 set.setDrawFilled(true)
-                set.fillFormatter = IFillFormatter { _, _ -> chart.axisLeft.axisMinimum }
+                set.fillFormatter = IFillFormatter { _, _ -> 0f }
                 set.fillDrawable = GradientDrawable().apply {
                     orientation = GradientDrawable.Orientation.TOP_BOTTOM
-                    setColors(intArrayOf(withAlpha(lineColor, FILL_ALPHA_TOP), withAlpha(lineColor, 0)))
+                    setColors(
+                        intArrayOf(
+                            alpha(income, FILL_ALPHA_EDGE), alpha(income, FILL_ALPHA_ZERO),
+                            alpha(expense, FILL_ALPHA_ZERO), alpha(expense, FILL_ALPHA_EDGE)
+                        ),
+                        floatArrayOf(0f, zero, zero, 1f)
+                    )
                 }
                 set.highLightColor = textColor
                 set.highlightLineWidth = 1f

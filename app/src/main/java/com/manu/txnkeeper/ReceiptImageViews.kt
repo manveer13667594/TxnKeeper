@@ -18,9 +18,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -115,15 +117,22 @@ fun ReceiptPreview(fileName: String, modifier: Modifier = Modifier, onClick: () 
     }
 }
 
-/** The image full screen on black. Pinch to zoom, drag to move, X or Back to close. */
+/**
+ * The image full screen on black. Pinch to zoom, drag to move, X or Back to close.
+ * "Save to gallery" (top left) puts a copy in the phone's gallery: images are kept inside the app only,
+ * until the user chooses to save one.
+ */
 @Composable
 fun ReceiptImageViewer(fileName: String, onDismiss: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val image by produceState<ImageBitmap?>(initialValue = null, key1 = fileName) {
         value = ReceiptStore.loadForScreen(context, fileName, ReceiptStore.MAX_SIDE_PX)
     }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    var saving by remember { mutableStateOf(false) }
+    var saved by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -155,12 +164,51 @@ fun ReceiptImageViewer(fileName: String, onDismiss: () -> Unit) {
                         )
                 )
             }
+            TextButton(
+                onClick = {
+                    if (!saving && !saved) {
+                        saving = true
+                        scope.launch {
+                            val ok = ReceiptStore.saveToGallery(context, fileName)
+                            saving = false
+                            if (ok) {
+                                saved = true
+                                Toast.makeText(context, "Saved to your gallery (Pictures/TxnKeeper)", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Couldn't save the image", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    }
+                },
+                enabled = !saving && !saved && image != null,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(12.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.Black.copy(alpha = 0.6f)),
+                colors = ButtonDefaults.textButtonColors(
+                    contentColor = Color.White,
+                    disabledContentColor = Color.White.copy(alpha = 0.7f)
+                )
+            ) {
+                Text(
+                    text = when {
+                        saving -> "Saving…"
+                        saved -> "Saved to gallery"
+                        else -> "Save to gallery"
+                    },
+                    color = Color.White
+                )
+            }
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(8.dp)
+                    .padding(12.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.6f))
             ) {
                 Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
             }

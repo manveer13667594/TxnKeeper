@@ -1,5 +1,6 @@
 package com.manu.txnkeeper
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -7,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.ImageDecoder
 import android.net.Uri
+import android.provider.MediaStore
 import android.util.LruCache
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -29,6 +31,8 @@ import kotlinx.coroutines.withContext
  * - A picked or scanned image is shrunk (longest side [MAX_SIDE_PX]) and saved as a JPEG, so one
  *   receipt costs a few hundred KB instead of several MB. The phone's rotation flag is applied.
  * - The original photo (gallery, shared image) is never touched.
+ * - Nothing is added to the gallery on its own, not even photos taken with the in-app camera.
+ *   The user can copy an image to the gallery from the image viewer: see [saveToGallery].
  */
 object ReceiptStore {
 
@@ -156,6 +160,42 @@ object ReceiptStore {
         } catch (e: Exception) {
             temp.delete()
             null
+        }
+    }
+
+    // ------------------------------------------------------------------ saving a copy to the gallery
+
+    /**
+     * Copies the stored image into the phone's gallery (Pictures/TxnKeeper). The copy is separate from the
+     * one in the app: deleting the transaction later does not remove it from the gallery. Needs no
+     * storage permission (the app only supports Android 10 and newer). Returns true when it was saved.
+     */
+    suspend fun saveToGallery(context: Context, name: String?): Boolean = withContext(Dispatchers.IO) {
+        val source = file(context, name)?.takeIf { it.isFile } ?: return@withContext false
+        val resolver = context.contentResolver
+        val stamp = java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US)
+            .format(System.currentTimeMillis())
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "TXN_$stamp")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/TxnKeeper")
+            put(MediaStore.Images.Media.IS_PENDING, 1)   // hidden from other apps until it is fully written
+        }
+        val target = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            ?: return@withContext false
+        try {
+            val out = resolver.openOutputStream(target) ?: throw java.io.IOException("no output stream")
+            out.use { stream -> source.inputStream().use { it.copyTo(stream) } }
+            values.clear()
+            values.put(MediaStore.Images.Media.IS_PENDING, 0)
+            resolver.update(target, values, null, null)
+            true
+        } catch (e: CancellationException) {
+            resolver.delete(target, null, null)
+            throw e
+        } catch (e: Exception) {
+            resolver.delete(target, null, null)   // never leave a half-written image in the gallery
+            false
         }
     }
 

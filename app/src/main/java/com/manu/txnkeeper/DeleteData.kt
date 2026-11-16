@@ -125,8 +125,8 @@ fun DeleteDataControls(settings: AppSettings, database: AppDatabase) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Photos taken with the in-app camera are saved in your gallery (Pictures/TxnKeeper). " +
-                        "They are not deleted here.",
+                text = "Images are kept inside the app. Copies you saved to your gallery (Pictures/TxnKeeper) " +
+                        "are not deleted here.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

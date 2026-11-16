@@ -2,14 +2,12 @@ package com.manu.txnkeeper
 
 import android.Manifest
 import android.app.Activity
-import android.content.ContentValues
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.provider.MediaStore
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -102,6 +100,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.Observer
 import com.manu.manudesignsystem.components.ManuButton
 import kotlinx.coroutines.delay
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -125,6 +124,15 @@ private enum class FlashSetting(val label: String) {
 private class FocusTap(val offset: Offset, val id: Long)
 
 /**
+ * Clears photos left in the camera's temporary folder. Only files older than ten minutes go, so a
+ * photo that is still being read is never touched.
+ */
+private fun clearOldCameraFiles(dir: File) {
+    val cutoff = System.currentTimeMillis() - 10 * 60 * 1000L
+    dir.listFiles()?.forEach { if (it.lastModified() < cutoff) it.delete() }
+}
+
+/**
  * Full-screen camera for scanning receipts.
  *
  *  - Top: back arrow, and the flash button (Off / Auto / Torch) when the lens has a flash.
@@ -132,7 +140,7 @@ private class FocusTap(val offset: Offset, val id: Long)
  *    "Gallery" (bottom-right, opens the system photo picker, no storage permission needed).
  *  - On the preview: tap to focus, pinch to zoom (tap the zoom label to go back to 1x).
  *
- * Photos are saved to Pictures/TxnKeeper and reported via onPhotoSaved.
+ * Photos are saved to the app's cache folder (not the gallery) and reported via onPhotoSaved.
  * Swipe right-to-left, the back arrow or the system back closes it.
  *
  * [isOpen] is false while the screen is sliding out, and [enterFinished] turns true once it has
@@ -348,18 +356,13 @@ fun CameraScreen(
 
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
             .format(System.currentTimeMillis())
-        val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "TXN_$stamp")
-            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
-            if (Build.VERSION.SDK_INT >= 29) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/TxnKeeper")
-            }
-        }
-        val options = ImageCapture.OutputFileOptions.Builder(
-            context.contentResolver,
-            MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-            values
-        ).build()
+        // The photo goes into the app's own cache folder, not the gallery. The app keeps its own shrunk
+        // copy with the transaction (ReceiptStore); this full-size temporary file is cleared away later.
+        // A photo can be saved to the gallery afterwards from the image viewer.
+        val dir = File(context.cacheDir, "camera").also { it.mkdirs() }
+        clearOldCameraFiles(dir)
+        val photoFile = File(dir, "TXN_$stamp.jpg")
+        val options = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
         try {
             imageCapture.takePicture(
@@ -367,8 +370,8 @@ fun CameraScreen(
                 mainExecutor,
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        val uri = output.savedUri
-                        if (uri != null) {
+                        val uri = output.savedUri ?: Uri.fromFile(photoFile)
+                        if (photoFile.isFile) {
                             onPhotoSaved(uri)
                             onImageReady(uri)
                         } else {

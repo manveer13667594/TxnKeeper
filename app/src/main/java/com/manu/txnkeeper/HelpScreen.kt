@@ -53,7 +53,8 @@ private val FAQS = listOf(
         question = "How do I scan a receipt or payment screenshot?",
         answer = "Tap the camera icon at the top of the home screen, or swipe from left to right. " +
                 "Take a photo or pick an image. You can also share an image to TxnKeeper from your gallery or a payment app.\n" +
-                "The amount, date, time, type and title are filled in for you. Check the form before you save."
+                "The amount, date, time, type and title are filled in for you. Check the form before you save.\n" +
+                "The image stays inside the app. To keep a copy in your gallery, open the image from the transaction and tap Save to gallery."
     ),
     Faq(
         question = "How does voice entry work?",
@@ -104,7 +105,7 @@ private val FAQS = listOf(
         answer = "Open the ⋮ menu, then Settings, then Delete data. Choose All data or a single account, " +
                 "then type the phrase shown to confirm.\n" +
                 "This can't be undone, so export a CSV first if you want a copy. " +
-                "Photos taken with the in-app camera are saved in your gallery and are not deleted."
+                "Images are kept inside the app. Copies you saved to your gallery are not deleted."
     ),
 )
 
