@@ -72,6 +72,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.manu.txnkeeper.data.local.AccountSummary
+import com.manu.txnkeeper.data.local.TagEntity
+import com.manu.txnkeeper.data.local.updateWithTags
 import com.manu.txnkeeper.data.local.TransactionDao
 import com.manu.txnkeeper.data.local.TransactionEntity
 import com.manu.txnkeeper.data.local.TransactionTotals
@@ -206,6 +208,13 @@ fun TransactionsScreen(
 
     val overallFlow = remember { dao.getTotalCount() }
     val overall: Int? by overallFlow.collectAsState(initial = null)
+
+    // Tags: the list of tags, and which transaction has which (for the chips on rows and in the Edit dialog)
+    val tagsFlow = remember { dao.observeTags() }
+    val allTags by tagsFlow.collectAsState(initial = emptyList())
+    val linksFlow = remember { dao.observeTagLinks() }
+    val tagLinks by linksFlow.collectAsState(initial = emptyList())
+    val tagMap = remember(allTags, tagLinks) { tagsByTransaction(allTags, tagLinks) }
 
     // Filter chips: your payment methods, plus any a transaction still uses (e.g. one you removed)
     val usedMethodsFlow = remember { dao.observePaymentMethodsInUse() }
@@ -501,6 +510,7 @@ fun TransactionsScreen(
                                                 TransactionRow(
                                                     txn = txn,
                                                     accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
+                                                    tags = tagMap[txn.id] ?: emptyList(),
                                                     onOpen = { viewing = txn },
                                                     onEdit = { editing = txn },
                                                     onDelete = { deleting = txn }
@@ -550,6 +560,7 @@ fun TransactionsScreen(
         TransactionDetailDialog(
             txn = txn,
             accountName = accountNames[txn.accountId] ?: "",
+            tags = tagMap[txn.id] ?: emptyList(),
             onEdit = {
                 viewing = null
                 editing = txn
@@ -577,9 +588,21 @@ fun TransactionsScreen(
                     }
                 }
             },
-            onSave = { updated ->
+            tags = allTags,
+            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+            onAddTag = { name, colorIndex, onCreated ->
                 scope.launch {
-                    if (safeWrite(context, "save the changes") { dao.update(updated) }) {
+                    var newId = 0L
+                    if (safeWrite(context, "add the tag") {
+                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                        }) {
+                        onCreated(newId)
+                    }
+                }
+            },
+            onSave = { updated, tagIds ->
+                scope.launch {
+                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
                         // The image it had before is not used any more if it was removed or replaced
                         txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
                     }
@@ -799,6 +822,7 @@ private fun EmptyMessage(
 private fun TransactionRow(
     txn: TransactionEntity,
     accountName: String?,
+    tags: List<TagEntity>,
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -895,6 +919,8 @@ private fun TransactionRow(
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
+            // Tags under the details (nothing when the transaction has none)
+            TagChipRow(tags = tags, modifier = Modifier.padding(top = 6.dp))
         }
         // Three-dot menu on its own, centred on the right
 //        Box {
@@ -926,6 +952,7 @@ private fun TransactionRow(
 private fun TransactionDetailDialog(
     txn: TransactionEntity,
     accountName: String,
+    tags: List<TagEntity>,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
@@ -1008,6 +1035,23 @@ private fun TransactionDetailDialog(
                 if (txn.paymentMethod.isNotBlank()) {
                     HorizontalDivider()
                     DetailLine("Payment", txn.paymentMethod)
+                }
+                if (tags.isNotEmpty()) {
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.Top,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Tags",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        TagChipRow(tags = tags, modifier = Modifier.weight(1f))
+                    }
                 }
 
                 // Description in its own box, shown in full

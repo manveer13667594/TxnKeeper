@@ -60,6 +60,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
+import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionEntity
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuCard
@@ -113,6 +114,9 @@ class TxnFormState {
     var payment by mutableStateOf("CASH")
     var dateTime by mutableStateOf(System.currentTimeMillis())
     var description by mutableStateOf("")
+
+    /** The tags picked for this transaction (ids of TagEntity). Not used for the entries of a voice recording. */
+    var tagIds by mutableStateOf<Set<Long>>(emptySet())
 
     /**
      * What a blank form starts with (from Settings > Defaults; the app keeps these up to date).
@@ -256,6 +260,7 @@ class TxnFormState {
                     "notice" to f.notice,
                     "imageFile" to f.imageFile,
                     "includeImage" to f.includeImage,
+                    "tagIds" to ArrayList(f.tagIds),
                     "batchIndex" to f.batchIndex,
                     "batchSaved" to f.batchSaved,
                     "batch" to f.batch.map {
@@ -275,6 +280,8 @@ class TxnFormState {
                     f.notice = m["notice"] as String?
                     f.imageFile = m["imageFile"] as String?
                     f.includeImage = (m["includeImage"] as Boolean?) ?: true
+                    @Suppress("UNCHECKED_CAST")
+                    f.tagIds = ((m["tagIds"] as List<Long>?) ?: emptyList()).toSet()
                     f.batchIndex = m["batchIndex"] as Int
                     f.batchSaved = m["batchSaved"] as Int
                     @Suppress("UNCHECKED_CAST")
@@ -315,6 +322,7 @@ class TxnFormState {
         // Closing the page without saving deletes it (MainActivity does that before calling reset).
         imageFile = null
         includeImage = true
+        tagIds = emptySet()
     }
 
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
@@ -342,9 +350,13 @@ fun AddTransactionScreen(
     settings: AppSettings,
     /** Saves a new account; calls the second function with its id once it exists. */
     onAddAccount: (AccountEntity, (Long) -> Unit) -> Unit,
+    /** Every tag there is, for the tag chips. */
+    tags: List<TagEntity>,
+    /** Saves a new tag (name, colour number); calls the last function with its id once it exists. */
+    onAddTag: (String, Int, (Long) -> Unit) -> Unit,
     onClose: () -> Unit,
     /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
-    onSubmit: (TransactionEntity, stay: Boolean) -> Unit,
+    onSubmit: (TransactionEntity, tagIds: Set<Long>, stay: Boolean) -> Unit,
     /** Save & exit on a recording with several entries: saves every marked one at once, then closes. */
     onSubmitAll: (List<TransactionEntity>) -> Unit,
     onScan: () -> Unit,
@@ -366,6 +378,7 @@ fun AddTransactionScreen(
     var timePickerOpen by remember { mutableStateOf(false) }
     var addAccountOpen by remember { mutableStateOf(false) }
     var addPaymentOpen by remember { mutableStateOf(false) }
+    var addTagOpen by remember { mutableStateOf(false) }
     // The account that will be used: the chosen one, or the first if none is chosen (or it was deleted).
     // The list is ordered oldest first, so the first one is the main account.
     val account = accounts.firstOrNull { it.id == form.accountId } ?: accounts.firstOrNull()
@@ -581,6 +594,19 @@ fun AddTransactionScreen(
                             singleLine = false
                         )
 
+                        // Tags: tap to switch on or off. Not for the entries of a voice recording.
+                        if (!form.inBatch) {
+                            TagPicker(
+                                tags = tags,
+                                selected = form.tagIds,
+                                onChange = { form.tagIds = it },
+                                onNew = {
+                                    focusManager.clearFocus()
+                                    addTagOpen = true
+                                }
+                            )
+                        }
+
                         // Receipt image: from a scan, or attached here. Not for the entries of a voice recording.
                         if (!form.inBatch) {
                             ReceiptImageField(
@@ -638,6 +664,8 @@ fun AddTransactionScreen(
                             } else {
                                 error = null
                                 focusManager.clearFocus()
+                                // A tag deleted while this page was open is dropped here
+                                val liveTagIds = tags.map { it.id }.toSet()
                                 onSubmit(
                                     TransactionEntity(
                                         title = form.title.trim(),
@@ -649,6 +677,7 @@ fun AddTransactionScreen(
                                         accountId = account?.id ?: 1L,
                                         imageFile = if (form.includeImage) form.imageFile else null
                                     ),
+                                    form.tagIds.filter { it in liveTagIds }.toSet(),
                                     stay
                                 )
                             }
@@ -722,6 +751,19 @@ fun AddTransactionScreen(
                 addPaymentOpen = false
             },
             onDismiss = { addPaymentOpen = false }
+        )
+    }
+
+    // "+ New tag": saved, then switched on for this transaction right away
+    if (addTagOpen) {
+        TagDialog(
+            initial = null,
+            takenNames = tags.map { it.name.lowercase() }.toSet(),
+            onSave = { name, colorIndex ->
+                onAddTag(name, colorIndex) { id -> form.tagIds = form.tagIds + id }
+                addTagOpen = false
+            },
+            onDismiss = { addTagOpen = false }
         )
     }
 

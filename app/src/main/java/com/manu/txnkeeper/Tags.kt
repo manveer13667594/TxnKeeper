@@ -1,0 +1,235 @@
+package com.manu.txnkeeper
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.dp
+import com.manu.manudesignsystem.components.ManuChip
+import com.manu.manudesignsystem.components.ManuDialog
+import com.manu.manudesignsystem.components.ManuTextField
+import com.manu.txnkeeper.data.local.TagEntity
+import com.manu.txnkeeper.data.local.TransactionTagCrossRef
+import kotlinx.coroutines.delay
+
+/** Longest tag name (short names keep the chips tidy). */
+const val MAX_TAG_NAME = 20
+
+/** The colours a tag can have. A tag stores only the number of its colour (TagEntity.colorIndex). */
+val TAG_COLORS = listOf(
+    Color(0xFF2E9E6B),   // green
+    Color(0xFFE0833A),   // orange
+    Color(0xFF3F7CE0),   // blue
+    Color(0xFF8E5BD6),   // purple
+    Color(0xFFD65B8A),   // pink
+    Color(0xFF1FA3B5),   // teal
+    Color(0xFFC9A227),   // gold
+    Color(0xFFD9534F),   // red
+    Color(0xFF6B7A8F),   // slate
+    Color(0xFF7A9E2E)    // olive
+)
+
+fun tagColor(index: Int): Color = TAG_COLORS[index.mod(TAG_COLORS.size)]
+
+/** Tidies a tag name: no extra spaces, not too long. A blank name stays blank. */
+fun cleanTagName(raw: String): String =
+    raw.trim().replace(Regex("\\s+"), " ").take(MAX_TAG_NAME).trim()
+
+/**
+ * Joins the tag list with the "transaction has tag" pairs: transaction id -> its tags (by name).
+ * A transaction with no tags is simply not in the map.
+ */
+fun tagsByTransaction(tags: List<TagEntity>, links: List<TransactionTagCrossRef>): Map<Int, List<TagEntity>> {
+    if (links.isEmpty()) return emptyMap()
+    val byId = tags.associateBy { it.id }
+    return links
+        .mapNotNull { link -> byId[link.tagId]?.let { link.transactionId to it } }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, list) -> list.sortedBy { it.name.lowercase() } }
+}
+
+/** A small coloured label, shown on a transaction row and in its details. */
+@Composable
+fun TagChip(tag: TagEntity, modifier: Modifier = Modifier) {
+    val color = tagColor(tag.colorIndex)
+    Text(
+        text = tag.name,
+        style = MaterialTheme.typography.labelSmall,
+        fontWeight = FontWeight.Medium,
+        color = color,
+        maxLines = 1,
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(color.copy(alpha = 0.15f))
+            .padding(horizontal = 8.dp, vertical = 2.dp)
+    )
+}
+
+/** Several [TagChip]s side by side, wrapping onto the next line when they do not fit. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun TagChipRow(tags: List<TagEntity>, modifier: Modifier = Modifier) {
+    if (tags.isEmpty()) return
+    FlowRow(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        tags.forEach { TagChip(it) }
+    }
+}
+
+/**
+ * The tag choice on the Add and Edit pages: every tag is a chip you tap to switch on or off, and
+ * "+ New tag" at the end makes another one.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun TagPicker(
+    tags: List<TagEntity>,
+    selected: Set<Long>,
+    onChange: (Set<Long>) -> Unit,
+    onNew: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Tags",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            tags.forEach { tag ->
+                val on = tag.id in selected
+                ManuChip(
+                    label = tag.name,
+                    selected = on,
+                    onClick = { onChange(if (on) selected - tag.id else selected + tag.id) }
+                )
+            }
+            ManuChip(label = "+ New tag", selected = false, onClick = onNew)
+        }
+    }
+}
+
+/**
+ * The "New tag" / "Edit tag" dialog: a name and a colour. The keyboard opens by itself.
+ *
+ * [takenNames] holds the other tags' names in lower case, to catch a name that is already used
+ * (the name of the tag being edited is left out of it by the caller).
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun TagDialog(
+    initial: TagEntity?,
+    takenNames: Set<String>,
+    onSave: (name: String, colorIndex: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var colorIndex by remember { mutableIntStateOf(initial?.colorIndex ?: 0) }
+    var error by remember { mutableStateOf<String?>(null) }
+    val focus = remember { FocusRequester() }
+
+    // Put the cursor in the box (a short wait lets the dialog finish opening first)
+    LaunchedEffect(Unit) {
+        delay(150)
+        try {
+            focus.requestFocus()
+        } catch (e: Exception) {
+            // The user can still tap the box
+        }
+    }
+
+    ManuDialog(
+        visible = true,
+        title = if (initial == null) "New tag" else "Edit tag",
+        confirmText = if (initial == null) "Add" else "Save",
+        onConfirm = {
+            val clean = cleanTagName(name)
+            when {
+                clean.isEmpty() -> error = "Type a name."
+                clean.lowercase() in takenNames -> error = "You already have this tag."
+                else -> onSave(clean, colorIndex)
+            }
+        },
+        onDismiss = onDismiss
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            ManuTextField(
+                value = name,
+                onValueChange = {
+                    if (it.length <= MAX_TAG_NAME) {
+                        name = it
+                        error = null
+                    }
+                },
+                placeholder = { Text("e.g. Groceries, Rent") },
+                modifier = Modifier.focusRequester(focus),
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words)
+            )
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Text(
+                text = "Colour",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TAG_COLORS.forEachIndexed { index, color ->
+                    val chosen = index == colorIndex
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .clip(CircleShape)
+                            .background(color)
+                            .then(
+                                if (chosen) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                else Modifier
+                            )
+                            .semantics {
+                                contentDescription = "Colour ${index + 1}"
+                                selected = chosen
+                            }
+                            .clickable { colorIndex = index }
+                    )
+                }
+            }
+        }
+    }
+}

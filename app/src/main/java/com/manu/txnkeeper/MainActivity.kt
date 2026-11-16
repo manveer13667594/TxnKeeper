@@ -41,6 +41,8 @@ import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
 import com.manu.txnkeeper.data.local.DatabaseModule
+import com.manu.txnkeeper.data.local.TagEntity
+import com.manu.txnkeeper.data.local.insertWithTags
 import com.manu.manudesignsystem.theme.ManuDesignSystemTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -205,6 +207,8 @@ fun TxnkeeperApp(
         accountFilter ?: settings.validDefaultAccountId(accounts.map { it.id }) ?: form.accountId
 
     var fabVisible by remember { mutableStateOf(true) }
+    // Tags for the chips on the Add page
+    val tags by remember { dao.observeTags() }.collectAsState(initial = emptyList<TagEntity>())
     var showCamera by remember { mutableStateOf(false) }
     var showVoice by remember { mutableStateOf(false) }
     // Text recognition runs here, after the camera has closed
@@ -406,6 +410,19 @@ fun TxnkeeperApp(
                             }
                         }
                     },
+                    tags = tags,
+                    // "+ New tag" on the Add page: save it, then the page switches it on
+                    onAddTag = { name, colorIndex, onCreated ->
+                        scope.launch {
+                            var newId = 0L
+                            if (safeWrite(context, "add the tag") {
+                                    newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                                }
+                            ) {
+                                onCreated(newId)
+                            }
+                        }
+                    },
                     onClose = { showAdd = false },
                     onScan = { openCamera() },
                     // Save & exit on a recording with several entries: all marked ones, in one go
@@ -425,12 +442,12 @@ fun TxnkeeperApp(
                             }
                         }
                     },
-                    onSubmit = { entity, stay ->
+                    onSubmit = { entity, tagIds, stay ->
                         scope.launch {
                             // An image in the form that is not kept ("Include image" unticked) is deleted after saving
                             val unusedImage = form.imageFile?.takeIf { it != entity.imageFile }
                             // If saving fails the form stays open with everything the user typed
-                            if (!safeWrite(context, "save the transaction") { dao.insert(entity) }) return@launch
+                            if (!safeWrite(context, "save the transaction") { dao.insertWithTags(entity, tagIds) }) return@launch
                             if (unusedImage != null) ReceiptStore.delete(context, unusedImage)
                             if (stay) {
                                 // Save & next: the next spoken entry, or an empty form

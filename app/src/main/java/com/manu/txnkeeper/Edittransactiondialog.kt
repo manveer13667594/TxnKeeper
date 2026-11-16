@@ -22,6 +22,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
+import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionEntity
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDatePicker
@@ -37,13 +38,19 @@ import com.manu.manudesignsystem.components.ManuTextField
 @Composable
 fun EditTransactionDialog(
     original: TransactionEntity,
-    onSave: (TransactionEntity) -> Unit,
+    /** The changed transaction and the ids of the tags it should have now. */
+    onSave: (TransactionEntity, Set<Long>) -> Unit,
     onDismiss: () -> Unit,
     /** Where the payment methods come from (and where a new one is saved). */
     settings: AppSettings,
     /** Saves a new account; calls the second function with its id once it exists. */
     onAddAccount: (AccountEntity, (Long) -> Unit) -> Unit,
-    accounts: List<AccountSummary> = emptyList()
+    accounts: List<AccountSummary> = emptyList(),
+    /** Every tag there is, and the ids this transaction has now. */
+    tags: List<TagEntity> = emptyList(),
+    initialTagIds: Set<Long> = emptySet(),
+    /** Saves a new tag (name, colour number); calls the last function with its id once it exists. */
+    onAddTag: (String, Int, (Long) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     var title by remember { mutableStateOf(original.title) }
     var amountText by remember { mutableStateOf(formatAmountPaise(original.amountPaise)) }
@@ -59,6 +66,8 @@ fun EditTransactionDialog(
     var accountMenuOpen by remember { mutableStateOf(false) }
     var addAccountOpen by remember { mutableStateOf(false) }
     var addPaymentOpen by remember { mutableStateOf(false) }
+    var tagIds by remember { mutableStateOf(initialTagIds) }
+    var addTagOpen by remember { mutableStateOf(false) }
 
     // The receipt image. "Keep image" unticked removes it from the transaction when saved. A newly picked
     // image is a file made by this dialog ([added]); it is deleted again if the dialog is cancelled.
@@ -97,7 +106,9 @@ fun EditTransactionDialog(
                         description = description.trim(),
                         accountId = accountId,
                         imageFile = finalImage
-                    )
+                    ),
+                    // A tag deleted while this dialog was open is dropped here
+                    tagIds.filter { id -> tags.any { it.id == id } }.toSet()
                 )
             }
         },
@@ -185,6 +196,12 @@ fun EditTransactionDialog(
                 label = { Text("Description (optional)") },
                 singleLine = false
             )
+            TagPicker(
+                tags = tags,
+                selected = tagIds,
+                onChange = { tagIds = it },
+                onNew = { addTagOpen = true }
+            )
             ReceiptImageField(
                 imageFile = imageFile,
                 include = keepImage,
@@ -228,6 +245,19 @@ fun EditTransactionDialog(
                 addPaymentOpen = false
             },
             onDismiss = { addPaymentOpen = false }
+        )
+    }
+
+    // "+ New tag": saved, then switched on for this transaction right away
+    if (addTagOpen) {
+        TagDialog(
+            initial = null,
+            takenNames = tags.map { it.name.lowercase() }.toSet(),
+            onSave = { name, colorIndex ->
+                onAddTag(name, colorIndex) { id -> tagIds = tagIds + id }
+                addTagOpen = false
+            },
+            onDismiss = { addTagOpen = false }
         )
     }
 

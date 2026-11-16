@@ -27,7 +27,9 @@ import androidx.compose.material.icons.filled.ImportExport
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
@@ -40,13 +42,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.AppDatabase
+import com.manu.txnkeeper.data.local.TagEntity
+import kotlinx.coroutines.launch
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDialog
@@ -66,6 +72,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 private enum class SettingsPage(val title: String) {
     MAIN("Settings"),
     PAYMENT("Payment methods"),
+    TAGS("Tags"),
     DEFAULTS("Defaults"),
     DATA("Export & import"),
     DELETE("Delete data")
@@ -100,6 +107,17 @@ fun SettingsScreen(
         removingUsage = null
         removingMethod?.let { removingUsage = database.transactionDao().countByPaymentMethod(it) }
     }
+
+    // Tags: the list, how many transactions use each, and the add / edit / delete dialogs
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val tagDao = remember(database) { database.transactionDao() }
+    val tags by remember(tagDao) { tagDao.observeTags() }.collectAsState(initial = emptyList<TagEntity>())
+    val tagUsage by remember(tagDao) { tagDao.observeTagUsage() }.collectAsState(initial = emptyList())
+    val usageById = remember(tagUsage) { tagUsage.associate { it.tagId to it.uses } }
+    var addingTag by remember { mutableStateOf(false) }
+    var editingTag by remember { mutableStateOf<TagEntity?>(null) }
+    var deletingTag by remember { mutableStateOf<TagEntity?>(null) }
 
     // Back from a sub-page returns to the list; from the list it closes Settings (handled by the app)
     BackHandler(enabled = page != SettingsPage.MAIN) { page = SettingsPage.MAIN }
@@ -139,6 +157,8 @@ fun SettingsScreen(
                         settings = settings,
                         onManageAccounts = onManageAccounts,
                         onOpenPayment = { page = SettingsPage.PAYMENT },
+                        tagCount = tags.size,
+                        onOpenTags = { page = SettingsPage.TAGS },
                         onOpenDefaults = { page = SettingsPage.DEFAULTS },
                         onOpenData = { page = SettingsPage.DATA },
                         onOpenDelete = { page = SettingsPage.DELETE },
@@ -150,6 +170,14 @@ fun SettingsScreen(
                         settings = settings,
                         onAdd = { addingMethod = true },
                         onRemove = { removingMethod = it }
+                    )
+
+                    SettingsPage.TAGS -> TagsPage(
+                        tags = tags,
+                        usage = usageById,
+                        onAdd = { addingTag = true },
+                        onEdit = { editingTag = it },
+                        onDelete = { deletingTag = it }
                     )
 
                     SettingsPage.DEFAULTS -> DefaultsPage(settings = settings, accounts = accounts)
@@ -165,6 +193,63 @@ fun SettingsScreen(
                 }
                 Spacer(Modifier.height(20.dp))
             }
+        }
+    }
+
+    if (addingTag) {
+        TagDialog(
+            initial = null,
+            takenNames = tags.map { it.name.lowercase() }.toSet(),
+            onSave = { name, colorIndex ->
+                scope.launch {
+                    safeWrite(context, "add the tag") {
+                        tagDao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                    }
+                }
+                addingTag = false
+            },
+            onDismiss = { addingTag = false }
+        )
+    }
+
+    editingTag?.let { tag ->
+        TagDialog(
+            initial = tag,
+            takenNames = tags.filter { it.id != tag.id }.map { it.name.lowercase() }.toSet(),
+            onSave = { name, colorIndex ->
+                scope.launch {
+                    safeWrite(context, "save the tag") {
+                        tagDao.updateTag(tag.copy(name = name, colorIndex = colorIndex))
+                    }
+                }
+                editingTag = null
+            },
+            onDismiss = { editingTag = null }
+        )
+    }
+
+    // Asks before deleting, and says how many transactions have it. Only the label goes, never a transaction.
+    deletingTag?.let { tag ->
+        val uses = usageById[tag.id] ?: 0
+        ManuDialog(
+            visible = true,
+            title = "Delete \"${tag.name}\"?",
+            confirmText = "Delete",
+            onConfirm = {
+                scope.launch { safeWrite(context, "delete the tag") { tagDao.deleteTag(tag.id) } }
+                deletingTag = null
+            },
+            onDismiss = { deletingTag = null },
+            destructive = true
+        ) {
+            Text(
+                if (uses == 0) {
+                    "No transactions have this tag."
+                } else {
+                    "${if (uses == 1) "1 transaction has" else "$uses transactions have"} this tag. " +
+                            "The tag is taken off; the transactions themselves are not deleted."
+                }
+            )
         }
     }
 
@@ -213,6 +298,8 @@ private fun MainSettings(
     settings: AppSettings,
     onManageAccounts: () -> Unit,
     onOpenPayment: () -> Unit,
+    tagCount: Int,
+    onOpenTags: () -> Unit,
     onOpenDefaults: () -> Unit,
     onOpenData: () -> Unit,
     onOpenDelete: () -> Unit,
@@ -261,6 +348,13 @@ private fun MainSettings(
             icon = Icons.Default.CreditCard,
             subtitle = if (count == 0) "None" else "$count saved",
             onClick = onOpenPayment
+        )
+        HorizontalDivider()
+        SettingsRow(
+            title = "Tags",
+            icon = Icons.Default.Sell,
+            subtitle = if (tagCount == 0) "None" else "$tagCount saved",
+            onClick = onOpenTags
         )
         HorizontalDivider()
         SettingsRow(
@@ -345,6 +439,63 @@ private fun PaymentMethodsPage(
         modifier = Modifier.fillMaxWidth(),
         onClick = onAdd
     ) { Text("Add payment method") }
+}
+
+/** The list of tags: edit or delete each one, and one Add button. */
+@Composable
+private fun TagsPage(
+    tags: List<TagEntity>,
+    usage: Map<Long, Int>,
+    onAdd: () -> Unit,
+    onEdit: (TagEntity) -> Unit,
+    onDelete: (TagEntity) -> Unit
+) {
+    Text(
+        text = "Labels like Groceries or Savings. Put them on a transaction when you add or edit it.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    SettingsCard {
+        Column(
+            modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.sm),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (tags.isEmpty()) {
+                Text(
+                    text = "No tags yet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
+            }
+            tags.forEach { tag ->
+                val uses = usage[tag.id] ?: 0
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row { TagChip(tag) }
+                        Text(
+                            text = if (uses == 1) "1 transaction" else "$uses transactions",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
+                    }
+                    IconButton(onClick = { onEdit(tag) }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit ${tag.name}")
+                    }
+                    IconButton(onClick = { onDelete(tag) }) {
+                        Icon(Icons.Default.Close, contentDescription = "Delete ${tag.name}")
+                    }
+                }
+            }
+        }
+    }
+    ManuButton(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onAdd
+    ) { Text("Add tag") }
 }
 
 /**

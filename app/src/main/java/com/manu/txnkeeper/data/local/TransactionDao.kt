@@ -3,6 +3,7 @@ package com.manu.txnkeeper.data.local
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RawQuery
 import androidx.room.Update
@@ -162,4 +163,43 @@ interface TransactionDao {
         """
     )
     fun observeAccounts(): Flow<List<AccountSummary>>
+
+    // ------------------------------------------------------------ tags
+
+    /** Like [insert], but gives back the new transaction's id (needed to attach its tags). */
+    @Insert
+    suspend fun insertWithId(transaction: TransactionEntity): Long
+
+    @Insert
+    suspend fun insertTag(tag: TagEntity): Long
+
+    @Update
+    suspend fun updateTag(tag: TagEntity)
+
+    /** Deleting a tag only removes the label: its rows in transaction_tags go with it, transactions stay. */
+    @Query("DELETE FROM tags WHERE id = :id")
+    suspend fun deleteTag(id: Long)
+
+    @Query("SELECT * FROM tags ORDER BY name COLLATE NOCASE")
+    fun observeTags(): Flow<List<TagEntity>>
+
+    /** Every "transaction has tag" pair; the list joins these with the tags to show chips on rows. */
+    @Query("SELECT * FROM transaction_tags")
+    fun observeTagLinks(): Flow<List<TransactionTagCrossRef>>
+
+    /** How many transactions use each tag (tags nobody uses are not listed). */
+    @Query("SELECT tagId, COUNT(*) AS uses FROM transaction_tags GROUP BY tagId")
+    fun observeTagUsage(): Flow<List<TagUsage>>
+
+    @Query("DELETE FROM transaction_tags WHERE transactionId = :transactionId")
+    suspend fun clearTagLinks(transactionId: Int)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertTagLinks(links: List<TransactionTagCrossRef>)
 }
+
+/** How many transactions carry one tag. */
+data class TagUsage(
+    val tagId: Long,
+    val uses: Int
+)

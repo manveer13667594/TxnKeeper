@@ -6,8 +6,13 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
-    entities = [TransactionEntity::class, AccountEntity::class],
-    version = 4,
+    entities = [
+        TransactionEntity::class,
+        AccountEntity::class,
+        TagEntity::class,
+        TransactionTagCrossRef::class
+    ],
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -97,12 +102,48 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
-/** A brand-new install has no migration to run, so the first account is added when the file is created. */
+/**
+ * Version 4 -> 5: tags. Adds the tag list and the table that says which transaction has which tag.
+ * The transactions table is not touched, so nothing can be lost. The starting tags are added too.
+ * (The SQL must produce exactly the tables Room expects for TagEntity and TransactionTagCrossRef.)
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `tags` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`colorIndex` INTEGER NOT NULL)"
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `transaction_tags` (" +
+                    "`transactionId` INTEGER NOT NULL, " +
+                    "`tagId` INTEGER NOT NULL, " +
+                    "PRIMARY KEY(`transactionId`, `tagId`), " +
+                    "FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE, " +
+                    "FOREIGN KEY(`tagId`) REFERENCES `tags`(`id`) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE)"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_transaction_tags_tagId` ON `transaction_tags` (`tagId`)")
+        seedDefaultTags(db)
+    }
+}
+
+/** Adds the starting tags (see DEFAULT_TAGS). Used by the 4 -> 5 migration and by a new install. */
+private fun seedDefaultTags(db: SupportSQLiteDatabase) {
+    DEFAULT_TAGS.forEach { (name, color) ->
+        db.execSQL("INSERT INTO `tags` (`name`, `colorIndex`) VALUES ('$name', $color)")
+    }
+}
+
+/** A brand-new install has no migration to run, so the first account and the starting tags are added when the file is created. */
 val SEED_DEFAULT_ACCOUNT = object : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         db.execSQL(
             "INSERT INTO `accounts` (`id`, `name`, `type`, `openingBalancePaise`) " +
                     "VALUES (1, '$DEFAULT_ACCOUNT_NAME', 'BANK', 0)"
         )
+        seedDefaultTags(db)
     }
 }
