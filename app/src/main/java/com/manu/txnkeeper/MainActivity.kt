@@ -43,7 +43,6 @@ import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
 import com.manu.txnkeeper.data.local.DatabaseModule
 import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.insertWithTags
-import com.manu.txnkeeper.widget.WidgetActions
 import com.manu.manudesignsystem.theme.ManuDesignSystemTheme
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
@@ -71,15 +70,10 @@ class MainActivity : ComponentActivity() {
     // Image shared into the app from the gallery / a payment app
     private var sharedUri by mutableStateOf<Uri?>(null)
 
-    // Button tapped on the home screen widget (+ or mic), until the app has acted on it
-    private var widgetAction by mutableStateOf<String?>(null)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleShareIntent(intent)
-        // Only on a fresh launch, so rotating the phone does not repeat it
-        if (savedInstanceState == null) widgetAction = widgetActionOf(intent)
         val settings = AppSettings(this)
         setContent {
             // Light / dark comes from Settings; "System default" follows the phone
@@ -105,9 +99,7 @@ class MainActivity : ComponentActivity() {
                 TxnkeeperApp(
                     settings = settings,
                     sharedImageUri = sharedUri,
-                    onSharedImageHandled = { sharedUri = null },
-                    widgetAction = widgetAction,
-                    onWidgetActionHandled = { widgetAction = null }
+                    onSharedImageHandled = { sharedUri = null }
                 )
             }
         }
@@ -118,11 +110,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleShareIntent(intent)
-        widgetAction = widgetActionOf(intent)
     }
-
-    private fun widgetActionOf(intent: Intent?): String? =
-        intent?.action?.takeIf { it == WidgetActions.ADD_TRANSACTION || it == WidgetActions.VOICE_ENTRY }
 
     private fun handleShareIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
@@ -149,9 +137,7 @@ class MainActivity : ComponentActivity() {
 fun TxnkeeperApp(
     settings: AppSettings = rememberAppSettings(),
     sharedImageUri: Uri? = null,
-    onSharedImageHandled: () -> Unit = {},
-    widgetAction: String? = null,
-    onWidgetActionHandled: () -> Unit = {}
+    onSharedImageHandled: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val database = remember { DatabaseModule.provideDatabase(context) }
@@ -221,6 +207,8 @@ fun TxnkeeperApp(
         accountFilter ?: settings.validDefaultAccountId(accounts.map { it.id }) ?: form.accountId
 
     var fabVisible by remember { mutableStateOf(true) }
+    // true while transactions are selected in the list: the + button and the swipe shortcuts step aside
+    var selecting by remember { mutableStateOf(false) }
     // Tags for the chips on the Add page
     val tags by remember { dao.observeTags() }.collectAsState(initial = emptyList<TagEntity>())
     var showCamera by remember { mutableStateOf(false) }
@@ -322,28 +310,6 @@ fun TxnkeeperApp(
         showVoice = true
     }
 
-    // Home screen widget: + opens the Add page (same as the + button), the mic opens voice entry
-    LaunchedEffect(widgetAction) {
-        val action = widgetAction ?: return@LaunchedEffect
-        // Close anything else that is open on top of the list
-        showCamera = false
-        showSettings = false
-        showAccounts = false
-        showHelp = false
-        showAbout = false
-        showStats = false
-        when (action) {
-            WidgetActions.ADD_TRANSACTION -> {
-                showVoice = false
-                if (form.isBlank) form.useDefaults()
-                form.accountId = startingAccountId()
-                showAdd = true
-            }
-            WidgetActions.VOICE_ENTRY -> openVoice()
-        }
-        onWidgetActionHandled()
-    }
-
     // Leaving the Add page (back arrow, system back, swipe) clears what was typed, so the next
     // "Add transaction" starts empty. The short wait lets the page finish sliding away first.
     LaunchedEffect(showAdd) {
@@ -389,7 +355,10 @@ fun TxnkeeperApp(
                     modifier = Modifier
                         .fillMaxSize()
                         // Left to right opens the camera, right to left opens voice entry
-                        .swipeHorizontally(onLeft = { openVoice() }, onRight = { openCamera() })
+                        .swipeHorizontally(
+                            onLeft = { if (!selecting) openVoice() },
+                            onRight = { if (!selecting) openCamera() }
+                        )
                 ) {
                     TransactionsScreen(
                         dao = dao,
@@ -405,13 +374,15 @@ fun TxnkeeperApp(
                             statsRequest = StatsRequest(filters, search, account)
                             showStats = true
                         },
-                        onScrollDirection = { fabVisible = it }
+                        onScrollDirection = { fabVisible = it },
+                        onSelectionModeChange = { selecting = it },
+                        runInTransaction = { block -> database.withTransaction { block() } }
                     )
 
                     // Floating + button: opens the Add transaction page. It slips away while you
                     // scroll down the list, so it never covers a row, and returns on scroll up.
                     AnimatedVisibility(
-                        visible = fabVisible,
+                        visible = fabVisible && !selecting,
                         enter = fadeIn() + scaleIn(),
                         exit = fadeOut() + scaleOut(),
                         modifier = Modifier

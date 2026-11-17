@@ -88,6 +88,31 @@ interface TransactionDao {
     @Query("SELECT COUNT(*) FROM transactions")
     fun getTotalCount(): Flow<Int>
 
+    // ------------------------------------------------------------------ several transactions at once
+    // Used by the list's selection mode (see TransactionSelection.kt). Every list of ids passed in here
+    // must stay under SQLite's limit on "?" marks, so callers hand them over in chunks (ID_CHUNK).
+
+    /** The ids of every row a raw query matches ("Select all" on the list). */
+    @RawQuery
+    suspend fun rawIds(query: SupportSQLiteQuery): List<Int>
+
+    @Query("SELECT * FROM transactions WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Int>): List<TransactionEntity>
+
+    /** The image file names of these transactions (read before they are deleted). */
+    @Query("SELECT imageFile FROM transactions WHERE id IN (:ids) AND imageFile IS NOT NULL")
+    suspend fun imageFilesOfIds(ids: List<Int>): List<String>
+
+    @Query("UPDATE transactions SET accountId = :accountId WHERE id IN (:ids)")
+    suspend fun moveByIds(ids: List<Int>, accountId: Long)
+
+    @Query("UPDATE transactions SET paymentMethod = :method WHERE id IN (:ids)")
+    suspend fun setPaymentByIds(ids: List<Int>, method: String)
+
+    /** Their tag links go with them (ON DELETE CASCADE). */
+    @Query("DELETE FROM transactions WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Int>)
+
     /** First saved transaction whose description contains this reference number. */
     @Query("SELECT * FROM transactions WHERE description LIKE '%' || :ref || '%' LIMIT 1")
     suspend fun findByReference(ref: String): TransactionEntity?

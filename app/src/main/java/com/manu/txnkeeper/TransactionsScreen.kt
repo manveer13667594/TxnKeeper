@@ -6,6 +6,21 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import com.manu.txnkeeper.data.local.TransactionTagCrossRef
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -56,6 +71,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -146,6 +162,7 @@ private fun buildGroups(list: List<TransactionEntity>): List<DayGroup> {
  * Where the system bars are is handled by the caller (the Scaffold in MainActivity passes its
  * padding in [modifier]), and the "+" button floats over the list from there.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransactionsScreen(
     dao: TransactionDao,
@@ -165,6 +182,10 @@ fun TransactionsScreen(
     onOpenStats: (filters: TxnFilters, search: String, accountId: Long?) -> Unit = { _, _, _ -> },
     /** true = the floating + button should show, false = hide it (scrolling down the list). */
     onScrollDirection: (Boolean) -> Unit = {},
+    /** true while rows are selected: the caller hides the + button and the swipe shortcuts. */
+    onSelectionModeChange: (Boolean) -> Unit = {},
+    /** Runs the given changes as one database transaction (all or nothing). */
+    runInTransaction: suspend (suspend () -> Unit) -> Unit = { it() },
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -179,9 +200,24 @@ fun TransactionsScreen(
     var search by remember { mutableStateOf("") }          // searchText after a short pause
     var filterSheetOpen by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<TransactionEntity?>(null) }
+    // "Edit" with several rows selected: they open one after the other. The ids still to come, and how many there were.
+    var editQueue by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var editTotal by remember { mutableIntStateOf(0) }
     var deleting by remember { mutableStateOf<TransactionEntity?>(null) }
     // The transaction shown in full in a popup (tap a row)
     var viewing by remember { mutableStateOf<TransactionEntity?>(null) }
+
+    // Selection mode: long-press a row to start, tap rows to add or remove them. Holds transaction ids.
+    var selectedIds by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    val selectionMode = selectedIds.isNotEmpty()
+    var moveOpen by remember { mutableStateOf(false) }
+    var deleteSelectedOpen by remember { mutableStateOf(false) }
+    var paymentOpen by remember { mutableStateOf(false) }
+    var tagOpen by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    LaunchedEffect(selectionMode) { onSelectionModeChange(selectionMode) }
+    // Back leaves selection mode first
+    BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
 
     // Wait a moment after typing so we don't query on every keystroke
     LaunchedEffect(searchText) {
@@ -277,6 +313,160 @@ fun TransactionsScreen(
     val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }
     // Name the account on each row only when rows from several accounts are mixed together
     val showAccountOnRows = accounts.size > 1 && accountId == null
+
+    // ---- Actions on the selected transactions
+    fun clearSelection() {
+        selectedIds = emptySet()
+    }
+
+    fun toggle(id: Int) {
+        selectedIds = if (id in selectedIds) selectedIds - id else selectedIds + id
+    }
+
+    fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+
+    fun countText(n: Int) = if (n == 1) "1 transaction" else "$n transactions"
+
+    /** "Select all": every transaction the current filters, search and account match, not only the loaded page. */
+    fun selectAll() {
+        scope.launch {
+            var ids = emptyList<Int>()
+            if (safeWrite(context, "select all") { ids = dao.matchingIds(query) }) selectedIds = ids.toSet()
+        }
+    }
+
+    /**
+     * Selects every transaction of one day (all of them that the current filters and search match, not only
+     * the loaded rows). When the whole day is selected already, it is deselected instead.
+     */
+    fun toggleDay(dayStart: Long) {
+        scope.launch {
+            var ids = emptyList<Int>()
+            val dayQuery = query.copy(
+                dateFrom = maxOf(query.dateFrom ?: dayStart, dayStart),
+                dateTo = minOf(query.dateTo ?: Long.MAX_VALUE, endOfDay(dayStart))
+            )
+            if (safeWrite(context, "select the day") { ids = dao.matchingIds(dayQuery) }) {
+                val day = ids.toSet()
+                if (day.isNotEmpty()) {
+                    selectedIds = if (selectedIds.containsAll(day)) selectedIds - day else selectedIds + day
+                }
+            }
+        }
+    }
+
+    fun shareSelected(format: ShareFormat) {
+        val ids = selectedIds.toList()
+        scope.launch {
+            if (format != ShareFormat.TEXT) toast(if (format == ShareFormat.PDF) "Preparing PDF..." else "Preparing CSV...")
+            safeWrite(context, "share the transactions") {
+                val rows = dao.loadByIds(ids)
+                if (rows.isNotEmpty()) shareTransactions(context, format, rows, accountNames)
+            }
+        }
+    }
+
+    /** Opens the next transaction of the edit queue, or closes the editor when the queue is empty. */
+    fun openNextInQueue() {
+        val next = editQueue.firstOrNull()
+        if (next == null) {
+            editing = null
+            editTotal = 0
+            return
+        }
+        editQueue = editQueue.drop(1)
+        scope.launch {
+            var found: TransactionEntity? = null
+            safeWrite(context, "open the transaction") { found = dao.getByIds(listOf(next)).firstOrNull() }
+            val txn = found
+            if (txn == null) {
+                openNextInQueue()
+            } else {
+                editing = txn
+                toast("Editing ${editTotal - editQueue.size} of $editTotal")
+            }
+        }
+    }
+
+    /** One selected row opens its editor; with several, the editor opens for each in turn (newest first). */
+    fun editSelected() {
+        val ids = selectedIds.toList()
+        if (ids.isEmpty()) return
+        scope.launch {
+            var rows = emptyList<TransactionEntity>()
+            safeWrite(context, "open the transactions") { rows = dao.loadByIds(ids) }
+            val ordered = rows.sortedWith(compareByDescending<TransactionEntity> { it.dateTime }.thenByDescending { it.id })
+            val first = ordered.firstOrNull() ?: return@launch
+            clearSelection()
+            editQueue = ordered.drop(1).map { it.id }
+            editTotal = ordered.size
+            editing = first
+            if (ordered.size > 1) toast("Editing 1 of ${ordered.size}. Save opens the next, Cancel stops.")
+        }
+    }
+
+    fun moveSelected(toId: Long) {
+        val ids = selectedIds.toList()
+        val target = accountNames[toId].orEmpty()
+        scope.launch {
+            if (safeWrite(context, "move the transactions") {
+                    runInTransaction { ids.chunked(ID_CHUNK).forEach { dao.moveByIds(it, toId) } }
+                }
+            ) {
+                clearSelection()
+                toast("Moved ${countText(ids.size)} to $target")
+            }
+        }
+    }
+
+    fun setPaymentOfSelected(method: String) {
+        val ids = selectedIds.toList()
+        scope.launch {
+            if (safeWrite(context, "change the payment method") {
+                    runInTransaction { ids.chunked(ID_CHUNK).forEach { dao.setPaymentByIds(it, method) } }
+                }
+            ) {
+                clearSelection()
+                toast("Payment method set to $method")
+            }
+        }
+    }
+
+    fun addTagToSelected(tagId: Long) {
+        val ids = selectedIds.toList()
+        scope.launch {
+            if (safeWrite(context, "add the tag") {
+                    runInTransaction {
+                        ids.chunked(ID_CHUNK).forEach { chunk ->
+                            dao.insertTagLinks(chunk.map { TransactionTagCrossRef(it, tagId) })
+                        }
+                    }
+                }
+            ) {
+                clearSelection()
+                toast("Tag added to ${countText(ids.size)}")
+            }
+        }
+    }
+
+    fun deleteSelected() {
+        val ids = selectedIds.toList()
+        scope.launch {
+            var images = emptyList<String>()
+            // The images are read first and removed only once the rows are really gone
+            if (safeWrite(context, "delete the transactions") {
+                    runInTransaction {
+                        images = ids.chunked(ID_CHUNK).flatMap { dao.imageFilesOfIds(it) }
+                        ids.chunked(ID_CHUNK).forEach { dao.deleteByIds(it) }
+                    }
+                }
+            ) {
+                clearSelection()
+                if (images.isNotEmpty()) withContext(Dispatchers.IO) { ReceiptStore.deleteAll(context, images) }
+                toast("Deleted ${countText(ids.size)}")
+            }
+        }
+    }
 
     Box(modifier = modifier.fillMaxSize()) {
         Column(
@@ -377,6 +567,24 @@ fun TransactionsScreen(
                     }
                 }
             )
+
+            // ---- While rows are selected: how many, plus "Select all" and "Cancel". The action buttons
+            // (share, edit, move, delete ...) float at the right edge, see SelectionRail.
+            AnimatedVisibility(visible = selectionMode) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "${selectedIds.size} selected",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.weight(1f)
+                    )
+                    ManuTextButton(onClick = { selectAll() }) { Text("Select all") }
+                    ManuTextButton(onClick = { clearSelection() }) { Text("Cancel") }
+                }
+            }
 
             // ---- Search box (opens from the search button)
             AnimatedVisibility(visible = searchOpen) {
@@ -495,15 +703,44 @@ fun TransactionsScreen(
                         ) {
                             item(key = "totals") { totalsHeader() }
                             items(items = groups, key = { it.key }) { group ->
+                                // Width of this day's card: a selected row paints itself out to the card's edges
+                                var cardWidth by remember { mutableIntStateOf(0) }
                                 Column {
-                                    Text(
-                                        text = group.label,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp)
-                                    )
+                                    // Day heading. Long-press it to select the whole day; while selecting, tap it
+                                    // (or "Select day") to add or remove the whole day.
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .combinedClickable(
+                                                onClick = { if (selectionMode) toggleDay(group.dayStart) },
+                                                onLongClick = {
+                                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                    toggleDay(group.dayStart)
+                                                }
+                                            )
+                                            .padding(top = 14.dp, bottom = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = group.label,
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (selectionMode) {
+                                            Text(
+                                                text = if (group.txns.all { it.id in selectedIds }) "Deselect day" else "Select day",
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
                                     // One card per day; amount at the right end of each row
-                                    ManuCard(modifier = Modifier.fillMaxWidth()) {
+                                    ManuCard(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .onSizeChanged { cardWidth = it.width }
+                                    ) {
                                         Column {
                                             group.txns.forEachIndexed { index, txn ->
                                                 if (index > 0) HorizontalDivider()
@@ -511,7 +748,14 @@ fun TransactionsScreen(
                                                     txn = txn,
                                                     accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
                                                     tags = tagMap[txn.id] ?: emptyList(),
-                                                    onOpen = { viewing = txn },
+                                                    selectionMode = selectionMode,
+                                                    selected = txn.id in selectedIds,
+                                                    cardWidthPx = cardWidth,
+                                                    onLongPress = {
+                                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        toggle(txn.id)
+                                                    },
+                                                    onOpen = { if (selectionMode) toggle(txn.id) else viewing = txn },
                                                     onEdit = { editing = txn },
                                                     onDelete = { deleting = txn }
                                                 )
@@ -544,6 +788,33 @@ fun TransactionsScreen(
             onClick = { scope.launch { listState.animateScrollToItem(0) } },
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        // ---- Quick actions for the selected rows, floating at the right edge (where the + button is)
+        SelectionRail(
+            visible = selectionMode,
+            onShare = { format -> shareSelected(format) },
+            onEdit = { editSelected() },
+            onMove = {
+                if (accounts.size < 2) {
+                    toast("Add another account first (Settings > Accounts)")
+                } else {
+                    moveOpen = true
+                }
+            },
+            onPayment = { paymentOpen = true },
+            onTag = {
+                if (allTags.isEmpty()) {
+                    toast("No tags yet. Create one from a transaction's Edit page.")
+                } else {
+                    tagOpen = true
+                }
+            },
+            onDelete = { deleteSelectedOpen = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .navigationBarsPadding()
+                .padding(end = 12.dp, bottom = 24.dp)
+        )
     }
 
     // ---- Dialogs and sheets
@@ -574,6 +845,8 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
+      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+      key(txn.id) {
         EditTransactionDialog(
             original = txn,
             accounts = accounts,
@@ -607,10 +880,16 @@ fun TransactionsScreen(
                         txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
                     }
                 }
-                editing = null
+                // Next one of the queue, or close (a normal single edit has an empty queue)
+                openNextInQueue()
             },
-            onDismiss = { editing = null }
+            onDismiss = {
+                editQueue = emptyList()
+                editTotal = 0
+                editing = null
+            }
         )
+      }
     }
 
     deleting?.let { txn ->
@@ -633,6 +912,64 @@ fun TransactionsScreen(
                 deleting = null
             },
             onDismiss = { deleting = null }
+        )
+    }
+
+    // ---- Dialogs for the selected transactions
+    if (deleteSelectedOpen) {
+        ManuDialogBox(
+            visible = true,
+            title = if (selectedIds.size == 1) "Delete this transaction?" else "Delete ${selectedIds.size} transactions?",
+            message = "They will be deleted together with their receipt images.\n\nThis can't be undone.",
+            confirmText = "Delete",
+            dismissText = "Cancel",
+            onConfirm = {
+                deleteSelectedOpen = false
+                deleteSelected()
+            },
+            onDismiss = { deleteSelectedOpen = false }
+        )
+    }
+
+    if (moveOpen) {
+        PickOneDialog(
+            title = "Move to account",
+            message = "Move ${countText(selectedIds.size)} to:",
+            confirmText = "Move",
+            options = accounts.map { it.id to it.name },
+            onConfirm = { id ->
+                moveOpen = false
+                moveSelected(id)
+            },
+            onDismiss = { moveOpen = false }
+        )
+    }
+
+    if (paymentOpen) {
+        PickOneDialog(
+            title = "Payment method",
+            message = "Set the payment method of ${countText(selectedIds.size)} to:",
+            confirmText = "Apply",
+            options = settings.paymentMethods.map { it to it },
+            onConfirm = { method ->
+                paymentOpen = false
+                setPaymentOfSelected(method)
+            },
+            onDismiss = { paymentOpen = false }
+        )
+    }
+
+    if (tagOpen) {
+        PickOneDialog(
+            title = "Add tag",
+            message = "Add a tag to ${countText(selectedIds.size)}:",
+            confirmText = "Add",
+            options = allTags.map { it.id to it.name },
+            onConfirm = { tagId ->
+                tagOpen = false
+                addTagToSelected(tagId)
+            },
+            onDismiss = { tagOpen = false }
         )
     }
 }
@@ -818,11 +1155,18 @@ private fun EmptyMessage(
  * One transaction: icon, title, small details under it, and the amount at the right end
  * (before the three-dot menu), so every row has the same shape. Tap to open it in full.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TransactionRow(
     txn: TransactionEntity,
     accountName: String?,
     tags: List<TagEntity>,
+    /** Selection mode: a checkbox shows at the left and a tap selects the row instead of opening it. */
+    selectionMode: Boolean = false,
+    selected: Boolean = false,
+    /** Width of the card the row sits in; the selected highlight is painted out to the card's edges. */
+    cardWidthPx: Int = 0,
+    onLongPress: () -> Unit = {},
     onOpen: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
@@ -831,6 +1175,7 @@ private fun TransactionRow(
     val sign = if (income) "+" else "−"
     var menuOpen by remember { mutableStateOf(false) }
     var viewerOpen by remember { mutableStateOf(false) }
+    val selectedTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
 
     // Details under the title: payment method and account (when there is something to show)
     val details = buildString {
@@ -848,11 +1193,26 @@ private fun TransactionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpen)
+            .drawBehind {
+                if (selected) {
+                    // The card pads its content at the sides; reach past that padding to the card's own edges
+                    val extra = ((cardWidthPx - size.width) / 2f).coerceAtLeast(0f)
+                    drawRect(
+                        color = selectedTint,
+                        topLeft = Offset(-extra, 0f),
+                        size = Size(size.width + 2 * extra, size.height)
+                    )
+                }
+            }
+            .combinedClickable(onClick = onOpen, onLongClick = onLongPress)
             .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (selectionMode) {
+            // The whole row handles the tap, so the box itself is only a picture of the state
+            Checkbox(checked = selected, onCheckedChange = null)
+        }
         // The receipt image when there is one (tap it to see it full screen), otherwise the first
         // letter of the title, in the same rounded square. The income / expense arrow is a small badge at its top right.
         Box(modifier = Modifier.size(46.dp)) {
@@ -861,7 +1221,8 @@ private fun TransactionRow(
                     fileName = txn.imageFile,
                     size = 40.dp,
                     modifier = Modifier.align(Alignment.BottomStart),
-                    onClick = { viewerOpen = true }
+                    // While selecting, a tap on the picture selects the row like anywhere else
+                    onClick = if (selectionMode) null else ({ viewerOpen = true })
                 )
             } else {
                 Box(

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Folders the FileProvider may share: only the "shared" folder inside the app's cache -->
+<paths>
+    <cache-path
+        name="shared"
+        path="shared/" />
+</paths>
