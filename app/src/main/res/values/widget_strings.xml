@@ -1,5 +1,12 @@
 <resources>
     <string name="widget_add_transaction">Add transaction</string>
     <string name="widget_voice_entry">Voice entry</string>
+    <string name="widget_scan_receipt">Scan receipt</string>
+    <string name="widget_open_app">Open TxnKeeper</string>
+    <string name="widget_add_label">Add</string>
+    <string name="widget_voice_label">Voice</string>
+    <string name="widget_hint">TxnKeeper</string>
+    <string name="widget_label_search">TxnKeeper search bar</string>
     <string name="widget_description">Quick add and voice entry for TxnKeeper</string>
+    <string name="widget_search_description">Search-bar style shortcuts: add, voice entry and scan a receipt</string>
 </resources>

@@ -3,16 +3,19 @@ package com.manu.txnkeeper.widget
 import android.content.Context
 import android.content.Intent
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.GlanceTheme
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -27,68 +30,111 @@ import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
-import com.manu.txnkeeper.MainActivity
+import androidx.glance.text.FontWeight
+import androidx.glance.text.Text
+import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
+import com.manu.txnkeeper.AppSettings
 import com.manu.txnkeeper.R
 
-/** Intent actions MainActivity listens for. */
-object WidgetActions {
-    const val ADD_TRANSACTION = "com.manu.txnkeeper.action.ADD_TRANSACTION"
-    const val VOICE_ENTRY = "com.manu.txnkeeper.action.VOICE_ENTRY"
-}
-
+/**
+ * The first home screen widget: a card with two buttons, "+" (add a transaction) and the mic (voice entry).
+ *
+ * It looks like the app: the same black-and-white palette (ui/theme/Color.kt), a white / charcoal card,
+ * the main button in "ink" (near black in light, near white in dark) like the app's buttons and selected
+ * pills, and the second one in the soft grey of the app's secondary surfaces. It follows the app's
+ * Light / Dark / System choice from Settings, not the wallpaper colours.
+ *
+ * Narrow (2 cells): icons only. Wider: icon and a short label. How far it can be stretched is set in
+ * res/xml/quick_actions_widget_info.xml (maxResizeWidth / maxResizeHeight).
+ */
 class QuickActionsWidget : GlanceAppWidget() {
 
+    override val sizeMode = SizeMode.Responsive(setOf(COMPACT, WIDE))
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        // Read when the widget is drawn; AppSettings.updateThemeMode redraws it when the choice changes
+        val mode = AppSettings(context).themeMode
+        val palette = WidgetPalette(mode)
         provideContent {
-            GlanceTheme {
-                Row(
-                    modifier = GlanceModifier
-                        .fillMaxSize()
-                        .background(GlanceTheme.colors.widgetBackground)
-                        .cornerRadius(28.dp)
-                        .padding(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    ActionButton(
-                        iconRes = R.drawable.ic_widget_add,
-                        description = context.getString(R.string.widget_add_transaction),
-                        intent = launchIntent(context, WidgetActions.ADD_TRANSACTION),
-                    )
-                    Spacer(GlanceModifier.width(8.dp))
-                    ActionButton(
-                        iconRes = R.drawable.ic_widget_mic,
-                        description = context.getString(R.string.widget_voice_entry),
-                        intent = launchIntent(context, WidgetActions.VOICE_ENTRY),
-                    )
-                }
+            val showLabels = LocalSize.current.width >= WIDE.width
+            Row(
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .background(palette.card)
+                    .cornerRadius(28.dp)
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ActionButton(
+                    iconRes = R.drawable.ic_widget_add,
+                    label = context.getString(R.string.widget_add_label),
+                    description = context.getString(R.string.widget_add_transaction),
+                    showLabel = showLabels,
+                    background = palette.ink,
+                    content = palette.onInk,
+                    intent = widgetLaunchIntent(context, WidgetActions.ADD_TRANSACTION),
+                )
+                Spacer(GlanceModifier.width(8.dp))
+                ActionButton(
+                    iconRes = R.drawable.ic_widget_mic,
+                    label = context.getString(R.string.widget_voice_label),
+                    description = context.getString(R.string.widget_voice_entry),
+                    showLabel = showLabels,
+                    background = palette.soft,
+                    content = palette.onSoft,
+                    intent = widgetLaunchIntent(context, WidgetActions.VOICE_ENTRY),
+                )
             }
         }
     }
 
-    private fun launchIntent(context: Context, action: String) =
-        Intent(context, MainActivity::class.java).apply {
-            this.action = action
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
+    private companion object {
+        val COMPACT = DpSize(110.dp, 55.dp)
+        val WIDE = DpSize(200.dp, 55.dp)
+    }
 }
 
 @Composable
-private fun RowScope.ActionButton(iconRes: Int, description: String, intent: Intent) {
+private fun RowScope.ActionButton(
+    iconRes: Int,
+    label: String,
+    description: String,
+    showLabel: Boolean,
+    background: ColorProvider,
+    content: ColorProvider,
+    intent: Intent,
+) {
     Box(
         modifier = GlanceModifier
             .defaultWeight()
             .fillMaxHeight()
-            .background(GlanceTheme.colors.primaryContainer)
+            .background(background)
             .cornerRadius(20.dp)
             .clickable(actionStartActivity(intent)),
         contentAlignment = Alignment.Center,
     ) {
-        Image(
-            provider = ImageProvider(iconRes),
-            contentDescription = description,
-            modifier = GlanceModifier.size(28.dp),
-            colorFilter = ColorFilter.tint(GlanceTheme.colors.onPrimaryContainer),
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                provider = ImageProvider(iconRes),
+                // With a visible label the icon needs no description of its own
+                contentDescription = if (showLabel) null else description,
+                modifier = GlanceModifier.size(24.dp),
+                colorFilter = ColorFilter.tint(content),
+            )
+            if (showLabel) {
+                Spacer(GlanceModifier.width(8.dp))
+                Text(
+                    text = label,
+                    maxLines = 1,
+                    style = TextStyle(
+                        color = content,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+                )
+            }
+        }
     }
 }
 

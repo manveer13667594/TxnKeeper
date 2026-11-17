@@ -184,6 +184,8 @@ fun TagDialog(
     var colorIndex by remember { mutableIntStateOf(initial?.colorIndex ?: 0) }
     var error by remember { mutableStateOf<String?>(null) }
     val focus = remember { FocusRequester() }
+    // The words of the other tags without their emoji, so "Food" and "🍔 Food" count as the same tag
+    val takenTexts = remember(takenNames) { takenNames.map { stripLeadingEmoji(it).lowercase() }.toSet() }
 
     // Put the cursor in the box (a short wait lets the dialog finish opening first)
     LaunchedEffect(Unit) {
@@ -200,10 +202,12 @@ fun TagDialog(
         title = if (initial == null) "New tag" else "Edit tag",
         confirmText = if (initial == null) "Add" else "Save",
         onConfirm = {
-            val clean = cleanTagName(name)
+            // Every tag is saved with an emoji: yours if you typed one, otherwise one that fits the words
+            val clean = withTagEmoji(name, MAX_TAG_NAME)
+            val words = stripLeadingEmoji(clean)
             when {
-                clean.isEmpty() -> error = "Type a name."
-                clean.lowercase() in takenNames -> error = "You already have this tag."
+                words.isEmpty() -> error = "Type a name."
+                words.lowercase() in takenTexts -> error = "You already have this tag."
                 else -> onSave(clean, colorIndex)
             }
         },
@@ -225,9 +229,18 @@ fun TagDialog(
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
+            // Shows the emoji that will be added when the name has none (or the shortened name)
+            val preview = withTagEmoji(name, MAX_TAG_NAME)
+            if (preview.isNotEmpty() && preview != name.trim()) {
+                Text(
+                    text = "Will be saved as $preview",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             // Quick picks: only when adding, and only the ones you do not have yet
             val suggestions = if (initial == null) {
-                SUGGESTED_TAGS.filter { it.first.lowercase() !in takenNames }
+                SUGGESTED_TAGS.filter { stripLeadingEmoji(it.first).lowercase() !in takenTexts }
             } else emptyList()
             if (suggestions.isNotEmpty()) {
                 Text(

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import com.manu.txnkeeper.widget.Widgets
 
 /** The two transaction types, as they are stored in the database. */
 const val TYPE_EXPENSE = "EXPENSE"
@@ -26,8 +27,8 @@ enum class ThemeMode(val label: String) {
  * To add a setting later: add a key, a `var` like [themeMode], and an `update...` function.
  */
 class AppSettings(context: Context) {
-    private val prefs = context.applicationContext
-        .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val appContext = context.applicationContext
+    private val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     var themeMode by mutableStateOf(readThemeMode())
         private set
@@ -35,6 +36,8 @@ class AppSettings(context: Context) {
     fun updateThemeMode(mode: ThemeMode) {
         themeMode = mode
         prefs.edit().putString(KEY_THEME_MODE, mode.name).apply()
+        // The home screen widgets follow the app's Light / Dark / System choice
+        Widgets.refreshAll(appContext)
     }
 
     private fun readThemeMode(): ThemeMode {

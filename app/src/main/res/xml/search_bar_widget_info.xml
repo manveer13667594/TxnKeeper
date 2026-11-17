@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The search-bar style widget. Only its width can be changed, up to maxResizeWidth; it stays one row high. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_search_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="250dp"
+    android:minHeight="55dp"
+    android:minResizeWidth="200dp"
+    android:minResizeHeight="55dp"
+    android:maxResizeWidth="420dp"
+    android:maxResizeHeight="80dp"
+    android:resizeMode="horizontal"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    tools:targetApi="31" />
