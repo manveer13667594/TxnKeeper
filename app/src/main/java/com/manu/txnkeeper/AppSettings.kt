@@ -40,6 +40,18 @@ class AppSettings(context: Context) {
         Widgets.refreshAll(appContext)
     }
 
+    /**
+     * The button of the home screen "Add / Voice / Scan" widget that was tapped last (one of the
+     * WidgetActions), or null before the first tap. The widget highlights it.
+     */
+    val lastQuickAction: String?
+        get() = prefs.getString(KEY_LAST_QUICK_ACTION, null)
+
+    fun markQuickAction(action: String) {
+        prefs.edit().putString(KEY_LAST_QUICK_ACTION, action).apply()
+        Widgets.refreshAll(appContext)
+    }
+
     private fun readThemeMode(): ThemeMode {
         val saved = prefs.getString(KEY_THEME_MODE, null)
         return ThemeMode.entries.firstOrNull { it.name == saved } ?: ThemeMode.SYSTEM
@@ -206,6 +218,7 @@ class AppSettings(context: Context) {
         const val KEY_DEFAULT_ACCOUNT = "default_account_id"
         const val KEY_DEFAULT_PAYMENT = "default_payment"
         const val KEY_THEME_MODE = "theme_mode"
+        const val KEY_LAST_QUICK_ACTION = "last_quick_widget_action"
         const val KEY_PAYMENT_METHODS = "payment_methods"
         const val KEY_VOICE_TIPS = "voice_tips"
         const val KEY_INCLUDE_IMAGE = "include_image_default"

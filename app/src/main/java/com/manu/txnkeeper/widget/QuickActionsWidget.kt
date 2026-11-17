@@ -27,90 +27,117 @@ import androidx.glance.layout.RowScope
 import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxHeight
 import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.unit.ColorProvider
 import com.manu.txnkeeper.AppSettings
 import com.manu.txnkeeper.R
 
 /**
- * The first home screen widget: a card with two buttons, "+" (add a transaction) and the mic (voice entry).
+ * The first home screen widget: a short, rounded bar with three pill buttons, "+" (add a transaction),
+ * the mic (voice entry) and the camera (scan a receipt).
  *
- * It looks like the app: the same black-and-white palette (ui/theme/Color.kt), a white / charcoal card,
- * the main button in "ink" (near black in light, near white in dark) like the app's buttons and selected
- * pills, and the second one in the soft grey of the app's secondary surfaces. It follows the app's
- * Light / Dark / System choice from Settings, not the wallpaper colours.
+ * The button you used last is the highlighted one, in "ink" (near black in light, near white in dark, like
+ * the app's buttons); the others sit in the card colour. Before the first tap none is highlighted. The app
+ * remembers the last tap (AppSettings.lastQuickAction, set when MainActivity opens from this widget) and
+ * redraws the widget.
  *
- * Narrow (2 cells): icons only. Wider: icon and a short label. How far it can be stretched is set in
- * res/xml/quick_actions_widget_info.xml (maxResizeWidth / maxResizeHeight).
+ * Every button's fill and icon colour are set on every draw, highlighted or not. The launcher redraws a
+ * widget onto the old one, so a colour that is only set for the highlighted button would stay on it after
+ * another button is tapped.
+ *
+ * Same palette and Light / Dark / System choice as the app and [SearchBarWidget]. Narrow: icons only. Wider:
+ * icon and a short label. The bar is always [BAR_HEIGHT] high, in the middle of the space the launcher gives
+ * it, and only its width can be changed (res/xml/quick_actions_widget_info.xml).
  */
 class QuickActionsWidget : GlanceAppWidget() {
 
     override val sizeMode = SizeMode.Responsive(setOf(COMPACT, WIDE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Read when the widget is drawn; AppSettings.updateThemeMode redraws it when the choice changes
-        val mode = AppSettings(context).themeMode
-        val palette = WidgetPalette(mode)
+        // Read when the widget is drawn; the app redraws it when the theme or the last tapped button changes
+        val settings = AppSettings(context)
+        val palette = WidgetPalette(settings.themeMode)
+        val last = settings.lastQuickAction
         provideContent {
             val showLabels = LocalSize.current.width >= WIDE.width
-            Row(
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .background(palette.card)
-                    .cornerRadius(28.dp)
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                ActionButton(
-                    iconRes = R.drawable.ic_widget_add,
-                    label = context.getString(R.string.widget_add_label),
-                    description = context.getString(R.string.widget_add_transaction),
-                    showLabel = showLabels,
-                    background = palette.ink,
-                    content = palette.onInk,
-                    intent = widgetLaunchIntent(context, WidgetActions.ADD_TRANSACTION),
-                )
-                Spacer(GlanceModifier.width(8.dp))
-                ActionButton(
-                    iconRes = R.drawable.ic_widget_mic,
-                    label = context.getString(R.string.widget_voice_label),
-                    description = context.getString(R.string.widget_voice_entry),
-                    showLabel = showLabels,
-                    background = palette.soft,
-                    content = palette.onSoft,
-                    intent = widgetLaunchIntent(context, WidgetActions.VOICE_ENTRY),
-                )
+            Box(modifier = GlanceModifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Row(
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .height(BAR_HEIGHT)
+                        .background(palette.bar)
+                        .cornerRadius(BAR_HEIGHT / 2)
+                        .padding(BAR_PADDING),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    QuickButton(
+                        iconRes = R.drawable.ic_widget_add,
+                        label = context.getString(R.string.widget_add_label),
+                        description = context.getString(R.string.widget_add_transaction),
+                        showLabel = showLabels,
+                        focused = last == WidgetActions.ADD_TRANSACTION,
+                        palette = palette,
+                        intent = widgetLaunchIntent(context, WidgetActions.ADD_TRANSACTION, WidgetActions.SOURCE_QUICK),
+                    )
+                    Spacer(GlanceModifier.width(BAR_PADDING))
+                    QuickButton(
+                        iconRes = R.drawable.ic_widget_mic,
+                        label = context.getString(R.string.widget_voice_label),
+                        description = context.getString(R.string.widget_voice_entry),
+                        showLabel = showLabels,
+                        focused = last == WidgetActions.VOICE_ENTRY,
+                        palette = palette,
+                        intent = widgetLaunchIntent(context, WidgetActions.VOICE_ENTRY, WidgetActions.SOURCE_QUICK),
+                    )
+                    Spacer(GlanceModifier.width(BAR_PADDING))
+                    QuickButton(
+                        iconRes = R.drawable.ic_widget_camera,
+                        label = context.getString(R.string.widget_scan_label),
+                        description = context.getString(R.string.widget_scan_receipt),
+                        showLabel = showLabels,
+                        focused = last == WidgetActions.OPEN_CAMERA,
+                        palette = palette,
+                        intent = widgetLaunchIntent(context, WidgetActions.OPEN_CAMERA, WidgetActions.SOURCE_QUICK),
+                    )
+                }
             }
         }
     }
 
     private companion object {
-        val COMPACT = DpSize(110.dp, 55.dp)
-        val WIDE = DpSize(200.dp, 55.dp)
+        /** How tall the bar is. Change this one number to make the widget taller or shorter. */
+        val BAR_HEIGHT = 64.dp
+        val BAR_PADDING = 8.dp
+        val COMPACT = DpSize(150.dp, 40.dp)
+        val WIDE = DpSize(240.dp, 40.dp)
     }
 }
 
 @Composable
-private fun RowScope.ActionButton(
+private fun RowScope.QuickButton(
     iconRes: Int,
     label: String,
     description: String,
     showLabel: Boolean,
-    background: ColorProvider,
-    content: ColorProvider,
+    focused: Boolean,
+    palette: WidgetPalette,
     intent: Intent,
 ) {
+    // Always both colours, see the note on QuickActionsWidget
+    val fill = if (focused) palette.ink else palette.card
+    val content = if (focused) palette.onInk else palette.onSoft
     Box(
         modifier = GlanceModifier
             .defaultWeight()
             .fillMaxHeight()
-            .background(background)
-            .cornerRadius(20.dp)
+            .background(fill)
+            .cornerRadius((BUTTON_HEIGHT) / 2)
             .clickable(actionStartActivity(intent)),
         contentAlignment = Alignment.Center,
     ) {
@@ -119,17 +146,17 @@ private fun RowScope.ActionButton(
                 provider = ImageProvider(iconRes),
                 // With a visible label the icon needs no description of its own
                 contentDescription = if (showLabel) null else description,
-                modifier = GlanceModifier.size(24.dp),
+                modifier = GlanceModifier.size(20.dp),
                 colorFilter = ColorFilter.tint(content),
             )
             if (showLabel) {
-                Spacer(GlanceModifier.width(8.dp))
+                Spacer(GlanceModifier.width(6.dp))
                 Text(
                     text = label,
                     maxLines = 1,
                     style = TextStyle(
                         color = content,
-                        fontSize = 14.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                     ),
                 )
@@ -137,6 +164,9 @@ private fun RowScope.ActionButton(
         }
     }
 }
+
+/** A button fills the bar's height minus the padding above and below it. */
+private val BUTTON_HEIGHT = 40.dp
 
 class QuickActionsWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = QuickActionsWidget()

@@ -40,8 +40,8 @@ import com.manu.txnkeeper.R
 
 /**
  * The second home screen widget, laid out like the Google search bar: a rounded bar with the app logo on
- * the left (tap it to open the app) and three icons on the right: + (add a transaction), the mic (voice
- * entry) and the camera (scan a receipt).
+ * the left (tap it to open the app) and four icons on the right: search (opens the app with the search box
+ * ready), + (add a transaction), the mic (voice entry) and the camera (scan a receipt).
  *
  * Same app colours and theme choice as [QuickActionsWidget]. Narrow: logo and icons. Wider: the app name
  * shows next to the logo as well.
@@ -96,7 +96,11 @@ class SearchBarWidget : GlanceAppWidget() {
                             )
                         }
                     }
-                    // Right: + , mic, camera
+                    // Right: search, + , mic, camera
+                    IconAction(
+                        R.drawable.ic_widget_search, context.getString(R.string.widget_search_transactions),
+                        palette.icon, widgetLaunchIntent(context, WidgetActions.OPEN_SEARCH),
+                    )
                     IconAction(
                         R.drawable.ic_widget_add, context.getString(R.string.widget_add_transaction),
                         palette.icon, widgetLaunchIntent(context, WidgetActions.ADD_TRANSACTION),
@@ -116,8 +120,9 @@ class SearchBarWidget : GlanceAppWidget() {
 
     private companion object {
         val BAR_HEIGHT = 56.dp
-        val COMPACT = DpSize(200.dp, 55.dp)
-        val WIDE = DpSize(260.dp, 55.dp)
+        // Logo + four icons need about 225dp; the app name shows from 330dp
+        val COMPACT = DpSize(230.dp, 55.dp)
+        val WIDE = DpSize(330.dp, 55.dp)
     }
 }
 
@@ -126,7 +131,7 @@ class SearchBarWidget : GlanceAppWidget() {
 private fun IconAction(iconRes: Int, description: String, tint: ColorProvider, intent: Intent) {
     Box(
         modifier = GlanceModifier
-            .size(44.dp)
+            .size(42.dp)
             .clickable(actionStartActivity(intent)),
         contentAlignment = Alignment.Center,
     ) {

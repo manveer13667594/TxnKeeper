@@ -184,6 +184,9 @@ fun TransactionsScreen(
     onScrollDirection: (Boolean) -> Unit = {},
     /** true while rows are selected: the caller hides the + button and the swipe shortcuts. */
     onSelectionModeChange: (Boolean) -> Unit = {},
+    /** true when something outside (the widget's search icon) asks for the search box to open. */
+    searchRequested: Boolean = false,
+    onSearchRequestHandled: () -> Unit = {},
     /** Runs the given changes as one database transaction (all or nothing). */
     runInTransaction: suspend (suspend () -> Unit) -> Unit = { it() },
     modifier: Modifier = Modifier
@@ -226,6 +229,12 @@ fun TransactionsScreen(
     }
     // Opening search puts the cursor in the box
     LaunchedEffect(searchOpen) { if (searchOpen) searchFocus.requestFocus() }
+    LaunchedEffect(searchRequested) {
+        if (searchRequested) {
+            searchOpen = true
+            onSearchRequestHandled()
+        }
+    }
 
     // ---- Data: one page at a time, plus totals computed by the database
     val query = remember(filters, search, accountId) { filters.toQuery(search, accountId) }

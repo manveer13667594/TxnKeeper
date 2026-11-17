@@ -6,7 +6,7 @@
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="250dp"
     android:minHeight="55dp"
-    android:minResizeWidth="200dp"
+    android:minResizeWidth="230dp"
     android:minResizeHeight="55dp"
     android:maxResizeWidth="420dp"
     android:maxResizeHeight="80dp"

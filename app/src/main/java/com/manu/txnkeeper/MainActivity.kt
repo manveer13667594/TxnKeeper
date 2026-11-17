@@ -79,7 +79,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         handleShareIntent(intent)
         // Only on a fresh launch, so rotating the phone does not repeat it
-        if (savedInstanceState == null) widgetAction = widgetActionOf(intent)
+        if (savedInstanceState == null) {
+            widgetAction = widgetActionOf(intent)
+            recordQuickTap(intent)
+        }
         val settings = AppSettings(this)
         setContent {
             // Light / dark comes from Settings; "System default" follows the phone
@@ -119,11 +122,21 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         handleShareIntent(intent)
         widgetAction = widgetActionOf(intent)
+        recordQuickTap(intent)
+    }
+
+    // A tap on the Add / Voice / Scan widget: remember which button it was, so the widget highlights it
+    private fun recordQuickTap(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != WidgetActions.SCHEME || data.host != WidgetActions.SOURCE_QUICK) return
+        val action = widgetActionOf(intent) ?: return
+        AppSettings(this).markQuickAction(action)
     }
 
     private fun widgetActionOf(intent: Intent?): String? =
         intent?.action?.takeIf {
-            it == WidgetActions.ADD_TRANSACTION || it == WidgetActions.VOICE_ENTRY || it == WidgetActions.OPEN_CAMERA
+            it == WidgetActions.ADD_TRANSACTION || it == WidgetActions.VOICE_ENTRY ||
+                it == WidgetActions.OPEN_CAMERA || it == WidgetActions.OPEN_SEARCH
         }
 
     private fun handleShareIntent(intent: Intent?) {
@@ -237,6 +250,8 @@ fun TxnkeeperApp(
     }
     var showCamera by remember { mutableStateOf(false) }
     var showVoice by remember { mutableStateOf(false) }
+    // The widget's search icon: the list opens its search box (and clears this again)
+    var searchRequested by remember { mutableStateOf(false) }
     // Text recognition runs here, after the camera has closed
     val ocr = rememberOcrController()
 
@@ -353,6 +368,10 @@ fun TxnkeeperApp(
                 showAdd = true
             }
             WidgetActions.VOICE_ENTRY -> openVoice()
+            WidgetActions.OPEN_SEARCH -> {
+                showVoice = false
+                searchRequested = true
+            }
             WidgetActions.OPEN_CAMERA -> {
                 showVoice = false
                 openCamera()
@@ -427,6 +446,8 @@ fun TxnkeeperApp(
                         },
                         onScrollDirection = { fabVisible = it },
                         onSelectionModeChange = { selecting = it },
+                        searchRequested = searchRequested,
+                        onSearchRequestHandled = { searchRequested = false },
                         runInTransaction = { block -> database.withTransaction { block() } }
                     )
 

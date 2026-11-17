@@ -45,6 +45,30 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/quick_actions_widget_info" />
         </receiver>
+
+        <!-- Home screen widget: search-bar style (add, voice entry, scan receipt) -->
+        <receiver
+            android:name=".widget.SearchBarWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_label_search">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/search_bar_widget_info" />
+        </receiver>
+
+        <!-- Lets the app hand a PDF / CSV it made (in its cache folder) to the share sheet -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_file_paths" />
+        </provider>
     </application>
 
 </manifest>
