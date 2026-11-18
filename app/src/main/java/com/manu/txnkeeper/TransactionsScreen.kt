@@ -86,6 +86,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.TagEntity
@@ -854,51 +855,51 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-      key(txn.id) {
-        EditTransactionDialog(
-            original = txn,
-            accounts = accounts,
-            settings = settings,
-            onAddAccount = { newAccount, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the account") {
-                            newId = dao.insertAccount(newAccount)
-                        }) {
-                        onCreated(newId)
+        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+        key(txn.id) {
+            EditTransactionDialog(
+                original = txn,
+                accounts = accounts,
+                settings = settings,
+                onAddAccount = { newAccount, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the account") {
+                                newId = dao.insertAccount(newAccount)
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            tags = allTags,
-            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-            onAddTag = { name, colorIndex, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the tag") {
-                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                        }) {
-                        onCreated(newId)
+                },
+                tags = allTags,
+                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+                onAddTag = { name, colorIndex, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the tag") {
+                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            onSave = { updated, tagIds ->
-                scope.launch {
-                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
-                        // The image it had before is not used any more if it was removed or replaced
-                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                },
+                onSave = { updated, tagIds ->
+                    scope.launch {
+                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
+                            // The image it had before is not used any more if it was removed or replaced
+                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                        }
                     }
+                    // Next one of the queue, or close (a normal single edit has an empty queue)
+                    openNextInQueue()
+                },
+                onDismiss = {
+                    editQueue = emptyList()
+                    editTotal = 0
+                    editing = null
                 }
-                // Next one of the queue, or close (a normal single edit has an empty queue)
-                openNextInQueue()
-            },
-            onDismiss = {
-                editQueue = emptyList()
-                editTotal = 0
-                editing = null
-            }
-        )
-      }
+            )
+        }
     }
 
     deleting?.let { txn ->
@@ -1186,19 +1187,6 @@ private fun TransactionRow(
     var viewerOpen by remember { mutableStateOf(false) }
     val selectedTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
 
-    // Details under the title: payment method and account (when there is something to show)
-    val details = buildString {
-        if (txn.paymentMethod.isNotBlank()) append(txn.paymentMethod)
-        if (accountName != null) {
-            if (isNotEmpty()) append(" • ")
-            append(accountName)
-        }
-    }
-    val timeLine = buildString {
-        append(formatTime(txn.dateTime))
-        if (txn.description.isNotBlank()) append(" • ").append(txn.description)
-    }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1214,7 +1202,7 @@ private fun TransactionRow(
                 }
             }
             .combinedClickable(onClick = onOpen, onLongClick = onLongPress)
-            .padding(vertical = 12.dp),
+            .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
@@ -1262,36 +1250,38 @@ private fun TransactionRow(
             )
         }
         Column(modifier = Modifier.weight(1f)) {
-            // Title gets the full width up to the three-dot menu
-            Text(text = txn.title, style = MaterialTheme.typography.titleMedium)
-            // Payment / account and time on the left, the amount at the right end of this row
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    if (details.isNotEmpty()) {
-                        Text(
-                            text = details,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Text(
-                        text = timeLine,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Text(
-                    text = sign + formatMoney(txn.amountPaise),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (income) IncomeColor else ExpenseColor,
-                    maxLines = 1,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-            // Tags under the details (nothing when the transaction has none)
-            TagChipRow(tags = tags, modifier = Modifier.padding(top = 6.dp))
+            // Line 1: title (one line)
+            Text(
+                text = txn.title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            // Line 2: tags (first two, then +N), only when there are any
+            TagChipLine(tags = tags, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
+            // Line 3: one muted line, time · payment · account · note (the note is cut first when short of space)
+            val meta = listOfNotNull(
+                formatTime(txn.dateTime),
+                txn.paymentMethod.takeIf { it.isNotBlank() },
+                accountName?.takeIf { it.isNotBlank() },
+                txn.description.takeIf { it.isNotBlank() }?.replace('\n', ' ')
+            ).joinToString(" • ")
+            Text(
+                text = meta,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
         }
+        // The amount, centred vertically on the right so it lines up across every row
+        Text(
+            text = sign + formatMoney(txn.amountPaise),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (income) IncomeColor else ExpenseColor,
+            maxLines = 1
+        )
         // Three-dot menu on its own, centred on the right
 //        Box {
 //            IconButton(onClick = { menuOpen = true }) {

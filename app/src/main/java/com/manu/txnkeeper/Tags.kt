@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,6 +36,8 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuDialog
@@ -109,11 +112,37 @@ fun TagChip(tag: TagEntity, modifier: Modifier = Modifier) {
         fontWeight = FontWeight.Medium,
         color = color,
         maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .clip(RoundedCornerShape(50))
             .background(color.copy(alpha = 0.15f))
             .padding(horizontal = 8.dp, vertical = 2.dp)
     )
+}
+
+/**
+ * Compact one-line version for list rows: the first [maxVisible] tags, then "+N" for the rest.
+ * Never wraps; a long tag name is shortened with "…" instead.
+ */
+@Composable
+fun TagChipLine(tags: List<TagEntity>, modifier: Modifier = Modifier, maxVisible: Int = 2) {
+    if (tags.isEmpty()) return
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        tags.take(maxVisible).forEach { TagChip(it, modifier = Modifier.weight(1f, fill = false)) }
+        val more = tags.size - maxVisible
+        if (more > 0) {
+            Text(
+                text = "+$more",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1
+            )
+        }
+    }
 }
 
 /** Several [TagChip]s side by side, wrapping onto the next line when they do not fit. */
