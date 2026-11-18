@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,7 +49,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -70,8 +68,6 @@ import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.components.ManuFab
 import com.manu.manudesignsystem.theme.ManuDesignSystem
-import com.manu.manudesignsystem.components.ManuDropdownMenu
-import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuPickerField
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuDatePicker
@@ -354,6 +350,8 @@ fun AddTransactionScreen(
     tags: List<TagEntity>,
     /** Saves a new tag (name, colour number); calls the last function with its id once it exists. */
     onAddTag: (String, Int, (Long) -> Unit) -> Unit,
+    /** Which tags fit this title best (from your past transactions and keywords); empty when unsure. */
+    suggestTags: suspend (title: String) -> Set<Long> = { emptySet() },
     onClose: () -> Unit,
     /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
     onSubmit: (TransactionEntity, tagIds: Set<Long>, stay: Boolean) -> Unit,
@@ -391,6 +389,24 @@ fun AddTransactionScreen(
             titleFocus.requestFocus()
             keyboardController?.show()
         }
+    }
+
+    // Tags switched on by the app from the title (typed, scanned or spoken). Once you change the tags
+    // yourself, the app stops touching them for this entry.
+    var autoTags by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    LaunchedEffect(form.title, tags) {
+        val title = form.title.trim()
+        if (title.isBlank()) {
+            // Blank form: drop what the app picked earlier, if you did not change it
+            if (form.tagIds == autoTags) form.tagIds = emptySet()
+            autoTags = emptySet()
+            return@LaunchedEffect
+        }
+        kotlinx.coroutines.delay(400)   // wait until typing pauses
+        if (form.tagIds != autoTags) return@LaunchedEffect   // you picked tags yourself
+        val suggestion = suggestTags(title)
+        form.tagIds = suggestion
+        autoTags = suggestion
     }
 
     // The payment methods you have set up in Settings
@@ -524,44 +540,46 @@ fun AddTransactionScreen(
                             ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
                             ManuChip(label = "Income", selected = form.type == "INCOME", onClick = { form.type = "INCOME" })
                         }
+
+                        // Tags: one row that scrolls sideways, tap to switch on or off.
+                        // Not for the entries of a voice recording.
+                        if (!form.inBatch) {
+                            TagPicker(
+                                tags = tags,
+                                selected = form.tagIds,
+                                onChange = { form.tagIds = it },
+                                onNew = {
+                                    focusManager.clearFocus()
+                                    addTagOpen = true
+                                }
+                            )
+                        }
                         Column(
                             modifier = Modifier.width(220.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
 
                         ) {
                             // Account: always shown, so a new one can be added from here
-                            Box {
-                                ManuPickerField(
-                                    value = account?.name ?: "",
-                                    leadingIcon = AppIcons.Wallet,
-                                    trailingIcon = Icons.Default.KeyboardArrowDown,
-                                    onClick = { accountMenuOpen = true }
-                                )
-                                ManuDropdownMenu(
-                                    expanded = accountMenuOpen,
-                                    onDismissRequest = { accountMenuOpen = false },
-                                    items = accounts.map { a ->
-                                        ManuMenuItem(label = a.name, onClick = { form.accountId = a.id })
-                                    } + ManuMenuItem(label = "+ New account", onClick = { addAccountOpen = true })
-                                )
-                            }
+                            ManuPickerField(
+                                value = account?.name ?: "",
+                                leadingIcon = AppIcons.Wallet,
+                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    accountMenuOpen = true
+                                }
+                            )
 
                             // Payment method: your list from Settings, plus "+ Add new" at the end
-                            Box {
-                                ManuPickerField(
-                                    value = form.payment.ifBlank { "Add payment method" },
-                                    leadingIcon = Icons.Default.CreditCard,
-                                    trailingIcon = Icons.Default.KeyboardArrowDown,
-                                    onClick = { payMenuOpen = true }
-                                )
-                                ManuDropdownMenu(
-                                    expanded = payMenuOpen,
-                                    onDismissRequest = { payMenuOpen = false },
-                                    items = methods.map { method ->
-                                        ManuMenuItem(label = method, onClick = { form.payment = method })
-                                    } + ManuMenuItem(label = "+ Add new", onClick = { addPaymentOpen = true })
-                                )
-                            }
+                            ManuPickerField(
+                                value = form.payment.ifBlank { "Add payment method" },
+                                leadingIcon = Icons.Default.CreditCard,
+                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    payMenuOpen = true
+                                }
+                            )
 
                             // Date
                             ManuPickerField(
@@ -593,19 +611,6 @@ fun AddTransactionScreen(
                             placeholder = { Text("Description (optional)") },
                             singleLine = false
                         )
-
-                        // Tags: tap to switch on or off. Not for the entries of a voice recording.
-                        if (!form.inBatch) {
-                            TagPicker(
-                                tags = tags,
-                                selected = form.tagIds,
-                                onChange = { form.tagIds = it },
-                                onNew = {
-                                    focusManager.clearFocus()
-                                    addTagOpen = true
-                                }
-                            )
-                        }
 
                         // Receipt image: from a scan, or attached here. Not for the entries of a voice recording.
                         if (!form.inBatch) {
@@ -702,13 +707,12 @@ fun AddTransactionScreen(
             }
 
             // Floating buttons: mic (speak a transaction) and camera (scan a receipt).
-            // Hidden while the keyboard is open so they don't cover what you are typing.
-            val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-            // ...and while scrolling down, so they never sit on top of fields or buttons
+            // They stay visible (just above the keyboard) when the page opens, and hide only while
+            // scrolling down, so they never sit on top of fields or buttons
             var fabsVisible by remember { mutableStateOf(true) }
             FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
             AnimatedVisibility(
-                visible = !keyboardOpen && fabsVisible,
+                visible = fabsVisible,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut(),
                 modifier = Modifier.align(Alignment.BottomEnd)
@@ -726,6 +730,26 @@ fun AddTransactionScreen(
                 }
             }
         }
+    }
+
+    // Account and payment method lists open as a card in the middle of the screen
+    if (accountMenuOpen) {
+        PickerListDialog(
+            title = "Account",
+            options = accounts.map { acc ->
+                PickerOption(acc.name, selected = acc.id == account?.id, onClick = { form.accountId = acc.id })
+            } + PickerOption("+ New account", accent = true, onClick = { addAccountOpen = true }),
+            onDismiss = { accountMenuOpen = false }
+        )
+    }
+    if (payMenuOpen) {
+        PickerListDialog(
+            title = "Payment method",
+            options = methods.map { method ->
+                PickerOption(method, selected = method == form.payment, onClick = { form.payment = method })
+            } + PickerOption("+ Add new", accent = true, onClick = { addPaymentOpen = true }),
+            onDismiss = { payMenuOpen = false }
+        )
     }
 
     // "+ New account": name and optional opening balance; the new account is selected right away

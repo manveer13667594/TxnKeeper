@@ -216,6 +216,18 @@ interface TransactionDao {
     @Query("SELECT tagId, COUNT(*) AS uses FROM transaction_tags GROUP BY tagId")
     fun observeTagUsage(): Flow<List<TagUsage>>
 
+    /** How often each tag was used on transactions whose title matches the LIKE pattern (most used first). */
+    @Query(
+        "SELECT tt.tagId AS tagId, COUNT(*) AS uses FROM transaction_tags tt " +
+            "JOIN transactions t ON t.id = tt.transactionId " +
+            "WHERE t.title LIKE :pattern ESCAPE '\\' GROUP BY tt.tagId ORDER BY uses DESC LIMIT 3"
+    )
+    suspend fun tagUsageForTitleLike(pattern: String): List<TagUsage>
+
+    /** How many transactions have a title matching the LIKE pattern (tagged or not). */
+    @Query("SELECT COUNT(*) FROM transactions WHERE title LIKE :pattern ESCAPE '\\'")
+    suspend fun countTitleLike(pattern: String): Int
+
     @Query("DELETE FROM transaction_tags WHERE transactionId = :transactionId")
     suspend fun clearTagLinks(transactionId: Int)
 

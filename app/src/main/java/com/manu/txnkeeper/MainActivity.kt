@@ -490,6 +490,8 @@ fun TxnkeeperApp(
                         }
                     },
                     tags = tags,
+                    // Pre-selects the most fitting tag from the title (history first, then keywords)
+                    suggestTags = { title -> suggestTagIds(dao, title, form.description, tags) },
                     // "+ New tag" on the Add page: save it, then the page switches it on
                     onAddTag = { name, colorIndex, onCreated ->
                         scope.launch {

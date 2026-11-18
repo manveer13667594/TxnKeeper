@@ -29,8 +29,6 @@ import com.manu.manudesignsystem.components.ManuDatePicker
 import com.manu.manudesignsystem.components.ManuTimePicker
 import java.util.Calendar
 import com.manu.manudesignsystem.components.ManuDialog
-import com.manu.manudesignsystem.components.ManuDropdownMenu
-import com.manu.manudesignsystem.components.ManuMenuItem
 import com.manu.manudesignsystem.components.ManuPickerField
 import com.manu.manudesignsystem.components.ManuTextField
 
@@ -143,39 +141,21 @@ fun EditTransactionDialog(
                 )
             }
             // Account: always shown, so a new one can be added from here
-            Box {
-                ManuPickerField(
-                    value = accounts.firstOrNull { it.id == accountId }?.name ?: "?",
-                    label = { Text("Account") },
-                    leadingIcon = AppIcons.Wallet,
-                    trailingIcon = Icons.Default.KeyboardArrowDown,
-                    onClick = { accountMenuOpen = true }
-                )
-                ManuDropdownMenu(
-                    expanded = accountMenuOpen,
-                    onDismissRequest = { accountMenuOpen = false },
-                    items = accounts.map { account ->
-                        ManuMenuItem(label = account.name, onClick = { accountId = account.id })
-                    } + ManuMenuItem(label = "+ New account", onClick = { addAccountOpen = true })
-                )
-            }
+            ManuPickerField(
+                value = accounts.firstOrNull { it.id == accountId }?.name ?: "?",
+                label = { Text("Account") },
+                leadingIcon = AppIcons.Wallet,
+                trailingIcon = Icons.Default.KeyboardArrowDown,
+                onClick = { accountMenuOpen = true }
+            )
             // Payment method: your list from Settings, plus "+ Add new" at the end
-            Box {
-                ManuPickerField(
-                    value = payment.ifBlank { "None" },
-                    label = { Text("Payment method") },
-                    leadingIcon = Icons.Default.CreditCard,
-                    trailingIcon = Icons.Default.KeyboardArrowDown,
-                    onClick = { payMenuOpen = true }
-                )
-                ManuDropdownMenu(
-                    expanded = payMenuOpen,
-                    onDismissRequest = { payMenuOpen = false },
-                    items = options.map { method ->
-                        ManuMenuItem(label = method, onClick = { payment = method })
-                    } + ManuMenuItem(label = "+ Add new", onClick = { addPaymentOpen = true })
-                )
-            }
+            ManuPickerField(
+                value = payment.ifBlank { "None" },
+                label = { Text("Payment method") },
+                leadingIcon = Icons.Default.CreditCard,
+                trailingIcon = Icons.Default.KeyboardArrowDown,
+                onClick = { payMenuOpen = true }
+            )
             ManuPickerField(
                 value = formatDateLong(dateTime),
                 label = { Text("Date") },
@@ -220,6 +200,26 @@ fun EditTransactionDialog(
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
+    }
+
+    // Account and payment method lists open as a card in the middle of the screen
+    if (accountMenuOpen) {
+        PickerListDialog(
+            title = "Account",
+            options = accounts.map { acc ->
+                PickerOption(acc.name, selected = acc.id == accountId, onClick = { accountId = acc.id })
+            } + PickerOption("+ New account", accent = true, onClick = { addAccountOpen = true }),
+            onDismiss = { accountMenuOpen = false }
+        )
+    }
+    if (payMenuOpen) {
+        PickerListDialog(
+            title = "Payment method",
+            options = options.map { method ->
+                PickerOption(method, selected = method == payment, onClick = { payment = method })
+            } + PickerOption("+ Add new", accent = true, onClick = { addPaymentOpen = true }),
+            onDismiss = { payMenuOpen = false }
+        )
     }
 
     // "+ New account": name and optional opening balance; the new account is selected right away

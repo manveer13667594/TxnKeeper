@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
@@ -178,19 +179,42 @@ fun TagPicker(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        // A block of up to 3 rows that scrolls sideways as one piece. Tags are dealt into the
+        // currently shortest row, so the rows end up about the same length.
+        val items: List<TagEntity?> = tags + listOf(null)          // null = the "+ New tag" chip
+        val rowCount = when {
+            items.size <= 4 -> 1
+            items.size <= 8 -> 2
+            else -> 3
+        }
+        val rows = List(rowCount) { mutableListOf<TagEntity?>() }
+        val lengths = IntArray(rowCount)
+        items.forEach { tag ->
+            val label = tag?.name ?: "+ New tag"
+            val target = lengths.indices.minByOrNull { lengths[it] } ?: 0
+            rows[target].add(tag)
+            lengths[target] += label.length + 4                       // + chip padding
+        }
+        Column(
+            modifier = Modifier.horizontalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            tags.forEach { tag ->
-                val on = tag.id in selected
-                ManuChip(
-                    label = tag.name,
-                    selected = on,
-                    onClick = { onChange(if (on) selected - tag.id else selected + tag.id) }
-                )
+            rows.forEach { rowTags ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowTags.forEach { tag ->
+                        if (tag == null) {
+                            ManuChip(label = "+ New tag", selected = false, onClick = onNew)
+                        } else {
+                            val on = tag.id in selected
+                            ManuChip(
+                                label = tag.name,
+                                selected = on,
+                                onClick = { onChange(if (on) selected - tag.id else selected + tag.id) }
+                            )
+                        }
+                    }
+                }
             }
-            ManuChip(label = "+ New tag", selected = false, onClick = onNew)
         }
     }
 }
