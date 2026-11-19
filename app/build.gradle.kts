@@ -39,6 +39,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true   // lets debug-only code check BuildConfig.DEBUG
     }
 }
 ksp {
@@ -64,6 +65,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     debugImplementation(libs.androidx.compose.ui.tooling)
     implementation("com.google.mlkit:text-recognition:16.0.1")
+    // Names the main object in a photo (notebook, bottle ...) when the receipt text gives no title
+    implementation("com.google.mlkit:image-labeling:17.0.9")
     implementation("com.github.manveer13667594:ManuDesignSystem:v1.0.7")
     // Plays the speaking animation (res/raw/voice_speaking.riv) on the voice screen
     implementation("app.rive:rive-android:10.4.5")

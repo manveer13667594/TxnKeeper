@@ -415,6 +415,10 @@ internal fun fillFromSpeech(form: TxnFormState, text: String) {
         return
     }
     val found = SpokenTransactionParser.parseAll(text)
+    // Debug builds only: what was heard and what the parser made of it
+    if (BuildConfig.DEBUG) {
+        DebugInsights.recordVoice(text, found.ifEmpty { listOf(SpokenTransactionParser.parse(text)) })
+    }
     if (found.size > 1) {
         form.startBatch(found, text)
         return

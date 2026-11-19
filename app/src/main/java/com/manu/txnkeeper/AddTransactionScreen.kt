@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -139,6 +140,9 @@ class TxnFormState {
 
     /** A short note shown above the form (for example after scanning a receipt). */
     var notice by mutableStateOf<String?>(null)
+
+    /** Other possible titles for a photographed product (tap one to use it). Not saved with the form. */
+    var titleSuggestions by mutableStateOf<List<String>>(emptyList())
 
     /**
      * The receipt image waiting in this form (a file in ReceiptStore): the photo that was scanned, or
@@ -313,6 +317,7 @@ class TxnFormState {
         description = ""
         include = true
         notice = null
+        titleSuggestions = emptyList()
         useDefaults()   // type and payment method come from Settings > Defaults
         // The image file is not deleted here: after saving it belongs to the transaction.
         // Closing the page without saving deletes it (MainActivity does that before calling reset).
@@ -443,6 +448,9 @@ fun AddTransactionScreen(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Debug builds only: what the scan or voice found and where it went (nothing in release)
+                DebugInsightsCard()
+
                 form.notice?.let { notice ->
                     // The "Possible duplicate" paragraph is a warning, so it is red; the rest stays grey
                     notice.split("\n\n").forEach { paragraph ->
@@ -522,6 +530,25 @@ fun AddTransactionScreen(
                             placeholder = { Text("Transaction title") },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         )
+
+                        // Other guesses for what the photographed product is: tap one to use it
+                        val titleChips = form.titleSuggestions.filter { !it.equals(form.title.trim(), ignoreCase = true) }
+                        if (titleChips.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Is it:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                titleChips.forEach { suggestion ->
+                                    ManuChip(label = suggestion, selected = false, onClick = { form.title = suggestion })
+                                }
+                            }
+                        }
 
                         ManuTextField(
                             value = form.amount,

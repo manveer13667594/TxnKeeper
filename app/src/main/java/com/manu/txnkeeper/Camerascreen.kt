@@ -352,7 +352,8 @@ fun CameraScreen(
         if (capturing || camera == null) return   // one photo at a time
         capturing = true
         shutterBlink = true
-        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        // No vibration here: it would shake the phone while the picture is being taken.
+        // The buzz comes once the photo is saved (see onImageSaved below).
 
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US)
             .format(System.currentTimeMillis())
@@ -364,7 +365,7 @@ fun CameraScreen(
         val photoFile = File(dir, "TXN_$stamp.jpg")
         val options = ImageCapture.OutputFileOptions.Builder(photoFile).build()
 
-        try {
+        fun shoot() { try {
             imageCapture.takePicture(
                 options,
                 mainExecutor,
@@ -372,6 +373,7 @@ fun CameraScreen(
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                         val uri = output.savedUri ?: Uri.fromFile(photoFile)
                         if (photoFile.isFile) {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                             onPhotoSaved(uri)
                             onImageReady(uri)
                         } else {
@@ -389,6 +391,28 @@ fun CameraScreen(
         } catch (e: Exception) {
             capturing = false
             Toast.makeText(context, "Couldn't take photo", Toast.LENGTH_SHORT).show()
+        } }
+
+        // Let the camera finish focusing before the shutter fires, so text is sharp. If you tapped to
+        // focus a moment ago that focus is kept; otherwise it focuses on the centre first (1.5 s at most).
+        val cam = camera
+        val tappedRecently = focusTap != null
+        if (cam == null || tappedRecently) {
+            shoot()
+        } else {
+            var fired = false
+            fun fireOnce() { if (!fired) { fired = true; shoot() } }
+            try {
+                val centre = previewView.meteringPointFactory.createPoint(previewView.width / 2f, previewView.height / 2f)
+                val focus = FocusMeteringAction.Builder(
+                    centre,
+                    FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+                ).build()
+                cam.cameraControl.startFocusAndMetering(focus).addListener({ fireOnce() }, mainExecutor)
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ fireOnce() }, 1500)
+            } catch (e: Exception) {
+                fireOnce()
+            }
         }
     }
 

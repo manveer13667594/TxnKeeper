@@ -282,6 +282,9 @@ fun TxnkeeperApp(
         }
     }
 
+    // Debug builds only: opens the file of scan / voice samples (does nothing in release)
+    LaunchedEffect(Unit) { DebugDataLog.attach(context) }
+
     // A finished scan fills the Add page right away; what was detected is shown above the fields
     // This listens with snapshotFlow instead of keying the effect on ocr.outcome: clearing the outcome
     // below used to restart the effect and cancel it in the middle of the duplicate check, so
@@ -296,13 +299,17 @@ fun TxnkeeperApp(
                     Toast.makeText(context, "No text found in this image.", Toast.LENGTH_SHORT).show()
                 }
 
-                outcome.parsed.isEmpty -> {
+                outcome.parsed.isEmpty && outcome.suggestions.isEmpty() -> {
                     dropScanImage()
                     Toast.makeText(context, "Text detected, but no transaction details found.", Toast.LENGTH_LONG).show()
                 }
 
                 else -> {
-                    var message = "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save."
+                    var message = if (outcome.parsed.isEmpty) {
+                        "Couldn't tell what this is. Tap a suggestion or type a title."
+                    } else {
+                        "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save."
+                    }
                     // Warn before saving if the same reference number is already in the list
                     val ref = outcome.parsed.description?.removePrefix("Ref: ")?.trim()
                     if (!ref.isNullOrEmpty()) {
@@ -328,6 +335,7 @@ fun TxnkeeperApp(
                         if (old != null) ReceiptStore.delete(context, old)
                     }
                     form.fill(outcome.parsed, message = message)
+                    form.titleSuggestions = outcome.suggestions
                     showAdd = true
                 }
             }
@@ -512,6 +520,7 @@ fun TxnkeeperApp(
                             if (entities.isNotEmpty() &&
                                 !safeWrite(context, "save the transactions") { dao.insertAll(entities) }
                             ) return@launch
+                            DebugDataLog.markSavedAll(entities)   // debug builds only
                             val account = form.accountId
                             form.reset()
                             form.accountId = account
@@ -524,12 +533,15 @@ fun TxnkeeperApp(
                         }
                     },
                     onSubmit = { entity, tagIds, stay ->
+                        // Debug builds only: which entry of the scan / recording this is (kept before the form moves on)
+                        val debugEntry = if (form.inBatch) form.batchIndex else 0
                         scope.launch {
                             // An image in the form that is not kept ("Include image" unticked) is deleted after saving
                             val unusedImage = form.imageFile?.takeIf { it != entity.imageFile }
                             // If saving fails the form stays open with everything the user typed
                             if (!safeWrite(context, "save the transaction") { dao.insertWithTags(entity, tagIds) }) return@launch
                             if (unusedImage != null) ReceiptStore.delete(context, unusedImage)
+                            DebugDataLog.markSaved(entity, debugEntry)
                             if (stay) {
                                 // Save & next: the next spoken entry, or an empty form
                                 if (!form.nextFromBatch()) {
