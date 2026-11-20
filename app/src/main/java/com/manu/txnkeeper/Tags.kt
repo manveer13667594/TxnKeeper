@@ -65,18 +65,23 @@ val SUGGESTED_TAGS = listOf(
     "💸 Loan / EMI" to 7, "🛡️ Insurance" to 8, "🙏 Donation" to 3, "🎉 Party" to 3
 )
 
-/** The colours a tag can have. A tag stores only the number of its colour (TagEntity.colorIndex). */
+/**
+ * The colours a tag can have: muted tones that sit well with the black-and-white theme and work on both
+ * the light and the dark background. They are used in the charts (a tag keeps its colour in the legend
+ * and the slices), not on the tag chips, which stay neutral. No green or red, so a slice is never
+ * mistaken for income or expense. A tag stores only the number of its colour (TagEntity.colorIndex).
+ */
 val TAG_COLORS = listOf(
-    Color(0xFF2E9E6B),   // green
-    Color(0xFFE0833A),   // orange
-    Color(0xFF3F7CE0),   // blue
-    Color(0xFF8E5BD6),   // purple
-    Color(0xFFD65B8A),   // pink
-    Color(0xFF1FA3B5),   // teal
-    Color(0xFFC9A227),   // gold
-    Color(0xFFD9534F),   // red
-    Color(0xFF6B7A8F),   // slate
-    Color(0xFF7A9E2E)    // olive
+    Color(0xFF5B7DB1),   // slate blue
+    Color(0xFFC99A3B),   // amber
+    Color(0xFF8A6FB5),   // violet
+    Color(0xFF3F9A97),   // teal
+    Color(0xFFC4688F),   // rose
+    Color(0xFF8D6E4F),   // brown
+    Color(0xFF5AA6D1),   // sky
+    Color(0xFFC9783F),   // copper
+    Color(0xFF7C828A),   // grey
+    Color(0xFF6E64A8)    // indigo
 )
 
 fun tagColor(index: Int): Color = TAG_COLORS[index.mod(TAG_COLORS.size)]
@@ -103,21 +108,20 @@ fun tagsByTransaction(tags: List<TagEntity>, links: List<TransactionTagCrossRef>
         .mapValues { (_, list) -> list.sortedBy { it.name.lowercase() } }
 }
 
-/** A small coloured label, shown on a transaction row and in its details. */
+/** A small neutral label (the theme's own surface colours), shown on a transaction row and in its details. */
 @Composable
 fun TagChip(tag: TagEntity, modifier: Modifier = Modifier) {
-    val color = tagColor(tag.colorIndex)
     Text(
         text = tag.name,
         style = MaterialTheme.typography.labelSmall,
         fontWeight = FontWeight.Medium,
-        color = color,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.15f))
-            .padding(horizontal = 8.dp, vertical = 2.dp)
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .padding(horizontal = 8.dp, vertical = 3.dp)
     )
 }
 
@@ -325,7 +329,7 @@ fun TagDialog(
                 }
             }
             Text(
-                text = "Colour",
+                text = "Colour (used in the charts)",
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

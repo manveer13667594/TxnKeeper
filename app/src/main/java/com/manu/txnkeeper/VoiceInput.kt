@@ -58,6 +58,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -152,7 +154,13 @@ class VoiceRecorder {
 // ------------------------------------------------------------------ speech to text
 
 /** What the speech model heard, and how long that took (model loading is not counted). */
-data class VoiceTranscript(val text: String, val seconds: Double, val audioSeconds: Double)
+data class VoiceTranscript(
+    val text: String,
+    val seconds: Double,
+    val audioSeconds: Double,
+    /** How long loading the model took for this run (0 when it was already loaded). */
+    val loadSeconds: Double = 0.0
+)
 
 /** Holds the one loaded speech model and turns recorded audio into text. */
 /** "Downloading voice model… 23% (13 of 57 MB)". The size is the model's approximate size. */
@@ -166,25 +174,69 @@ object VoiceEngine {
     private val mutex = Mutex()
     @Volatile private var kit: WhisperKit? = null
 
+    /** After the voice page is closed the model stays in memory this long, so the next entry starts at once. */
+    private const val KEEP_LOADED_MS = 3 * 60_000L
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var releaseJob: Job? = null
+
+    /** Debug builds only: how long loading and transcribing took, for the debug card. */
+    @Volatile var lastTimings: String = ""
+        private set
+
+    private fun cancelRelease() {
+        releaseJob?.cancel()
+        releaseJob = null
+    }
+
+    /** How long the model took to load the last time it was loaded (during a preload or a recording). */
+    @Volatile private var modelLoadSeconds = 0.0
+
+    private suspend fun loadModel(context: Context, onStatus: (String) -> Unit): WhisperKit {
+        val loadStart = SystemClock.elapsedRealtime()
+        val created = WhisperKit.create(context.applicationContext, VOICE_MODEL) { p ->
+            onStatus(downloadStatus(p))
+        }
+        modelLoadSeconds = (SystemClock.elapsedRealtime() - loadStart) / 1000.0
+        return created
+    }
+
     suspend fun transcribe(
         context: Context,
         samples: FloatArray,
         onStatus: (String) -> Unit
-    ): VoiceTranscript = mutex.withLock {
-        val loaded = kit ?: run {
-            onStatus("Loading voice model…")
-            WhisperKit.create(context.applicationContext, VOICE_MODEL) { p ->
-                onStatus(downloadStatus(p))
-            }.also { kit = it }
+    ): VoiceTranscript {
+        cancelRelease()
+        val requested = SystemClock.elapsedRealtime()
+        return mutex.withLock {
+            // Time spent waiting for a preload that was still running, or loading the model right now
+            val loadedNow = kit == null
+            val loaded = kit ?: run {
+                onStatus("Loading voice model…")
+                loadModel(context, onStatus).also { kit = it }
+            }
+            val waitedSeconds = (SystemClock.elapsedRealtime() - requested) / 1000.0
+            onStatus("Transcribing…")
+            val start = SystemClock.elapsedRealtime()
+            // shortWindow: a spoken sentence does not need whisper's full 30 s window
+            val text = loaded.transcribe(samples, TranscribeOptions(language = "en", shortWindow = true)).text.trim()
+            val result = VoiceTranscript(
+                text = text,
+                seconds = (SystemClock.elapsedRealtime() - start) / 1000.0,
+                audioSeconds = samples.size / SAMPLE_RATE.toDouble(),
+                loadSeconds = waitedSeconds
+            )
+            if (BuildConfig.DEBUG) {
+                val loadNote = when {
+                    loadedNow -> "model load %.1f s (during this entry)".format(modelLoadSeconds)
+                    waitedSeconds > 0.3 -> "model load %.1f s (preload; waited %.1f s for it)".format(modelLoadSeconds, waitedSeconds)
+                    else -> "model load %.1f s (preloaded, ready in time)".format(modelLoadSeconds)
+                }
+                lastTimings = "Voice timing: $loadNote, transcribe %.1f s, audio %.1f s".format(
+                    result.seconds, result.audioSeconds
+                )
+            }
+            result
         }
-        onStatus("Transcribing…")
-        val start = SystemClock.elapsedRealtime()
-        val text = loaded.transcribe(samples, TranscribeOptions(language = "en")).text.trim()
-        VoiceTranscript(
-            text = text,
-            seconds = (SystemClock.elapsedRealtime() - start) / 1000.0,
-            audioSeconds = samples.size / SAMPLE_RATE.toDouble()
-        )
     }
 
     /** True when the speech model is already on the phone (so no download is needed). */
@@ -193,20 +245,43 @@ object VoiceEngine {
 
     /** Downloads the model if needed and loads it, without transcribing anything. */
     suspend fun prepare(context: Context, onStatus: (String) -> Unit) {
+        cancelRelease()
         mutex.withLock {
             if (kit == null) {
                 onStatus(downloadStatus(0f))
-                kit = WhisperKit.create(context.applicationContext, VOICE_MODEL) { p ->
-                    onStatus(downloadStatus(p))
-                }
+                kit = loadModel(context, onStatus)
             }
         }
     }
 
-    /** Frees the model's memory. It reloads (a second or two) the next time it is needed. */
+    /**
+     * Loads the model in the background when a voice page opens, so it is ready by the time you finish
+     * speaking. Only when it is already downloaded: this never starts a download.
+     */
+    fun preloadIfReady(context: Context) {
+        if (kit != null || !isModelReady(context)) return
+        val app = context.applicationContext
+        scope.launch {
+            try {
+                prepare(app) { }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Not important: it simply loads when it is needed
+            }
+        }
+    }
+
+    /** Called when a voice page closes: the model's memory is freed after [KEEP_LOADED_MS], unless it is used again. */
     fun release() {
-        kit?.close()
-        kit = null
+        cancelRelease()
+        releaseJob = scope.launch {
+            delay(KEEP_LOADED_MS)
+            mutex.withLock {   // waits for a transcription that is still running
+                kit?.close()
+                kit = null
+            }
+        }
     }
 }
 
@@ -304,7 +379,8 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         }
     }
 
-    // Free the model's memory when the Add page is closed
+    // Load the model in the background now, and free its memory a few minutes after the Add page is closed
+    LaunchedEffect(Unit) { VoiceEngine.preloadIfReady(context) }
     DisposableEffect(Unit) { onDispose { VoiceEngine.release() } }
 
     fun finish() {
@@ -417,7 +493,11 @@ internal fun fillFromSpeech(form: TxnFormState, text: String) {
     val found = SpokenTransactionParser.parseAll(text)
     // Debug builds only: what was heard and what the parser made of it
     if (BuildConfig.DEBUG) {
-        DebugInsights.recordVoice(text, found.ifEmpty { listOf(SpokenTransactionParser.parse(text)) })
+        DebugInsights.recordVoice(
+            text,
+            found.ifEmpty { listOf(SpokenTransactionParser.parse(text)) },
+            listOf(VoiceEngine.lastTimings).filter { it.isNotBlank() }
+        )
     }
     if (found.size > 1) {
         form.startBatch(found, text)

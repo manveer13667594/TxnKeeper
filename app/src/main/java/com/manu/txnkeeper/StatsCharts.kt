@@ -52,6 +52,7 @@ import com.github.mikephil.charting.highlight.Highlight
 import com.github.mikephil.charting.listener.OnChartValueSelectedListener
 import com.manu.manudesignsystem.components.ManuChip
 import com.manu.manudesignsystem.theme.ManuDesignSystem
+import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionEntity
 import com.manu.txnkeeper.ui.theme.ChartCategoryColors
 import com.manu.txnkeeper.ui.theme.ChartOtherColor
@@ -131,12 +132,13 @@ internal fun MoreChartsPanel(
     accountNames: Map<Long, String>,
     breakdownBy: BreakdownBy,
     onBreakdownBy: (BreakdownBy) -> Unit,
+    tagsOf: Map<Int, List<TagEntity>> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     when (type) {
         StatsChartType.BALANCE -> Unit   // drawn by StatsScreen itself
         StatsChartType.INCOME_EXPENSE -> IncomeExpensePanel(txns, rangeDays, modifier)
-        StatsChartType.BREAKDOWN -> BreakdownPanel(txns, rangeDays, accountNames, breakdownBy, onBreakdownBy, modifier)
+        StatsChartType.BREAKDOWN -> BreakdownPanel(txns, rangeDays, accountNames, breakdownBy, onBreakdownBy, tagsOf, modifier)
         StatsChartType.TOP_SPENDS -> TopSpendsPanel(txns, rangeDays, modifier)
         StatsChartType.WEEKDAY -> WeekdayPanel(txns, rangeDays, modifier)
     }
@@ -406,10 +408,11 @@ private fun BreakdownPanel(
     accountNames: Map<Long, String>,
     breakdownBy: BreakdownBy,
     onBreakdownBy: (BreakdownBy) -> Unit,
+    tagsOf: Map<Int, List<TagEntity>>,
     modifier: Modifier
 ) {
-    val result = rememberComputed(txns, rangeDays, breakdownBy, accountNames) {
-        val slices = spendBreakdown(withinDays(txns, rangeDays), breakdownBy, accountNames)
+    val result = rememberComputed(txns, rangeDays, breakdownBy, accountNames, tagsOf) {
+        val slices = spendBreakdown(withinDays(txns, rangeDays), breakdownBy, accountNames, tagsOf = tagsOf)
         BreakdownResult(slices, slices.sumOf { it.paise })
     }
 
@@ -434,7 +437,11 @@ private fun BreakdownPanel(
             } else {
                 val colors = remember(r) {
                     r.slices.mapIndexed { i, s ->
-                        if (s.isOther) ChartOtherColor else ChartCategoryColors[i % ChartCategoryColors.size]
+                        when {
+                            s.isOther || s.label == UNTAGGED_LABEL && s.colorIndex == null && breakdownBy == BreakdownBy.TAG -> ChartOtherColor
+                            s.colorIndex != null -> tagColor(s.colorIndex)   // a tag keeps its own colour
+                            else -> ChartCategoryColors[i % ChartCategoryColors.size]
+                        }
                     }
                 }
                 DonutChart(

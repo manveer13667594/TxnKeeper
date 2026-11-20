@@ -141,7 +141,9 @@ internal suspend fun shareTransactions(
     context: Context,
     format: ShareFormat,
     list: List<TransactionEntity>,
-    accountNames: Map<Long, String>
+    accountNames: Map<Long, String>,
+    /** Tag names per transaction id (for the CSV file). */
+    tagNames: Map<Int, List<String>> = emptyMap()
 ) {
     if (format == ShareFormat.TEXT) {
         shareText(context, buildShareText(list, accountNames))
@@ -168,7 +170,8 @@ internal suspend fun shareTransactions(
                     type = it.type,
                     paymentMethod = it.paymentMethod,
                     accountName = accountNames[it.accountId].orEmpty(),
-                    description = it.description
+                    description = it.description,
+                    tags = tagNames[it.id].orEmpty()
                 )
             }
         val pdf = format == ShareFormat.PDF

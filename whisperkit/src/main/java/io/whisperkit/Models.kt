@@ -35,6 +35,11 @@ data class TranscribeOptions(
     val threads: Int = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4),
     /** Long audio is split into pieces of about this size (cut at a quiet moment) to keep memory low. */
     val chunkSeconds: Int = 600,
+    /**
+     * For audio shorter than 30 s, process only the part that holds speech (plus a little spare) instead of
+     * a full 30 s window. Several times faster for a spoken sentence; leave off for long recordings.
+     */
+    val shortWindow: Boolean = false,
 )
 
 class WhisperException(message: String, cause: Throwable? = null) : Exception(message, cause)

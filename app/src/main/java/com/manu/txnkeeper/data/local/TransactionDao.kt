@@ -41,7 +41,7 @@ interface TransactionDao {
 
     /** Adds many transactions in one go (used by CSV import, inside a database transaction). */
     @Insert
-    suspend fun insertAll(transactions: List<TransactionEntity>)
+    suspend fun insertAll(transactions: List<TransactionEntity>): List<Long>
 
     /** Every transaction once (not observed), newest first. Used by CSV / PDF export and import. */
     @Query("SELECT * FROM transactions ORDER BY dateTime DESC, id DESC")

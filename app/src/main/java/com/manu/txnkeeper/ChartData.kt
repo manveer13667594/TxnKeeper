@@ -1,5 +1,6 @@
 package com.manu.txnkeeper
 
+import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionEntity
 import java.util.Calendar
 import kotlin.math.abs
@@ -193,7 +194,8 @@ enum class StatsChartType(val label: String) {
 /** What the breakdown (pie) chart splits spending by. */
 enum class BreakdownBy(val label: String) {
     PAYMENT("Payment method"),
-    ACCOUNT("Account")
+    ACCOUNT("Account"),
+    TAG("Tag")
 }
 
 /** How wide one bar of the income-vs-expense chart is. */
@@ -203,7 +205,13 @@ enum class Bucket { DAY, WEEK, MONTH }
 data class PeriodTotals(val startMillis: Long, val incomePaise: Long, val expensePaise: Long)
 
 /** One labelled amount: a pie slice or a bar. [isOther] marks the "everything else" slice. */
-data class Slice(val label: String, val paise: Long, val isOther: Boolean = false)
+data class Slice(
+    val label: String,
+    val paise: Long,
+    val isOther: Boolean = false,
+    /** For a tag slice: the tag's colour number (see TAG_COLORS), so the chart uses the tag's own colour. */
+    val colorIndex: Int? = null
+)
 
 private const val MILLIS_PER_DAY = 86_400_000L
 
@@ -311,18 +319,49 @@ fun spendBreakdown(
     txns: List<TransactionEntity>,
     by: BreakdownBy,
     accountNames: Map<Long, String>,
-    maxSlices: Int = MAX_SLICES
+    maxSlices: Int = MAX_SLICES,
+    /** Transaction id -> its tags; only used when [by] is TAG. */
+    tagsOf: Map<Int, List<TagEntity>> = emptyMap()
 ): List<Slice> {
+    if (by == BreakdownBy.TAG) return tagBreakdown(txns, tagsOf, maxSlices)
     val totals = LinkedHashMap<String, Long>()
     for (t in txns) {
         if (t.type != "EXPENSE") continue
         val key = when (by) {
             BreakdownBy.PAYMENT -> t.paymentMethod.ifBlank { "Unspecified" }
             BreakdownBy.ACCOUNT -> accountNames[t.accountId] ?: "Account ${t.accountId}"
+            BreakdownBy.TAG -> "Untagged"   // not reached: TAG returns above
         }
         totals.merge(key, t.amountPaise) { a, b -> a + b }
     }
     return topSlices(totals, maxSlices)
+}
+
+/** Name of the slice for expenses that have no tag. */
+const val UNTAGGED_LABEL = "Untagged"
+
+/**
+ * Expenses added up per tag. A transaction with several tags is shared equally between them (the odd
+ * paise go to the first), so the slices always add up to the real total; one without tags is "Untagged".
+ */
+fun tagBreakdown(txns: List<TransactionEntity>, tagsOf: Map<Int, List<TagEntity>>, maxSlices: Int = MAX_SLICES): List<Slice> {
+    val totals = LinkedHashMap<String, Long>()
+    val colorOf = HashMap<String, Int>()
+    for (t in txns) {
+        if (t.type != "EXPENSE") continue
+        val tags = tagsOf[t.id].orEmpty()
+        if (tags.isEmpty()) {
+            totals.merge(UNTAGGED_LABEL, t.amountPaise) { a, b -> a + b }
+            continue
+        }
+        val share = t.amountPaise / tags.size
+        val rest = t.amountPaise - share * tags.size
+        tags.forEachIndexed { i, tag ->
+            colorOf.putIfAbsent(tag.name, tag.colorIndex)
+            totals.merge(tag.name, share + if (i == 0) rest else 0L) { a, b -> a + b }
+        }
+    }
+    return topSlices(totals, maxSlices).map { if (it.isOther) it else it.copy(colorIndex = colorOf[it.label]) }
 }
 
 /**

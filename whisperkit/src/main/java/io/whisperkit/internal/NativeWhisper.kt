@@ -22,6 +22,7 @@ internal object NativeWhisper {
         threads: Int,
         language: String,
         translate: Boolean,
+        shortWindow: Boolean,
         callback: NativeCallback,
     ): Int
     @JvmStatic external fun nDetectedLanguage(handle: Long): String?

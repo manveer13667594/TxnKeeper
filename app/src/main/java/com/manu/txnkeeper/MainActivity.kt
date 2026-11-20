@@ -42,6 +42,7 @@ import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
 import com.manu.txnkeeper.data.local.DatabaseModule
 import com.manu.txnkeeper.data.local.TagEntity
+import com.manu.txnkeeper.data.local.TransactionTagCrossRef
 import com.manu.txnkeeper.data.local.insertWithTags
 import com.manu.txnkeeper.widget.WidgetActions
 import com.manu.manudesignsystem.theme.ManuDesignSystemTheme
@@ -515,10 +516,19 @@ fun TxnkeeperApp(
                     onClose = { showAdd = false },
                     onScan = { openCamera() },
                     // Save & exit on a recording with several entries: all marked ones, in one go
-                    onSubmitAll = { entities ->
+                    onSubmitAll = { entities, tagSets ->
                         scope.launch {
                             if (entities.isNotEmpty() &&
-                                !safeWrite(context, "save the transactions") { dao.insertAll(entities) }
+                                !safeWrite(context, "save the transactions") {
+                                    // The transactions and their tags go in together or not at all
+                                    database.withTransaction {
+                                        val ids = dao.insertAll(entities)
+                                        val links = ids.flatMapIndexed { i, id ->
+                                            tagSets.getOrElse(i) { emptySet() }.map { TransactionTagCrossRef(id.toInt(), it) }
+                                        }
+                                        if (links.isNotEmpty()) dao.insertTagLinks(links)
+                                    }
+                                }
                             ) return@launch
                             DebugDataLog.markSavedAll(entities)   // debug builds only
                             val account = form.accountId

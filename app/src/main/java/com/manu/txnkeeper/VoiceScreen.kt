@@ -198,7 +198,8 @@ fun VoiceScreen(
 
     BackHandler(onBack = onClose)
 
-    // Closing the screen cancels the scope (stops the mic) and frees the model's memory
+    // Load the model in the background now; closing the screen stops the mic and frees the model a few minutes later
+    LaunchedEffect(Unit) { VoiceEngine.preloadIfReady(context) }
     DisposableEffect(Unit) { onDispose { VoiceEngine.release() } }
 
     /** Turns a recording into text; if a transaction was heard, hands it on to [onHeard]. */

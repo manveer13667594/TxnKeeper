@@ -371,7 +371,7 @@ fun TransactionsScreen(
             if (format != ShareFormat.TEXT) toast(if (format == ShareFormat.PDF) "Preparing PDF..." else "Preparing CSV...")
             safeWrite(context, "share the transactions") {
                 val rows = dao.loadByIds(ids)
-                if (rows.isNotEmpty()) shareTransactions(context, format, rows, accountNames)
+                if (rows.isNotEmpty()) shareTransactions(context, format, rows, accountNames, tagMap.mapValues { (_, list) -> list.map { it.name } })
             }
         }
     }
@@ -855,51 +855,51 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-        key(txn.id) {
-            EditTransactionDialog(
-                original = txn,
-                accounts = accounts,
-                settings = settings,
-                onAddAccount = { newAccount, onCreated ->
-                    scope.launch {
-                        var newId = 0L
-                        if (safeWrite(context, "add the account") {
-                                newId = dao.insertAccount(newAccount)
-                            }) {
-                            onCreated(newId)
-                        }
+      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+      key(txn.id) {
+        EditTransactionDialog(
+            original = txn,
+            accounts = accounts,
+            settings = settings,
+            onAddAccount = { newAccount, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the account") {
+                            newId = dao.insertAccount(newAccount)
+                        }) {
+                        onCreated(newId)
                     }
-                },
-                tags = allTags,
-                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-                onAddTag = { name, colorIndex, onCreated ->
-                    scope.launch {
-                        var newId = 0L
-                        if (safeWrite(context, "add the tag") {
-                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                            }) {
-                            onCreated(newId)
-                        }
-                    }
-                },
-                onSave = { updated, tagIds ->
-                    scope.launch {
-                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
-                            // The image it had before is not used any more if it was removed or replaced
-                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
-                        }
-                    }
-                    // Next one of the queue, or close (a normal single edit has an empty queue)
-                    openNextInQueue()
-                },
-                onDismiss = {
-                    editQueue = emptyList()
-                    editTotal = 0
-                    editing = null
                 }
-            )
-        }
+            },
+            tags = allTags,
+            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+            onAddTag = { name, colorIndex, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the tag") {
+                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                        }) {
+                        onCreated(newId)
+                    }
+                }
+            },
+            onSave = { updated, tagIds ->
+                scope.launch {
+                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
+                        // The image it had before is not used any more if it was removed or replaced
+                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                    }
+                }
+                // Next one of the queue, or close (a normal single edit has an empty queue)
+                openNextInQueue()
+            },
+            onDismiss = {
+                editQueue = emptyList()
+                editTotal = 0
+                editing = null
+            }
+        )
+      }
     }
 
     deleting?.let { txn ->

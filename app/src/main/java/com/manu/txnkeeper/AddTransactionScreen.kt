@@ -84,7 +84,9 @@ data class BatchEntry(
     val dateTime: Long,
     val description: String,
     /** Marked = will be saved. Unmark an entry you do not want to keep. */
-    val include: Boolean = true
+    val include: Boolean = true,
+    /** The tags of this entry (suggested from its title, changeable). */
+    val tagIds: Set<Long> = emptySet()
 )
 
 /** The same defaults as the form: anything the parser was unsure about stays at its usual value. */
@@ -165,6 +167,18 @@ class TxnFormState {
 
     val inBatch: Boolean get() = batch.isNotEmpty()
 
+    /** True right after a recording was split into entries: the screen then suggests tags for each of them. */
+    var batchTagsPending by mutableStateOf(false)
+
+    /** Gives every entry the tags suggested for it (an entry whose tags were already picked keeps them). */
+    fun applyBatchTags(suggested: List<Set<Long>>) {
+        if (!inBatch) return
+        batch = batch.mapIndexed { i, e ->
+            if (i == batchIndex) e else if (e.tagIds.isEmpty()) e.copy(tagIds = suggested.getOrElse(i) { emptySet() }) else e
+        }
+        if (tagIds.isEmpty()) tagIds = suggested.getOrElse(batchIndex) { emptySet() }
+    }
+
     /** Starts reviewing several spoken entries: the first goes into the form. */
     fun startBatch(list: List<ParsedTransaction>, heard: String) {
         if (list.isEmpty()) return
@@ -175,6 +189,7 @@ class TxnFormState {
         batchIndex = 0
         batchSaved = 0
         load(batch[0])
+        batchTagsPending = true
         notice = "Heard: \"$heard\". Use the arrows to move between the ${list.size} entries, " +
                 "check each one, untick any you don't want, then Save & exit."
     }
@@ -264,7 +279,10 @@ class TxnFormState {
                     "batchIndex" to f.batchIndex,
                     "batchSaved" to f.batchSaved,
                     "batch" to f.batch.map {
-                        listOf(it.title, it.amount, it.type, it.payment, it.dateTime.toString(), it.description, it.include.toString())
+                        listOf(
+                            it.title, it.amount, it.type, it.payment, it.dateTime.toString(), it.description,
+                            it.include.toString(), it.tagIds.joinToString(",")
+                        )
                     }
                 )
             },
@@ -286,7 +304,10 @@ class TxnFormState {
                     f.batchSaved = m["batchSaved"] as Int
                     @Suppress("UNCHECKED_CAST")
                     f.batch = (m["batch"] as List<List<String>>).map {
-                        BatchEntry(it[0], it[1], it[2], it[3], it[4].toLong(), it[5], it.getOrNull(6) != "false")
+                        BatchEntry(
+                            it[0], it[1], it[2], it[3], it[4].toLong(), it[5], it.getOrNull(6) != "false",
+                            it.getOrNull(7)?.split(',')?.mapNotNull { id -> id.toLongOrNull() }?.toSet() ?: emptySet()
+                        )
                     }
                     // The entry on screen carries its own mark
                     f.include = f.batch.getOrNull(f.batchIndex)?.include ?: true
@@ -295,7 +316,7 @@ class TxnFormState {
         )
     }
 
-    private fun snapshot() = BatchEntry(title, amount, type, payment, dateTime, description, include)
+    private fun snapshot() = BatchEntry(title, amount, type, payment, dateTime, description, include, tagIds)
 
     private fun load(e: BatchEntry) {
         title = e.title
@@ -305,6 +326,7 @@ class TxnFormState {
         dateTime = e.dateTime
         description = e.description
         include = e.include
+        tagIds = e.tagIds
     }
 
     fun reset() {
@@ -361,7 +383,8 @@ fun AddTransactionScreen(
     /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
     onSubmit: (TransactionEntity, tagIds: Set<Long>, stay: Boolean) -> Unit,
     /** Save & exit on a recording with several entries: saves every marked one at once, then closes. */
-    onSubmitAll: (List<TransactionEntity>) -> Unit,
+    /** Saves the marked entries of a recording, with the tags of each (same order). */
+    onSubmitAll: (List<TransactionEntity>, List<Set<Long>>) -> Unit,
     onScan: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -399,7 +422,8 @@ fun AddTransactionScreen(
     // Tags switched on by the app from the title (typed, scanned or spoken). Once you change the tags
     // yourself, the app stops touching them for this entry.
     var autoTags by remember { mutableStateOf<Set<Long>>(emptySet()) }
-    LaunchedEffect(form.title, tags) {
+    LaunchedEffect(form.title, tags, form.inBatch) {
+        if (form.inBatch) return@LaunchedEffect   // a recording's entries get theirs in the effect below
         val title = form.title.trim()
         if (title.isBlank()) {
             // Blank form: drop what the app picked earlier, if you did not change it
@@ -412,6 +436,14 @@ fun AddTransactionScreen(
         val suggestion = suggestTags(title)
         form.tagIds = suggestion
         autoTags = suggestion
+    }
+
+    // A recording with several entries: suggest tags for each entry once, then you can change them per entry
+    LaunchedEffect(form.batchTagsPending, tags) {
+        if (!form.batchTagsPending) return@LaunchedEffect
+        val suggested = form.batch.map { suggestTags(it.title.trim()) }
+        form.applyBatchTags(suggested)
+        form.batchTagsPending = false
     }
 
     // The payment methods you have set up in Settings
@@ -569,18 +601,16 @@ fun AddTransactionScreen(
                         }
 
                         // Tags: one row that scrolls sideways, tap to switch on or off.
-                        // Not for the entries of a voice recording.
-                        if (!form.inBatch) {
-                            TagPicker(
-                                tags = tags,
-                                selected = form.tagIds,
-                                onChange = { form.tagIds = it },
-                                onNew = {
-                                    focusManager.clearFocus()
-                                    addTagOpen = true
-                                }
-                            )
-                        }
+                        // For a recording with several entries, each entry has its own tags.
+                        TagPicker(
+                            tags = tags,
+                            selected = form.tagIds,
+                            onChange = { form.tagIds = it },
+                            onNew = {
+                                focusManager.clearFocus()
+                                addTagOpen = true
+                            }
+                        )
                         Column(
                             modifier = Modifier.width(220.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -687,7 +717,13 @@ fun AddTransactionScreen(
                                 }
                                 error = null
                                 focusManager.clearFocus()
-                                onSubmitAll(form.markedEntries().map { toEntity(it, amountOf(it)!!) })
+                                val marked = form.markedEntries()
+                                // A tag deleted while this page was open is dropped here
+                                val liveIds = tags.map { it.id }.toSet()
+                                onSubmitAll(
+                                    marked.map { toEntity(it, amountOf(it)!!) },
+                                    marked.map { e -> e.tagIds.filter { it in liveIds }.toSet() }
+                                )
                                 return
                             }
                             val value = parsePaise(form.amount.replace(",", "").trim())

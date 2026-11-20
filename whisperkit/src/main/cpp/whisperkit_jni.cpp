@@ -103,7 +103,7 @@ JNIEXPORT jint JNICALL
 Java_io_whisperkit_internal_NativeWhisper_nTranscribe(JNIEnv *env, jclass, jlong ptr,
                                                       jfloatArray samples, jint threads,
                                                       jstring language, jboolean translate,
-                                                      jobject callback) {
+                                                      jboolean shortWindow, jobject callback) {
     auto *h = reinterpret_cast<Handle *>(ptr);
     h->abort = false;
 
@@ -136,6 +136,14 @@ Java_io_whisperkit_internal_NativeWhisper_nTranscribe(JNIEnv *env, jclass, jlong
 
     jfloat *pcm = env->GetFloatArrayElements(samples, nullptr);
     const jsize n = env->GetArrayLength(samples);
+
+    // Whisper normally runs its encoder over a fixed 30 s window, even for a 4 s sentence. For short
+    // audio, only the part that holds speech (plus ~3 s spare) is processed: several times faster.
+    // 50 encoder positions = 1 second; never below 400 (8 s) so very short clips stay accurate.
+    if (shortWindow == JNI_TRUE && n < 16000 * 30) {
+        const int needed = static_cast<int>(n / 16000.0 * 50.0) + 150;
+        p.audio_ctx = needed < 400 ? 400 : (needed > 1500 ? 1500 : needed);
+    }
     const int rc = whisper_full(h->ctx, p, pcm, n);
     env->ReleaseFloatArrayElements(samples, pcm, JNI_ABORT);
 

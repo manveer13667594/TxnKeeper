@@ -7,7 +7,9 @@ import androidx.sqlite.db.SimpleSQLiteQuery
 import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.txnkeeper.data.local.DEFAULT_ACCOUNT_NAME
+import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionEntity
+import com.manu.txnkeeper.data.local.TransactionTagCrossRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -256,6 +258,10 @@ object DataTransfer {
         val args = if (limit != null) where.args + limit else where.args
         val transactions = dao.rawTransactions(SimpleSQLiteQuery(sql, args.toTypedArray())).first()
 
+        // Tag names per transaction, so the file carries them (the colours are not exported)
+        val tagNames = tagsByTransaction(dao.observeTags().first(), dao.observeTagLinks().first())
+            .mapValues { (_, list) -> list.map { it.name } }
+
         return transactions.map {
             TxnRow(
                 dateTime = it.dateTime,
@@ -265,6 +271,7 @@ object DataTransfer {
                 paymentMethod = it.paymentMethod,
                 accountName = accountNames[it.accountId].orEmpty(),
                 description = it.description,
+                tags = tagNames[it.id].orEmpty(),
                 // Only an image that is really on the phone is named, so a file never points at nothing
                 imageFile = if (withImages) it.imageFile?.takeIf { name -> ReceiptStore.exists(context, name) } else null
             )
@@ -360,6 +367,7 @@ object DataTransfer {
             }
 
             val toInsert = ArrayList<TransactionEntity>()
+            val tagsToInsert = ArrayList<List<String>>()   // the tag names of each entry of toInsert, same order
             val used = HashSet<String>()
             var duplicates = 0
             var missing = 0
@@ -401,10 +409,31 @@ object DataTransfer {
                         accountId = accountId,
                         imageFile = image
                     )
+                    tagsToInsert += row.tags
                     if (image != null) used += image
                 }
             }
-            dao.insertAll(toInsert)
+            val newIds = dao.insertAll(toInsert)
+
+            // Tags from the file: an existing tag (same name) is reused, a missing one is created
+            if (tagsToInsert.any { it.isNotEmpty() }) {
+                val tagIds = HashMap<String, Long>()
+                val knownTags = dao.observeTags().first()
+                knownTags.forEach { tagIds.putIfAbsent(it.name.trim().lowercase(), it.id) }
+                var nextColor = knownTags.size
+                val links = ArrayList<TransactionTagCrossRef>()
+                tagsToInsert.forEachIndexed { i, names ->
+                    for (raw in names) {
+                        val name = cleanTagName(raw)
+                        if (name.isEmpty()) continue
+                        val id = tagIds.getOrPut(name.lowercase()) {
+                            dao.insertTag(TagEntity(name = name, colorIndex = nextColor++ % TAG_COLORS.size))
+                        }
+                        links += TransactionTagCrossRef(newIds[i].toInt(), id)
+                    }
+                }
+                if (links.isNotEmpty()) dao.insertTagLinks(links.distinct())
+            }
 
             Applied(
                 result = ImportResult(

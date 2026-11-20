@@ -240,7 +240,8 @@ class WhisperKit private constructor(
             try {
                 result.complete(
                     NativeWhisper.nTranscribe(
-                        handle, samples, options.threads, options.language, options.translateToEnglish, cb,
+                        handle, samples, options.threads, options.language, options.translateToEnglish,
+                        options.shortWindow, cb,
                     )
                 )
             } catch (t: Throwable) {

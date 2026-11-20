@@ -203,6 +203,10 @@ fun StatsScreen(
     var chartType by rememberSaveable { mutableStateOf(StatsChartType.BALANCE) }
     var breakdownBy by rememberSaveable { mutableStateOf(BreakdownBy.PAYMENT) }
     val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }
+    // Tags per transaction, for the "by tag" pie
+    val allTags by remember { dao.observeTags() }.collectAsState(initial = emptyList())
+    val tagLinks by remember { dao.observeTagLinks() }.collectAsState(initial = emptyList())
+    val tagsOf = remember(allTags, tagLinks) { tagsByTransaction(allTags, tagLinks) }
     val allTxns = remember(series) { series?.points?.map { it.txn } ?: emptyList() }
     // The chosen quick window (null = the default "latest points" view); the tick makes a repeat tap re-apply it
     var rangeDays by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -344,6 +348,7 @@ fun StatsScreen(
                                     accountNames = accountNames,
                                     breakdownBy = breakdownBy,
                                     onBreakdownBy = { breakdownBy = it },
+                                    tagsOf = tagsOf,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
