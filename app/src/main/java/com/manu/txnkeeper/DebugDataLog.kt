@@ -154,6 +154,15 @@ object DebugDataLog {
         persist()
     }
 
+    /** A speech-engine test (no form fields): one row with the heard text and the timing notes. */
+    fun addSpeechTest(source: String, heard: String, notes: List<String>) {
+        if (!BuildConfig.DEBUG) return
+        val id = UUID.randomUUID().toString()
+        val sample = DebugSample(id = id, time = System.currentTimeMillis(), source = source, rawText = heard, detected = null, notes = notes)
+        samples = listOf(sample) + samples
+        persist()
+    }
+
     private fun update(id: String, change: (DebugSample) -> DebugSample) {
         samples = samples.map { if (it.id == id) change(it) else it }
     }
@@ -186,6 +195,14 @@ object DebugDataLog {
             } ?: pending.keys.minOrNull() ?: -1
             markSaved(e, index)
         }
+    }
+
+    /** Adds a note to the rows of the latest scan / recording. */
+    fun appendNote(line: String) {
+        if (!BuildConfig.DEBUG) return
+        if (latestGroup.isEmpty()) return
+        samples = samples.map { if (it.id in latestGroup) it.copy(notes = it.notes + line) else it }
+        persist()
     }
 
     fun delete(ids: Set<String>) {
@@ -261,13 +278,13 @@ object DebugDataLog {
     private fun toCsv(chosen: List<DebugSample>, redact: Boolean): String {
         fun m(v: String?) = if (redact && v != null) mask(v) else v
         val header = listOf("time", "source", "status", "raw_text") +
-                FIELD_NAMES.map { "detected_$it" } + FIELD_NAMES.map { "saved_$it" } + listOf("edited_fields", "notes")
+            FIELD_NAMES.map { "detected_$it" } + FIELD_NAMES.map { "saved_$it" } + listOf("edited_fields", "notes")
         val fmt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
         val rows = chosen.sortedBy { it.time }.map { s ->
             (listOf(fmt.format(Date(s.time)), s.source, s.status, m(s.rawText)) +
-                    FIELD_NAMES.map { m(s.detected?.get(it)) } +
-                    FIELD_NAMES.map { m(s.saved?.get(it)) } +
-                    listOf(s.editedFields().joinToString(", "), m(s.notes.joinToString(" | "))))
+                FIELD_NAMES.map { m(s.detected?.get(it)) } +
+                FIELD_NAMES.map { m(s.saved?.get(it)) } +
+                listOf(s.editedFields().joinToString(", "), m(s.notes.joinToString(" | "))))
                 .joinToString(",") { cell(it) }
         }
         // The byte-order mark makes Excel read the file as UTF-8 (the rupee sign shows properly)
@@ -364,8 +381,8 @@ fun DebugDataDialog(onDismiss: () -> Unit) {
                                 }
                                 Text(
                                     (s.saved?.get("title") ?: s.detected?.get("title") ?: "(no title)") +
-                                            (s.saved?.get("amount")?.let { " · ₹$it" } ?: "") +
-                                            (if (s.rawText.isNotBlank()) " — " + s.rawText.replace('\n', ' ') else ""),
+                                        (s.saved?.get("amount")?.let { " · ₹$it" } ?: "") +
+                                        (if (s.rawText.isNotBlank()) " — " + s.rawText.replace('\n', ' ') else ""),
                                     style = MaterialTheme.typography.bodySmall,
                                     maxLines = 2,
                                     overflow = TextOverflow.Ellipsis,

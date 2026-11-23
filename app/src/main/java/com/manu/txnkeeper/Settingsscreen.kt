@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.HelpOutline
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DeleteForever
@@ -382,6 +383,20 @@ private fun MainSettings(
         )
     }
 
+    // Debug builds only: view and share the scan / voice logs (this block is removed from release builds)
+    if (BuildConfig.DEBUG) {
+        var logOpen by remember { mutableStateOf(false) }
+        if (logOpen) DebugDataDialog(onDismiss = { logOpen = false })
+        SettingsCard {
+            SettingsRow(
+                title = "Debug logs",
+                icon = Icons.Default.BugReport,
+                subtitle = "${DebugDataLog.samples.size} saved · view, share as CSV or JSON, delete",
+                onClick = { logOpen = true }
+            )
+        }
+    }
+
     SettingsCard {
         SettingsRow(title = "Help", icon = Icons.AutoMirrored.Filled.HelpOutline, onClick = onOpenHelp)
         HorizontalDivider()
@@ -595,6 +610,22 @@ private fun DefaultsPage(
 
     // ---- Voice entry
     SettingsCard {
+        SwitchRow(
+            icon = Icons.Default.Mic,
+            title = "Fast voice (Google)",
+            subtitle = "Uses your phone's Google speech service for quick, accurate text. It needs internet and Android 13+; otherwise, or if it fails, the on-device model is used.",
+            checked = settings.fastVoice,
+            onCheckedChange = { settings.updateFastVoice(it) }
+        )
+        HorizontalDivider()
+        SwitchRow(
+            icon = Icons.Default.Mic,
+            title = "Double-check with Whisper",
+            subtitle = "The on-device model also listens to each recording. If it understood the transaction differently, you can switch to its wording. Uses a little more battery.",
+            checked = settings.doubleCheckVoice,
+            onCheckedChange = { settings.updateDoubleCheckVoice(it) }
+        )
+        HorizontalDivider()
         SwitchRow(
             icon = Icons.Default.Mic,
             title = "Voice tips",

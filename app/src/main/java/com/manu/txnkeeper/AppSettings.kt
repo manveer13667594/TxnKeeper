@@ -66,6 +66,24 @@ class AppSettings(context: Context) {
         prefs.edit().putBoolean(KEY_VOICE_TIPS, on).apply()
     }
 
+    /** Whether voice entry uses the phone's Google speech recogniser first (fast, online), with Whisper as the fallback. */
+    var fastVoice by mutableStateOf(prefs.getBoolean(KEY_FAST_VOICE, true))
+        private set
+
+    fun updateFastVoice(on: Boolean) {
+        fastVoice = on
+        prefs.edit().putBoolean(KEY_FAST_VOICE, on).apply()
+    }
+
+    /** Whether Whisper also listens to every recording in the background and offers its wording when it differs. */
+    var doubleCheckVoice by mutableStateOf(prefs.getBoolean(KEY_DOUBLE_CHECK, true))
+        private set
+
+    fun updateDoubleCheckVoice(on: Boolean) {
+        doubleCheckVoice = on
+        prefs.edit().putBoolean(KEY_DOUBLE_CHECK, on).apply()
+    }
+
     /**
      * Receipt images. When a scanned or picked image is on the Add page, its "Include image" box starts
      * ticked or not ticked according to this. (You can always change the box for one transaction.)
@@ -221,6 +239,8 @@ class AppSettings(context: Context) {
         const val KEY_LAST_QUICK_ACTION = "last_quick_widget_action"
         const val KEY_PAYMENT_METHODS = "payment_methods"
         const val KEY_VOICE_TIPS = "voice_tips"
+        const val KEY_FAST_VOICE = "fast_voice_google"
+        const val KEY_DOUBLE_CHECK = "double_check_whisper"
         const val KEY_INCLUDE_IMAGE = "include_image_default"
         const val KEY_EXPORT_IMAGES = "export_with_images_default"
         const val KEY_VOICE_HINT_DONE = "voice_hint_done"

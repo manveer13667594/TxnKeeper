@@ -45,6 +45,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
@@ -81,7 +82,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
@@ -246,7 +253,8 @@ fun TransactionsScreen(
 
     // Small trend line in the balance card: the running balance of what the list shows
     // (the database sums it into about 60 slices, so no transaction rows are loaded for it)
-    val sparkFlow = remember(query) { dao.observeSparkBuckets(query) }
+    val trendWindow = remember(query) { recentTrendWindow(query) }
+    val sparkFlow = remember(trendWindow) { dao.observeSparkBuckets(trendWindow.first) }
     val sparkBuckets by sparkFlow.collectAsState(initial = null)
 
     val totalsFlow = remember(query) { dao.observeTotals(query) }
@@ -313,10 +321,11 @@ fun TransactionsScreen(
         accounts.size > 1 -> "Balance · all accounts"
         else -> "Balance"
     }
-    val sparkline = remember(sparkBuckets, balance, totals, filtersOn) {
+    val sparkline = remember(sparkBuckets, balance, filtersOn) {
         sparkBuckets?.let { buckets ->
             // Same rule as the Stats screen: real balance when nothing is filtered, otherwise a running net
-            val start = if (filtersOn) 0L else balance - (totals.incomePaise - totals.expensePaise)
+            // (the line shows only the recent part, so the start is the balance before that part began)
+            val start = if (filtersOn) 0L else balance - buckets.sumOf { it.netPaise }
             sparklineFromBuckets(buckets, start)
         }.orEmpty()
     }
@@ -641,7 +650,7 @@ fun TransactionsScreen(
             // scroll back to the top and it is there again. With no list it stays put.
             val totalsHeader: @Composable () -> Unit = {
                 TotalsCard(
-                    totals, balance, balanceLabel, sparkline,
+                    totals, balance, balanceLabel, sparkline, trendWindow.second,
                     modifier = Modifier.clickable {
                         focusManager.clearFocus()
                         onOpenStats(filters, search, accountId)
@@ -733,10 +742,26 @@ fun TransactionsScreen(
                                     ) {
                                         Text(
                                             text = group.label,
-                                            style = MaterialTheme.typography.labelLarge,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.weight(1f)
                                         )
+                                        // What the day added up to (income minus expense)
+                                        val dayNet = group.txns.sumOf {
+                                            when (it.type) {
+                                                "INCOME" -> it.amountPaise
+                                                "EXPENSE" -> -it.amountPaise
+                                                else -> 0L
+                                            }
+                                        }
+                                        if (!selectionMode) {
+                                            Text(
+                                                text = formatSignedMoney(dayNet),
+                                                style = MaterialTheme.typography.labelLarge,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
                                         if (selectionMode) {
                                             Text(
                                                 text = if (group.txns.all { it.id in selectedIds }) "Deselect day" else "Select day",
@@ -855,51 +880,51 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-      key(txn.id) {
-        EditTransactionDialog(
-            original = txn,
-            accounts = accounts,
-            settings = settings,
-            onAddAccount = { newAccount, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the account") {
-                            newId = dao.insertAccount(newAccount)
-                        }) {
-                        onCreated(newId)
+        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+        key(txn.id) {
+            EditTransactionDialog(
+                original = txn,
+                accounts = accounts,
+                settings = settings,
+                onAddAccount = { newAccount, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the account") {
+                                newId = dao.insertAccount(newAccount)
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            tags = allTags,
-            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-            onAddTag = { name, colorIndex, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the tag") {
-                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                        }) {
-                        onCreated(newId)
+                },
+                tags = allTags,
+                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+                onAddTag = { name, colorIndex, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the tag") {
+                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            onSave = { updated, tagIds ->
-                scope.launch {
-                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
-                        // The image it had before is not used any more if it was removed or replaced
-                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                },
+                onSave = { updated, tagIds ->
+                    scope.launch {
+                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
+                            // The image it had before is not used any more if it was removed or replaced
+                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                        }
                     }
+                    // Next one of the queue, or close (a normal single edit has an empty queue)
+                    openNextInQueue()
+                },
+                onDismiss = {
+                    editQueue = emptyList()
+                    editTotal = 0
+                    editing = null
                 }
-                // Next one of the queue, or close (a normal single edit has an empty queue)
-                openNextInQueue()
-            },
-            onDismiss = {
-                editQueue = emptyList()
-                editTotal = 0
-                editing = null
-            }
-        )
-      }
+            )
+        }
     }
 
     deleting?.let { txn ->
@@ -1026,53 +1051,135 @@ private fun TotalsCard(
     balance: Long,
     balanceLabel: String,
     trend: List<Long>,
+    trendLabel: String?,
     modifier: Modifier = Modifier
 ) {
     val net = totals.incomePaise - totals.expensePaise
-    ManuCard(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(24.dp)
+    // A soft tint of the accent colour fading into the card, so the balance stands out as the hero of the page
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(scheme.surface)
+            .background(
+                Brush.linearGradient(
+                    // Dark mode: strongest tint at the top left. Light mode: the other way round,
+                    // so the card is lightest at the top left and deepens towards the bottom right
+                    if (scheme.background.luminance() > 0.5f)
+                        listOf(scheme.primary.copy(alpha = 0.03f), scheme.primary.copy(alpha = 0.14f))
+                    else
+                        listOf(scheme.primary.copy(alpha = 0.18f), scheme.primary.copy(alpha = 0.04f))
+                )
+            )
+            .border(1.dp, scheme.primary.copy(alpha = 0.12f), shape)
+            .padding(16.dp)
+    ) {
+        Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = balanceLabel,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = scheme.onSurfaceVariant,
                         maxLines = 1
                     )
                     Text(
                         text = formatBalance(balance),
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
-                        color = if (balance < 0) ExpenseColor else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
+                        color = if (balance < 0) ExpenseColor else scheme.onSurface,
+                        maxLines = 1,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
-                // The empty top-right corner: a small preview of the Stats chart
+                // The top-right corner: a small preview of the Stats chart
                 if (trend.size >= 2) {
-                    Sparkline(
-                        values = trend,
-                        modifier = Modifier
-                            .padding(start = 12.dp)
-                            .size(width = 110.dp, height = 44.dp)
-                    )
+                    Column(
+                        modifier = Modifier.padding(start = 12.dp),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Sparkline(
+                            values = trend,
+                            modifier = Modifier.size(width = 110.dp, height = 44.dp)
+                        )
+                        if (trendLabel != null) {
+                            // What the line covers, and how much the balance moved over that time
+                            val moved = trend.last() - trend.first()
+                            Row {
+                                Text(
+                                    text = "$trendLabel ",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = scheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = formatSignedMoney(moved),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (moved >= 0) IncomeColor else ExpenseColor
+                                )
+                            }
+                        }
+                    }
                 }
             }
-            Row(modifier = Modifier.padding(top = 10.dp)) {
-                TotalCell("Income", formatMoney(totals.incomePaise), IncomeColor, Alignment.Start)
-                TotalCell(
-                    "Expense",
-                    formatMoney(totals.expensePaise),
-                    ExpenseColor,
-                    Alignment.CenterHorizontally
+            Row(
+                modifier = Modifier.padding(top = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                StatPill("Income", formatMoney(totals.incomePaise), IncomeColor, Icons.Default.ArrowDownward, Modifier.weight(1f))
+                StatPill("Expense", formatMoney(totals.expensePaise), ExpenseColor, Icons.Default.ArrowUpward, Modifier.weight(1f))
+            }
+            // A hint that the whole card opens the charts
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = "Charts & insights",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = scheme.primary
                 )
-                TotalCell(
-                    "Net",
-                    formatSignedMoney(net),
-                    if (net >= 0) IncomeColor else ExpenseColor,
-                    Alignment.End
+                Icon(
+                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = scheme.primary,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
+    }
+}
+
+/** One of the three small tinted tiles under the balance: a coloured arrow, the label and the amount. */
+@Composable
+private fun StatPill(label: String, value: String, color: Color, icon: ImageVector, modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(color.copy(alpha = 0.11f))
+            .padding(horizontal = 10.dp, vertical = 9.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp),
+                maxLines = 1
+            )
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 3.dp)
+        )
     }
 }
 
@@ -1162,8 +1269,8 @@ private fun EmptyMessage(
 }
 
 /**
- * One transaction: icon, title, small details under it, and the amount at the right end
- * (before the three-dot menu), so every row has the same shape. Tap to open it in full.
+ * One transaction: title, tags, small details under it, and the amount at the right end,
+ * so every row has the same shape. Tap to open it in full (the receipt image is shown there).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -1184,7 +1291,6 @@ private fun TransactionRow(
     val income = txn.type == "INCOME"
     val sign = if (income) "+" else "−"
     var menuOpen by remember { mutableStateOf(false) }
-    var viewerOpen by remember { mutableStateOf(false) }
     val selectedTint = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
 
     Row(
@@ -1210,45 +1316,6 @@ private fun TransactionRow(
             // The whole row handles the tap, so the box itself is only a picture of the state
             Checkbox(checked = selected, onCheckedChange = null)
         }
-        // The receipt image when there is one (tap it to see it full screen), otherwise the first
-        // letter of the title, in the same rounded square. The income / expense arrow is a small badge at its top right.
-        Box(modifier = Modifier.size(46.dp)) {
-            if (txn.imageFile != null) {
-                ReceiptThumb(
-                    fileName = txn.imageFile,
-                    size = 40.dp,
-                    modifier = Modifier.align(Alignment.BottomStart),
-                    // While selecting, a tap on the picture selects the row like anywhere else
-                    onClick = if (selectionMode) null else ({ viewerOpen = true })
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .align(Alignment.BottomStart)
-                        // Same rounded square as the receipt image, so both look alike
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = txn.title.trim().take(1).uppercase().ifEmpty { "?" },
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Image(
-                painter = painterResource(if (income) R.drawable.ic_income else R.drawable.ic_expense),
-                contentDescription = if (income) "Income" else "Expense",
-                modifier = Modifier
-                    .size(20.dp)
-                    .align(Alignment.TopEnd)
-                    .border(1.5.dp, MaterialTheme.colorScheme.surface, CircleShape)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Fit
-            )
-        }
         Column(modifier = Modifier.weight(1f)) {
             // Line 1: title (one line)
             Text(
@@ -1261,27 +1328,37 @@ private fun TransactionRow(
             TagChipLine(tags = tags, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
             // Line 3: one muted line, time · payment · account · note (the note is cut first when short of space)
             val meta = listOfNotNull(
-                formatTime(txn.dateTime),
                 txn.paymentMethod.takeIf { it.isNotBlank() },
                 accountName?.takeIf { it.isNotBlank() },
                 txn.description.takeIf { it.isNotBlank() }?.replace('\n', ' ')
             ).joinToString(" • ")
+            if (meta.isNotEmpty()) {
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        // The amount on the right with the time under it, so the right side is as full as the left
+        Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = meta,
+                text = sign + formatMoney(txn.amountPaise),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (income) IncomeColor else ExpenseColor,
+                maxLines = 1
+            )
+            Text(
+                text = formatTime(txn.dateTime),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier.padding(top = 2.dp)
             )
         }
-        // The amount, centred vertically on the right so it lines up across every row
-        Text(
-            text = sign + formatMoney(txn.amountPaise),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            color = if (income) IncomeColor else ExpenseColor,
-            maxLines = 1
-        )
         // Three-dot menu on its own, centred on the right
 //        Box {
 //            IconButton(onClick = { menuOpen = true }) {
@@ -1298,9 +1375,6 @@ private fun TransactionRow(
 //        }
     }
 
-    if (viewerOpen && txn.imageFile != null) {
-        ReceiptImageViewer(fileName = txn.imageFile, onDismiss = { viewerOpen = false })
-    }
 }
 
 /**

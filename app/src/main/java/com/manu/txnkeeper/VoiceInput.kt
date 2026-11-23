@@ -45,6 +45,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.TextButton
+import com.manu.manudesignsystem.components.ManuCard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
@@ -118,6 +122,9 @@ class VoiceRecorder {
             }
             try {
                 rec.startRecording()
+                VoiceTap.newRecording()
+                VoiceEngine.clearAlternative()
+                PhoneRecogniser.begin()
                 val buf = ShortArray(4096)
                 var lastSecond = -1
                 while (isActive) {
@@ -126,6 +133,7 @@ class VoiceRecorder {
                     if (size + n > pcm.size) pcm = pcm.copyOf(pcm.size * 2)
                     System.arraycopy(buf, 0, pcm, size, n)
                     size += n
+                    PhoneRecogniser.push(buf, n)
                     val second = size / SAMPLE_RATE
                     if (second != lastSecond) {
                         lastSecond = second
@@ -137,6 +145,7 @@ class VoiceRecorder {
                     }
                 }
             } finally {
+                PhoneRecogniser.endInput()
                 runCatching { rec.stop() }
                 rec.release()
             }
@@ -159,7 +168,9 @@ data class VoiceTranscript(
     val seconds: Double,
     val audioSeconds: Double,
     /** How long loading the model took for this run (0 when it was already loaded). */
-    val loadSeconds: Double = 0.0
+    val loadSeconds: Double = 0.0,
+    /** "Google" (the phone's speech service) or "Whisper" (on-device). */
+    val engine: String = "Whisper"
 )
 
 /** Holds the one loaded speech model and turns recorded audio into text. */
@@ -171,6 +182,20 @@ internal fun downloadStatus(fraction: Float): String {
 }
 
 object VoiceEngine {
+    /** The other engine's wording, when it understood the recording differently from the one already used. */
+    class Alternative(val text: String, val engine: String)
+
+    var alternative by mutableStateOf<Alternative?>(null)
+        private set
+
+    fun clearAlternative() {
+        alternative = null
+    }
+
+    /** What the parser makes of a text: amount and title of every transaction (empty = nothing usable). */
+    private fun parseKey(text: String): List<String> =
+        SpokenTransactionParser.parseAll(text).map { "${it.amount}|${(it.title ?: "").trim().lowercase()}" }
+
     private val mutex = Mutex()
     @Volatile private var kit: WhisperKit? = null
 
@@ -200,7 +225,59 @@ object VoiceEngine {
         return created
     }
 
+    /**
+     * Turns a recording into text: the phone's Google recogniser first (it has been listening along, so its
+     * text is ready almost at once); if that is off, offline or heard nothing, the on-device Whisper model.
+     */
     suspend fun transcribe(
+        context: Context,
+        samples: FloatArray,
+        onStatus: (String) -> Unit
+    ): VoiceTranscript {
+        val audioSeconds = samples.size / SAMPLE_RATE.toDouble()
+        if (PhoneRecogniser.isActive()) {
+            onStatus("Transcribing…")
+            val google = PhoneRecogniser.result(4_000)
+            val googleKey = google?.let { parseKey(it.text) }.orEmpty()
+            if (google != null && googleKey.isNotEmpty()) {
+                if (BuildConfig.DEBUG) {
+                    lastTimings = "Voice engine: Google (phone recogniser), final text %.1f s after Stop, audio %.1f s"
+                        .format(google.secondsAfterStop, audioSeconds)
+                }
+                if (PhoneRecogniser.alsoRunWhisper(context)) {
+                    // Double-check: Whisper listens to the same recording in the background. If it understood the
+                    // transaction differently, the Add page offers its wording (tap "Use this" to switch).
+                    scope.launch {
+                        try {
+                            val w = transcribeWithWhisper(context, samples) { }
+                            val whisperKey = parseKey(w.text)
+                            if (whisperKey.isNotEmpty() && whisperKey != googleKey) {
+                                alternative = Alternative(w.text, "Whisper")
+                            }
+                            if (BuildConfig.DEBUG) {
+                                VoiceTap.publish(
+                                    "Whisper (comparison): \"${w.text}\", transcribe %.1f s, audio %.1f s".format(w.seconds, w.audioSeconds)
+                                )
+                            }
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            if (BuildConfig.DEBUG) VoiceTap.publish("Whisper (comparison): failed (${e.message})")
+                        }
+                    }
+                }
+                return VoiceTranscript(
+                    text = google.text.trim(), seconds = google.secondsAfterStop,
+                    audioSeconds = audioSeconds, engine = "Google"
+                )
+            }
+            // Google heard nothing, or nothing that looks like a transaction: Whisper decides
+            if (BuildConfig.DEBUG) VoiceTap.publish("Google gave no usable transaction: used Whisper instead")
+        }
+        return transcribeWithWhisper(context, samples, onStatus)
+    }
+
+    private suspend fun transcribeWithWhisper(
         context: Context,
         samples: FloatArray,
         onStatus: (String) -> Unit
@@ -234,6 +311,11 @@ object VoiceEngine {
                 lastTimings = "Voice timing: $loadNote, transcribe %.1f s, audio %.1f s".format(
                     result.seconds, result.audioSeconds
                 )
+                VoiceTap.addWhisper(
+                    VoiceTap.WhisperRun(
+                        VoiceTap.recordingId, text, waitedSeconds + result.seconds, result.seconds, result.audioSeconds
+                    )
+                )
             }
             result
         }
@@ -259,6 +341,7 @@ object VoiceEngine {
      * speaking. Only when it is already downloaded: this never starts a download.
      */
     fun preloadIfReady(context: Context) {
+        PhoneRecogniser.attach(context)
         if (kit != null || !isModelReady(context)) return
         val app = context.applicationContext
         scope.launch {
@@ -382,6 +465,12 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
     // Load the model in the background now, and free its memory a few minutes after the Add page is closed
     LaunchedEffect(Unit) { VoiceEngine.preloadIfReady(context) }
     DisposableEffect(Unit) { onDispose { VoiceEngine.release() } }
+
+    // While recording, the words you are saying appear in the note above the form
+    val live = PhoneRecogniser.liveText
+    LaunchedEffect(live, recording) {
+        if (recording) form.notice = if (live.isBlank()) "Listening…" else live
+    }
 
     fun finish() {
         if (!recording) return
@@ -509,5 +598,33 @@ internal fun fillFromSpeech(form: TxnFormState, text: String) {
         form.notice = "Heard: \"$text\". Couldn't find transaction details in this."
     } else {
         form.fill(single, message = "Heard: \"$text\". Check the form, then save.")
+    }
+}
+
+/**
+ * Shown on the Add page when the two speech engines understood the same recording differently:
+ * the form has the first one's wording; this offers the other one.
+ */
+@Composable
+fun VoiceAlternativeBanner(form: TxnFormState, modifier: Modifier = Modifier) {
+    val alt = VoiceEngine.alternative ?: return
+    ManuCard(modifier = modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(
+                text = "${alt.engine} heard it differently:",
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(text = "\u201C${alt.text}\u201D", style = MaterialTheme.typography.bodyMedium)
+            Row {
+                TextButton(onClick = {
+                    fillFromSpeech(form, alt.text)
+                    VoiceEngine.clearAlternative()
+                }) { Text("Use this") }
+                TextButton(onClick = { VoiceEngine.clearAlternative() }) { Text("Keep current") }
+            }
+        }
     }
 }

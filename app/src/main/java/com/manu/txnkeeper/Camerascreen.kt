@@ -14,7 +14,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import android.hardware.camera2.CameraMetadata
+import android.hardware.camera2.CaptureRequest
+import android.util.Size
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageCapture
@@ -258,11 +266,7 @@ fun CameraScreen(
         }
     }
     // Receipts are all small text: favour a sharp photo over the fastest shutter
-    val imageCapture = remember {
-        ImageCapture.Builder()
-            .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-            .build()
-    }
+    val imageCapture = remember { sharpImageCapture() }
 
     // The preview fades in when the first frame arrives, so there is no black-to-picture jump
     DisposableEffect(previewView, lifecycleOwner) {
@@ -296,7 +300,7 @@ fun CameraScreen(
                 } catch (e: Exception) {
                     false
                 }
-                val newPreview = Preview.Builder().build().also {
+                val newPreview = autofocusPreview().also {
                     it.setSurfaceProvider(previewView.surfaceProvider)
                 }
                 preview = newPreview
@@ -320,6 +324,23 @@ fun CameraScreen(
             camera = null
             streaming = false
             provider?.unbind(*listOfNotNull<UseCase>(preview, imageCapture).toTypedArray())
+        }
+    }
+
+    // As soon as the camera is running, focus once on the centre (then it carries on focusing by itself)
+    LaunchedEffect(camera) {
+        val cam = camera ?: return@LaunchedEffect
+        kotlinx.coroutines.delay(600)
+        if (previewView.width > 0 && previewView.height > 0) {
+            try {
+                val centre = previewView.meteringPointFactory.createPoint(previewView.width / 2f, previewView.height / 2f)
+                cam.cameraControl.startFocusAndMetering(
+                    FocusMeteringAction.Builder(centre, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+                        .setAutoCancelDuration(3, TimeUnit.SECONDS).build()
+                )
+            } catch (e: Exception) {
+                // Not important: the camera still focuses by itself
+            }
         }
     }
 
@@ -408,8 +429,17 @@ fun CameraScreen(
                     centre,
                     FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
                 ).build()
-                cam.cameraControl.startFocusAndMetering(focus).addListener({ fireOnce() }, mainExecutor)
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ fireOnce() }, 1500)
+                // Focus on the centre; if the camera says it could not lock focus, try once more, then shoot
+                fun attempt(triesLeft: Int) {
+                    val result = cam.cameraControl.startFocusAndMetering(focus)
+                    result.addListener({
+                        val locked = try { result.get().isFocusSuccessful } catch (e: Exception) { false }
+                        if (locked || triesLeft <= 0) fireOnce() else attempt(triesLeft - 1)
+                    }, mainExecutor)
+                }
+                attempt(1)
+                // Never wait longer than this for the shot
+                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({ fireOnce() }, 2500)
             } catch (e: Exception) {
                 fireOnce()
             }
@@ -748,4 +778,41 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/**
+ * The photo camera set up for small text: the largest picture up to about 12 megapixels (4:3), top JPEG
+ * quality, the phone's high-quality sharpening and noise reduction, and image stabilisation when it has it.
+ * Settings a phone does not support are ignored by it.
+ */
+@OptIn(ExperimentalCamera2Interop::class)
+private fun sharpImageCapture(): ImageCapture {
+    val builder = ImageCapture.Builder()
+        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+        .setJpegQuality(100)
+        .setResolutionSelector(
+            ResolutionSelector.Builder()
+                .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                .setResolutionStrategy(
+                    ResolutionStrategy(Size(4000, 3000), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER)
+                )
+                .build()
+        )
+    Camera2Interop.Extender(builder)
+        .setCaptureRequestOption(CaptureRequest.EDGE_MODE, CameraMetadata.EDGE_MODE_HIGH_QUALITY)
+        .setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY)
+        .setCaptureRequestOption(
+            CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+            CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_ON
+        )
+    return builder.build()
+}
+
+/** The live preview, asking the camera to keep focusing continuously for still pictures. */
+@OptIn(ExperimentalCamera2Interop::class)
+private fun autofocusPreview(): Preview {
+    val builder = Preview.Builder()
+    Camera2Interop.Extender(builder)
+        .setCaptureRequestOption(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+    return builder.build()
 }

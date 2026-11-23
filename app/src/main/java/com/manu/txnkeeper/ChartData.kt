@@ -321,12 +321,14 @@ fun spendBreakdown(
     accountNames: Map<Long, String>,
     maxSlices: Int = MAX_SLICES,
     /** Transaction id -> its tags; only used when [by] is TAG. */
-    tagsOf: Map<Int, List<TagEntity>> = emptyMap()
+    tagsOf: Map<Int, List<TagEntity>> = emptyMap(),
+    /** "EXPENSE" (default) or "INCOME": which kind of transaction is added up. */
+    kind: String = "EXPENSE"
 ): List<Slice> {
-    if (by == BreakdownBy.TAG) return tagBreakdown(txns, tagsOf, maxSlices)
+    if (by == BreakdownBy.TAG) return tagBreakdown(txns, tagsOf, maxSlices, kind)
     val totals = LinkedHashMap<String, Long>()
     for (t in txns) {
-        if (t.type != "EXPENSE") continue
+        if (t.type != kind) continue
         val key = when (by) {
             BreakdownBy.PAYMENT -> t.paymentMethod.ifBlank { "Unspecified" }
             BreakdownBy.ACCOUNT -> accountNames[t.accountId] ?: "Account ${t.accountId}"
@@ -344,11 +346,16 @@ const val UNTAGGED_LABEL = "Untagged"
  * Expenses added up per tag. A transaction with several tags is shared equally between them (the odd
  * paise go to the first), so the slices always add up to the real total; one without tags is "Untagged".
  */
-fun tagBreakdown(txns: List<TransactionEntity>, tagsOf: Map<Int, List<TagEntity>>, maxSlices: Int = MAX_SLICES): List<Slice> {
+fun tagBreakdown(
+    txns: List<TransactionEntity>,
+    tagsOf: Map<Int, List<TagEntity>>,
+    maxSlices: Int = MAX_SLICES,
+    kind: String = "EXPENSE"
+): List<Slice> {
     val totals = LinkedHashMap<String, Long>()
     val colorOf = HashMap<String, Int>()
     for (t in txns) {
-        if (t.type != "EXPENSE") continue
+        if (t.type != kind) continue
         val tags = tagsOf[t.id].orEmpty()
         if (tags.isEmpty()) {
             totals.merge(UNTAGGED_LABEL, t.amountPaise) { a, b -> a + b }
@@ -368,11 +375,11 @@ fun tagBreakdown(txns: List<TransactionEntity>, tagsOf: Map<Int, List<TagEntity>
  * The titles you spent the most on, biggest first. "Coffee" and " coffee " count as the same title;
  * a blank title shows as "No title".
  */
-fun topSpendTitles(txns: List<TransactionEntity>, limit: Int = 8): List<Slice> {
+fun topSpendTitles(txns: List<TransactionEntity>, limit: Int = 8, kind: String = "EXPENSE"): List<Slice> {
     val totals = LinkedHashMap<String, Long>()
     val shownAs = HashMap<String, String>()
     for (t in txns) {
-        if (t.type != "EXPENSE") continue
+        if (t.type != kind) continue
         val shown = t.title.trim().ifEmpty { "No title" }
         val key = shown.lowercase()
         shownAs.putIfAbsent(key, shown)
@@ -385,11 +392,11 @@ fun topSpendTitles(txns: List<TransactionEntity>, limit: Int = 8): List<Slice> {
 }
 
 /** Total expense for each day of the week, Monday first (index 0) to Sunday (index 6). */
-fun spendByWeekday(txns: List<TransactionEntity>): List<Long> {
+fun spendByWeekday(txns: List<TransactionEntity>, kind: String = "EXPENSE"): List<Long> {
     val totals = LongArray(7)
     val cal = Calendar.getInstance()
     for (t in txns) {
-        if (t.type != "EXPENSE") continue
+        if (t.type != kind) continue
         cal.timeInMillis = t.dateTime
         // Calendar: Sunday = 1, Monday = 2 ... Saturday = 7  ->  Monday = 0 ... Sunday = 6
         totals[(cal.get(Calendar.DAY_OF_WEEK) + 5) % 7] += t.amountPaise

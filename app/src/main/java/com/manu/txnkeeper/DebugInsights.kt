@@ -55,6 +55,14 @@ object DebugInsights {
         if (!BuildConfig.DEBUG) return
         report = DebugReport("Voice", heard, entries, notes)
         DebugDataLog.addSamples("Voice", heard, entries, notes)
+        VoiceTap.rowCreated()
+    }
+
+    /** Adds a line to the card's "Other" notes and to the latest log rows (used by the voice comparison, which finishes a bit later). */
+    fun addNote(line: String) {
+        if (!BuildConfig.DEBUG) return
+        report = report?.let { DebugReport(it.source, it.rawText, it.entries, it.notes + line) }
+        DebugDataLog.appendNote(line)
     }
 
     fun clear() {

@@ -482,6 +482,8 @@ fun AddTransactionScreen(
             ) {
                 // Debug builds only: what the scan or voice found and where it went (nothing in release)
                 DebugInsightsCard()
+                if (BuildConfig.DEBUG) GoogleLiveCard()
+                VoiceAlternativeBanner(form)
 
                 form.notice?.let { notice ->
                     // The "Possible duplicate" paragraph is a warning, so it is red; the rest stays grey

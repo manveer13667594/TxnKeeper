@@ -466,6 +466,25 @@ fun VoiceScreen(
                     }
                 }
 
+                // What you are saying, as the speech service hears it (only with Fast voice; the end of a long
+                // sentence stays visible). The space is always kept so nothing moves.
+                val live = PhoneRecogniser.liveText
+                Box(
+                    modifier = Modifier.fillMaxWidth().height(76.dp).padding(horizontal = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if ((recording || working != null) && live.isNotBlank()) {
+                        Text(
+                            text = "\u201C" + live.takeLast(140) + "\u201D",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            textAlign = TextAlign.Center,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
                 // Status line: only shown when there is something to say (listening, working, a problem).
                 // The space is always kept, so the face and the mic do not move when it appears.
                 val status = when {

@@ -18,6 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Leaderboard
+import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -30,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
@@ -101,21 +109,114 @@ private const val WEEKDAY_BAR_MAX_DP = 110f
 // ------------------------------------------------------------------ chips and the panel
 
 /** The row of chips that picks which chart is shown. */
+private fun StatsChartType.icon(): ImageVector = when (this) {
+    StatsChartType.BALANCE -> Icons.AutoMirrored.Filled.ShowChart
+    StatsChartType.INCOME_EXPENSE -> Icons.Default.BarChart
+    StatsChartType.BREAKDOWN -> Icons.Default.PieChart
+    StatsChartType.TOP_SPENDS -> Icons.Default.Leaderboard
+    StatsChartType.WEEKDAY -> Icons.Default.DateRange
+}
+
+/** Short text that fits five to a row under an icon. */
+private fun StatsChartType.shortLabel(): String = when (this) {
+    StatsChartType.BALANCE -> "Balance"
+    StatsChartType.INCOME_EXPENSE -> "In/Out"
+    StatsChartType.BREAKDOWN -> "Split"
+    StatsChartType.TOP_SPENDS -> "Top"
+    StatsChartType.WEEKDAY -> "Weekday"
+}
+
+/** One line under the chart tabs saying what the chart shows. */
+internal fun StatsChartType.description(): String = when (this) {
+    StatsChartType.BALANCE -> "Your balance after every transaction"
+    StatsChartType.INCOME_EXPENSE -> "Money in and out, period by period"
+    StatsChartType.BREAKDOWN -> "Where the money went or came from"
+    StatsChartType.TOP_SPENDS -> "The biggest titles, ranked"
+    StatsChartType.WEEKDAY -> "Which days of the week add up the most"
+}
+
+/** The five chart types as equal tabs (icon over a short label). They always fit, so nothing scrolls sideways. */
 @Composable
 internal fun ChartTypeChips(
     selected: StatsChartType,
     onSelect: (StatsChartType) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val scheme = MaterialTheme.colorScheme
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-        verticalAlignment = Alignment.CenterVertically
+            .clip(RoundedCornerShape(16.dp))
+            .background(scheme.onSurface.copy(alpha = 0.05f))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         StatsChartType.entries.forEach { type ->
-            ManuChip(label = type.label, selected = type == selected, onClick = { onSelect(type) })
+            val on = type == selected
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (on) scheme.primary.copy(alpha = 0.16f) else Color.Transparent)
+                    .clickable { onSelect(type) }
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    type.icon(), contentDescription = null,
+                    tint = if (on) scheme.primary else scheme.onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+                Text(
+                    text = type.shortLabel(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (on) scheme.primary else scheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+/** A row of equal segments, one selected (used for the time window and Line / Step). */
+@Composable
+internal fun SegmentedRow(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    /** True when there are too many segments to share the width: they keep their own size and the row scrolls. */
+    scrollable: Boolean = false
+) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(scheme.onSurface.copy(alpha = 0.05f))
+            .then(if (scrollable) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
+            .padding(3.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        labels.forEachIndexed { i, label ->
+            val on = i == selectedIndex
+            Box(
+                modifier = (if (scrollable) Modifier else Modifier.weight(1f))
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (on) scheme.primary.copy(alpha = 0.16f) else Color.Transparent)
+                    .clickable { onSelect(i) }
+                    .padding(vertical = 7.dp, horizontal = if (scrollable) 14.dp else 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (on) scheme.primary else scheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
         }
     }
 }
@@ -133,14 +234,30 @@ internal fun MoreChartsPanel(
     breakdownBy: BreakdownBy,
     onBreakdownBy: (BreakdownBy) -> Unit,
     tagsOf: Map<Int, List<TagEntity>> = emptyMap(),
+    /** "EXPENSE" or "INCOME": what the breakdown, top titles and weekday charts add up. */
+    kind: String = "EXPENSE",
+    onKind: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     when (type) {
         StatsChartType.BALANCE -> Unit   // drawn by StatsScreen itself
         StatsChartType.INCOME_EXPENSE -> IncomeExpensePanel(txns, rangeDays, modifier)
-        StatsChartType.BREAKDOWN -> BreakdownPanel(txns, rangeDays, accountNames, breakdownBy, onBreakdownBy, tagsOf, modifier)
-        StatsChartType.TOP_SPENDS -> TopSpendsPanel(txns, rangeDays, modifier)
-        StatsChartType.WEEKDAY -> WeekdayPanel(txns, rangeDays, modifier)
+        StatsChartType.BREAKDOWN, StatsChartType.TOP_SPENDS, StatsChartType.WEEKDAY -> Column(modifier = modifier) {
+            // These three charts add up one kind of transaction at a time
+            SegmentedRow(
+                labels = listOf("Expense", "Income"),
+                selectedIndex = if (kind == "INCOME") 1 else 0,
+                onSelect = { onKind(if (it == 1) "INCOME" else "EXPENSE") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            )
+            when (type) {
+                StatsChartType.BREAKDOWN -> BreakdownPanel(txns, rangeDays, accountNames, breakdownBy, onBreakdownBy, tagsOf, kind, Modifier)
+                StatsChartType.TOP_SPENDS -> TopSpendsPanel(txns, rangeDays, kind, Modifier)
+                else -> WeekdayPanel(txns, rangeDays, kind, Modifier)
+            }
+        }
     }
 }
 
@@ -409,39 +526,52 @@ private fun BreakdownPanel(
     breakdownBy: BreakdownBy,
     onBreakdownBy: (BreakdownBy) -> Unit,
     tagsOf: Map<Int, List<TagEntity>>,
+    kind: String,
     modifier: Modifier
 ) {
-    val result = rememberComputed(txns, rangeDays, breakdownBy, accountNames, tagsOf) {
-        val slices = spendBreakdown(withinDays(txns, rangeDays), breakdownBy, accountNames, tagsOf = tagsOf)
+    val noun = if (kind == "INCOME") "Income" else "Expenses"
+    val result = rememberComputed(txns, rangeDays, breakdownBy, accountNames, tagsOf, kind) {
+        val slices = spendBreakdown(withinDays(txns, rangeDays), breakdownBy, accountNames, tagsOf = tagsOf, kind = kind)
         BreakdownResult(slices, slices.sumOf { it.paise })
     }
 
     Column(modifier = modifier) {
-        Row(
-            modifier = Modifier.padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-        ) {
-            BreakdownBy.entries.forEach { by ->
-                ManuChip(label = by.label, selected = by == breakdownBy, onClick = { onBreakdownBy(by) })
-            }
-        }
+        // "Group by": payment / account / tag as one row of equal segments
+        SegmentedRow(
+            labels = BreakdownBy.entries.map { it.label },
+            selectedIndex = BreakdownBy.entries.indexOf(breakdownBy),
+            onSelect = { onBreakdownBy(BreakdownBy.entries[it]) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 10.dp)
+        )
         val r = result
         val what = breakdownBy.label.lowercase()
         ChartCaption(
-            if (r == null || r.totalPaise == 0L) "Expenses by $what"
-            else "Expenses by $what\n${formatMoney(r.totalPaise)} in total"
+            if (r == null || r.totalPaise == 0L) "$noun by $what"
+            else "$noun by $what\n${formatMoney(r.totalPaise)} in total"
         )
         if (r != null) {
             if (r.slices.isEmpty()) {
-                EmptyNote("No expenses in this range.", Modifier.padding(vertical = 32.dp))
+                EmptyNote("No ${noun.lowercase()} in this range.", Modifier.padding(vertical = 32.dp))
             } else {
                 val colors = remember(r) {
+                    // Every slice gets its own colour: a tag keeps the colour you gave it, unless an earlier
+                    // slice already uses that one (two tags can share a colour); then the next free one is used.
+                    val used = HashSet<Color>()
                     r.slices.mapIndexed { i, s ->
-                        when {
-                            s.isOther || s.label == UNTAGGED_LABEL && s.colorIndex == null && breakdownBy == BreakdownBy.TAG -> ChartOtherColor
-                            s.colorIndex != null -> tagColor(s.colorIndex)   // a tag keeps its own colour
+                        val greyed = s.isOther ||
+                                (s.label == UNTAGGED_LABEL && s.colorIndex == null && breakdownBy == BreakdownBy.TAG)
+                        val colour = when {
+                            greyed -> ChartOtherColor
+                            s.colorIndex != null -> tagColor(s.colorIndex).takeIf { it !in used }
+                                ?: TAG_COLORS.firstOrNull { it !in used }
+                                ?: ChartCategoryColors.firstOrNull { it !in used }
+                                ?: tagColor(s.colorIndex)
                             else -> ChartCategoryColors[i % ChartCategoryColors.size]
                         }
+                        used.add(colour)
+                        colour
                     }
                 }
                 DonutChart(
@@ -547,28 +677,31 @@ private fun SliceLegend(slices: List<Slice>, colors: List<Color>, totalPaise: Lo
 private class TopSpendsResult(val slices: List<Slice>, val totalExpensePaise: Long)
 
 @Composable
-private fun TopSpendsPanel(txns: List<TransactionEntity>, rangeDays: Int, modifier: Modifier) {
-    val result = rememberComputed(txns, rangeDays) {
+private fun TopSpendsPanel(txns: List<TransactionEntity>, rangeDays: Int, kind: String, modifier: Modifier) {
+    val income = kind == "INCOME"
+    val result = rememberComputed(txns, rangeDays, kind) {
         val inRange = withinDays(txns, rangeDays)
         TopSpendsResult(
-            slices = topSpendTitles(inRange),
-            totalExpensePaise = inRange.filter { it.type == "EXPENSE" }.sumOf { it.amountPaise }
+            slices = topSpendTitles(inRange, kind = kind),
+            totalExpensePaise = inRange.filter { it.type == kind }.sumOf { it.amountPaise }
         )
     }
 
     Column(modifier = modifier) {
         val r = result
         ChartCaption(
-            if (r == null || r.slices.isEmpty() || r.totalExpensePaise <= 0L) "Titles you spent the most on, added up"
+            if (r == null || r.slices.isEmpty() || r.totalExpensePaise <= 0L) {
+                if (income) "Titles you earned the most from, added up" else "Titles you spent the most on, added up"
+            }
             else {
                 val top = r.slices.sumOf { it.paise }
-                "Top ${r.slices.size} titles are ${percentText(top, r.totalExpensePaise)} of your spending\n" +
+                "Top ${r.slices.size} titles are ${percentText(top, r.totalExpensePaise)} of your ${if (income) "income" else "spending"}\n" +
                         "${formatMoney(top)} of ${formatMoney(r.totalExpensePaise)}"
             }
         )
         when {
             r == null -> Spacer(Modifier.height(120.dp))
-            r.slices.isEmpty() -> EmptyNote("No expenses in this range.", Modifier.padding(vertical = 32.dp))
+            r.slices.isEmpty() -> EmptyNote(if (income) "No income in this range." else "No expenses in this range.", Modifier.padding(vertical = 32.dp))
             else -> {
                 val biggest = r.slices.first().paise.coerceAtLeast(1L)
                 Column(
@@ -605,7 +738,7 @@ private fun TopSpendsPanel(txns: List<TransactionEntity>, rangeDays: Int, modifi
                             // Bars are measured against the biggest title, so the ranking is easy to compare
                             ShareBar(
                                 fraction = s.paise.toFloat() / biggest,
-                                color = ExpenseColor,
+                                color = if (income) IncomeColor else ExpenseColor,
                                 modifier = Modifier.padding(start = 22.dp, top = 5.dp)
                             )
                         }
@@ -619,8 +752,9 @@ private fun TopSpendsPanel(txns: List<TransactionEntity>, rangeDays: Int, modifi
 // ------------------------------------------------------------------ By weekday
 
 @Composable
-private fun WeekdayPanel(txns: List<TransactionEntity>, rangeDays: Int, modifier: Modifier) {
-    val totals = rememberComputed(txns, rangeDays) { spendByWeekday(withinDays(txns, rangeDays)) }
+private fun WeekdayPanel(txns: List<TransactionEntity>, rangeDays: Int, kind: String, modifier: Modifier) {
+    val income = kind == "INCOME"
+    val totals = rememberComputed(txns, rangeDays, kind) { spendByWeekday(withinDays(txns, rangeDays), kind) }
     // The day that was tapped (cleared whenever the data changes); tapping it again clears it
     var picked by remember(totals) { mutableStateOf<Int?>(null) }
 
@@ -631,20 +765,21 @@ private fun WeekdayPanel(txns: List<TransactionEntity>, rangeDays: Int, modifier
         ChartCaption(
             when {
                 totals == null -> " "
-                shown == null -> "Expenses by day of week"
+                shown == null -> if (income) "Income by day of week" else "Expenses by day of week"
                 else -> {
                     val v = totals[shown]
                     (if (picked == null) "Busiest day: " else "") +
-                            "${FULL_WEEKDAYS[shown]}\n${formatMoney(v)} · ${percentText(v, sum)} of your spending"
+                            "${FULL_WEEKDAYS[shown]}\n${formatMoney(v)} · ${percentText(v, sum)} of your ${if (income) "income" else "spending"}"
                 }
             }
         )
         when {
             totals == null -> Spacer(Modifier.height(WEEKDAY_HEIGHT))
-            sum == 0L -> EmptyNote("No expenses in this range.", Modifier.height(WEEKDAY_HEIGHT))
+            sum == 0L -> EmptyNote(if (income) "No income in this range." else "No expenses in this range.", Modifier.height(WEEKDAY_HEIGHT))
             else -> WeekdayBars(
                 totals = totals,
                 emphasised = shown,
+                color = if (income) IncomeColor else ExpenseColor,
                 onPick = { picked = if (picked == it) null else it }
             )
         }
@@ -653,7 +788,7 @@ private fun WeekdayPanel(txns: List<TransactionEntity>, rangeDays: Int, modifier
 
 /** Seven columns, Monday to Sunday. The [emphasised] day is drawn in full colour and labelled. */
 @Composable
-private fun WeekdayBars(totals: List<Long>, emphasised: Int?, onPick: (Int) -> Unit) {
+private fun WeekdayBars(totals: List<Long>, emphasised: Int?, color: Color, onPick: (Int) -> Unit) {
     val biggest = totals.max().coerceAtLeast(1L)
     Row(
         modifier = Modifier
@@ -686,7 +821,7 @@ private fun WeekdayBars(totals: List<Long>, emphasised: Int?, onPick: (Int) -> U
                         .fillMaxWidth(0.7f)
                         .height(barDp.dp)
                         .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                        .background(if (strong) ExpenseColor else ExpenseColor.copy(alpha = 0.35f))
+                        .background(if (strong) color else color.copy(alpha = 0.35f))
                 )
                 Text(
                     text = WEEKDAY_LABELS[i],

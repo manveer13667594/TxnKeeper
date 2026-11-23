@@ -148,6 +148,24 @@ fun TxnFilters.toQuery(search: String, accountId: Long? = null): TxnQuery {
     return TxnQuery(type, payment, minAmount, maxAmount, from, to, accountId, search, newestFirst)
 }
 
+/**
+ * The part of the list the home card's small trend line draws. With no date filter that is this month so far
+ * (at least the last 14 days, so the first days of a month still show a line) instead of all your history;
+ * when a date filter is on, the line follows it. Returns the query to draw and a short caption (null with a date filter).
+ */
+fun recentTrendWindow(q: TxnQuery, now: Long = System.currentTimeMillis()): Pair<TxnQuery, String?> {
+    if (q.dateFrom != null) return q to null
+    val cal = Calendar.getInstance().apply {
+        timeInMillis = now
+        set(Calendar.DAY_OF_MONTH, 1)
+        set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+    }
+    val monthStart = cal.timeInMillis
+    val fourteenDays = now - 14L * 24 * 60 * 60 * 1000
+    return if (monthStart <= fourteenDays) q.copy(dateFrom = monthStart) to "This month"
+    else q.copy(dateFrom = fourteenDays) to "Last 14 days"
+}
+
 /** One page of matching rows, newest or oldest first. Raise [limit] to load more. */
 fun TransactionDao.observePage(q: TxnQuery, limit: Int): Flow<List<TransactionEntity>> {
     val where = TxnSql.where(q)

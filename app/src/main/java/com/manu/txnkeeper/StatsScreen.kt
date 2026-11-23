@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -32,7 +31,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Savings
+import androidx.compose.material.icons.filled.TrendingDown
+import androidx.compose.material.icons.filled.TrendingUp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -202,6 +210,8 @@ fun StatsScreen(
     // Which chart is shown (Balance = the line chart below, the others are in StatsCharts.kt)
     var chartType by rememberSaveable { mutableStateOf(StatsChartType.BALANCE) }
     var breakdownBy by rememberSaveable { mutableStateOf(BreakdownBy.PAYMENT) }
+    // Expense or income, for the breakdown, top titles and weekday charts
+    var chartKind by rememberSaveable { mutableStateOf("EXPENSE") }
     val accountNames = remember(accounts) { accounts.associate { it.id to it.name } }
     // Tags per transaction, for the "by tag" pie
     val allTags by remember { dao.observeTags() }.collectAsState(initial = emptyList())
@@ -215,9 +225,37 @@ fun StatsScreen(
     var selected by remember { mutableStateOf<ChartPoint?>(null) }
     // New data, or another chart: whatever was tapped no longer exists on screen
     LaunchedEffect(series, chartType) { selected = null }
-    val insights = remember(series) { series?.let { computeInsights(it) } }
     // Until a chip is tapped, open on the smallest window with enough points, and show that chip as selected
     val effectiveDays = rangeDays ?: remember(series) { series?.let { defaultRangeDays(it) } ?: 0 }
+    // Everything on top (totals, insights) follows the chosen window, so the numbers match what the chart shows
+    val windowSeries = remember(series, effectiveDays) {
+        series?.let { full ->
+            if (effectiveDays <= 0) full else {
+                val inWindow = withinDays(allTxns, effectiveDays)
+                val cut = inWindow.minOfOrNull { it.dateTime } ?: Long.MAX_VALUE
+                val before = allTxns.filter { it.dateTime < cut }.sumOf {
+                    when (it.type) { "INCOME" -> it.amountPaise; "EXPENSE" -> -it.amountPaise; else -> 0L }
+                }
+                buildChartSeries(inWindow, full.startPaise + before)
+            }
+        }
+    }
+    // The window just before it, to say whether spending went up or down
+    val previous = remember(series, effectiveDays) {
+        if (effectiveDays <= 0 || allTxns.isEmpty()) null else {
+            val newest = allTxns.maxOf { it.dateTime }
+            val day = 86_400_000L
+            val prev = allTxns.filter { it.dateTime >= newest - 2L * effectiveDays * day && it.dateTime < newest - effectiveDays * day }
+            if (prev.isEmpty()) null else Pair(
+                prev.filter { it.type == "INCOME" }.sumOf { it.amountPaise },
+                prev.filter { it.type == "EXPENSE" }.sumOf { it.amountPaise }
+            )
+        }
+    }
+    val windowLabel = RANGES.firstOrNull { it.second == effectiveDays }?.let {
+        if (it.second == 0) "All time" else "Last ${windowName(it.second)}"
+    } ?: "All time"
+    val insights = remember(windowSeries) { windowSeries?.let { computeInsights(it) } }
 
     ManuScaffold(
         // The home screen sits underneath this page. Without a touch handler here, a tap on any empty
@@ -256,7 +294,6 @@ fun StatsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp)
         ) {
-            AccountChips(accounts = accounts, selectedId = accountId, onSelect = { accountId = it })
             PeriodNavigator(filters = filters, onChange = { filters = it })
 
             val s = series
@@ -266,7 +303,7 @@ fun StatsScreen(
                     .fillMaxWidth()
                     .height(240.dp))
             } else {
-                SummaryCard(s, anchored, title, selected)
+                SummaryCard(s, windowSeries ?: s, previous, windowLabel, anchored, title, selected)
 
                 if (s.isEmpty) {
                     Box(
@@ -285,29 +322,53 @@ fun StatsScreen(
                     // One card holds everything that belongs to the chart: type chips, time chips, the chart
                     ManuCard(modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 12.dp)) {
+                        .padding(top = 14.dp)) {
                         Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
+                            // Which account the stats are for, in the same style as the tabs below
+                            if (accounts.size > 1) {
+                                val ids = listOf<Long?>(null) + accounts.map { it.id }
+                                SegmentedRow(
+                                    labels = listOf("All") + accounts.map { it.name },
+                                    selectedIndex = ids.indexOf(accountId).coerceAtLeast(0),
+                                    onSelect = { accountId = ids[it] },
+                                    scrollable = accounts.size > 3,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 10.dp)
+                                )
+                            }
                             ChartTypeChips(selected = chartType, onSelect = { chartType = it })
+                            // One time window for every chart, in one row that always fits
+                            SegmentedRow(
+                                labels = RANGES.map { it.first },
+                                selectedIndex = RANGES.indexOfFirst { it.second == effectiveDays },
+                                onSelect = { i -> rangeDays = RANGES[i].second; rangeTick++ },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 10.dp)
+                            )
+                            // What this chart is, with Line / Step on the right for the balance line
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp)
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                                    .padding(top = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RANGES.forEach { (label, days) ->
-                                    ManuChip(
-                                        label = label,
-                                        selected = effectiveDays == days,
-                                        onClick = { rangeDays = days; rangeTick++ }
-                                    )
-                                }
-                                // Line / Step only means something for the balance line
+                                Text(
+                                    text = chartType.description(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 if (chartType == StatsChartType.BALANCE) {
-                                    Box(Modifier.width(8.dp))
-                                    ManuChip(label = "Line", selected = !stepped, onClick = { stepped = false })
-                                    ManuChip(label = "Step", selected = stepped, onClick = { stepped = true })
+                                    SegmentedRow(
+                                        labels = listOf("Line", "Step"),
+                                        selectedIndex = if (stepped) 1 else 0,
+                                        onSelect = { stepped = it == 1 },
+                                        modifier = Modifier.width(120.dp)
+                                    )
                                 }
                             }
 
@@ -349,15 +410,23 @@ fun StatsScreen(
                                     breakdownBy = breakdownBy,
                                     onBreakdownBy = { breakdownBy = it },
                                     tagsOf = tagsOf,
+                                    kind = chartKind,
+                                    onKind = { chartKind = it },
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
                     }
 
-                    if (chartType == StatsChartType.BALANCE) {
-                        insights?.let { InsightsGrid(it, anchored, modifier = Modifier.padding(top = 20.dp)) }
-                    }
+                    SmartInsights(
+                        txns = allTxns,
+                        days = effectiveDays,
+                        windowLabel = windowLabel,
+                        previousExpense = previous?.second,
+                        base = insights,
+                        tagsOf = tagsOf,
+                        modifier = Modifier.padding(top = 20.dp)
+                    )
                     Spacer(Modifier.height(32.dp))
                 }
             }
@@ -375,7 +444,15 @@ fun StatsScreen(
 }
 
 @Composable
-private fun SummaryCard(series: ChartSeries, anchored: Boolean, title: String, selected: ChartPoint?) {
+private fun SummaryCard(
+    series: ChartSeries,
+    window: ChartSeries,
+    previous: Pair<Long, Long>?,
+    windowLabel: String,
+    anchored: Boolean,
+    title: String,
+    selected: ChartPoint?
+) {
     // Touching a point on the chart shows the balance right after that transaction
     val value = selected?.balancePaise ?: if (anchored) series.endPaise else series.netPaise
     val label = when {
@@ -388,70 +465,179 @@ private fun SummaryCard(series: ChartSeries, anchored: Boolean, title: String, s
         title.equals("All", ignoreCase = true) -> "Balance"
         else -> "Balance · $title"
     }
-    ManuCard(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md)) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(24.dp)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(scheme.surface)
+            .background(
+                Brush.linearGradient(
+                    // Same look as the home card: light mode deepens towards the bottom right, dark mode fades out
+                    if (scheme.background.luminance() > 0.5f)
+                        listOf(scheme.primary.copy(alpha = 0.03f), scheme.primary.copy(alpha = 0.14f))
+                    else
+                        listOf(scheme.primary.copy(alpha = 0.18f), scheme.primary.copy(alpha = 0.04f))
+                )
+            )
+            .border(1.dp, scheme.primary.copy(alpha = 0.12f), shape)
+            .padding(horizontal = 14.dp, vertical = 12.dp)
+    ) {
+        Column {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium,
+                color = scheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = if (anchored) formatBalance(value) else formatSignedMoney(value),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold,
-                color = if (value < 0) ExpenseColor else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-            Row(modifier = Modifier.padding(top = 10.dp)) {
-                Cell("Income", formatMoney(series.incomePaise), IncomeColor, Alignment.Start)
-                Cell("Expense", formatMoney(series.expensePaise), ExpenseColor, Alignment.CenterHorizontally)
-                Cell(
-                    "Net", formatSignedMoney(series.netPaise),
-                    if (series.netPaise >= 0) IncomeColor else ExpenseColor, Alignment.End
+            // Balance on the left, what the window added or took on the right: one line instead of two
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (anchored) formatBalance(value) else formatSignedMoney(value),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = if (value < 0) ExpenseColor else scheme.onSurface,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f)
                 )
+                if (selected == null) {
+                    Text(
+                        text = "${formatSignedMoney(window.netPaise)} · $windowLabel",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (window.netPaise >= 0) IncomeColor else ExpenseColor,
+                        maxLines = 1
+                    )
+                }
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SummaryPill("Income", formatMoney(window.incomePaise), IncomeColor, Icons.Default.ArrowDownward, change(window.incomePaise, previous?.first, upIsGood = true), Modifier.weight(1f))
+                SummaryPill("Expense", formatMoney(window.expensePaise), ExpenseColor, Icons.Default.ArrowUpward, change(window.expensePaise, previous?.second, upIsGood = false), Modifier.weight(1f))
             }
         }
     }
 }
 
-private class InsightTileData(val label: String, val value: String, val sub: String?, val color: Color?)
+@Composable
+private fun SummaryPill(
+    label: String,
+    value: String,
+    color: Color,
+    icon: ImageVector,
+    change: PillChange?,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(color.copy(alpha = 0.11f))
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp),
+                maxLines = 1
+            )
+        }
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.Bold,
+            color = color,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 3.dp)
+        )
+        // "vs the window before": a small coloured arrow and percent, or a quiet placeholder
+        Text(
+            text = change?.text ?: "no earlier data",
+            style = MaterialTheme.typography.labelSmall,
+            color = change?.color ?: MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1
+        )
+    }
+}
+
+private class PillChange(val text: String, val color: Color)
+
+/** "▲ 12% vs before" for [now] against [before]; green when it moved the good way (more income, less expense). */
+@Composable
+private fun change(now: Long, before: Long?, upIsGood: Boolean): PillChange? {
+    if (before == null || before <= 0L) return null
+    val pct = ((now - before) * 100.0 / before).let { Math.round(it).toInt() }
+    if (pct == 0) return PillChange("same as before", Color.Gray)
+    val up = pct > 0
+    return PillChange(
+        text = "${if (up) "▲" else "▼"} ${kotlin.math.abs(pct)}% vs before",
+        color = if (up == upIsGood) IncomeColor else ExpenseColor
+    )
+}
+
+private fun windowName(days: Int): String = when (days) {
+    7 -> "week"
+    30 -> "month"
+    90 -> "3 months"
+    180 -> "6 months"
+    365 -> "year"
+    else -> "$days days"
+}
+
+internal class InsightTileData(
+    val label: String,
+    val value: String,
+    val sub: String?,
+    val color: Color?,
+    val icon: ImageVector,
+    /** 0..1 fill of a thin bar under the tile (savings rate), or null for no bar. */
+    val progress: Float? = null
+)
 
 /** Small facts about the plotted transactions, two tiles to a row, so none of them is hidden off screen. */
 @Composable
-private fun InsightsGrid(i: ChartInsights, anchored: Boolean, modifier: Modifier = Modifier) {
+private fun InsightsGrid(i: ChartInsights, anchored: Boolean, windowLabel: String, modifier: Modifier = Modifier) {
     val money: (Long) -> String = { if (anchored) formatBalance(it) else formatSignedMoney(it) }
     val tiles = buildList {
-        add(InsightTileData("Avg spend / day", formatMoney(i.avgDailyExpensePaise), "${i.txnCount} transactions", ExpenseColor))
+        add(InsightTileData("Avg spend / day", formatMoney(i.avgDailyExpensePaise), "${i.txnCount} transactions", ExpenseColor, Icons.Default.DateRange))
         i.savingsRatePercent?.let {
             add(
                 InsightTileData(
                     "Savings rate", "$it%", "of income kept",
-                    if (it >= 0) IncomeColor else ExpenseColor
+                    if (it >= 0) IncomeColor else ExpenseColor,
+                    Icons.Default.Savings,
+                    progress = (it / 100f).coerceIn(0f, 1f)
                 )
             )
         }
         i.biggestExpense?.let {
-            add(InsightTileData("Biggest expense", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, ExpenseColor))
+            add(InsightTileData("Biggest expense", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, ExpenseColor, Icons.Default.ArrowUpward))
         }
         i.biggestIncome?.let {
-            add(InsightTileData("Biggest income", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, IncomeColor))
+            add(InsightTileData("Biggest income", formatMoney(it.txn.amountPaise), it.txn.title.ifBlank { formatDateLong(it.txn.dateTime) }, IncomeColor, Icons.Default.ArrowDownward))
         }
         i.highest?.let {
-            add(InsightTileData(if (anchored) "Peak balance" else "Peak net", money(it.paise), formatDateLong(it.millis), null))
+            add(InsightTileData(if (anchored) "Peak balance" else "Peak net", money(it.paise), formatDateLong(it.millis), null, Icons.Default.TrendingUp))
         }
         i.lowest?.let {
-            add(InsightTileData(if (anchored) "Lowest balance" else "Lowest net", money(it.paise), formatDateLong(it.millis), null))
+            add(InsightTileData(if (anchored) "Lowest balance" else "Lowest net", money(it.paise), formatDateLong(it.millis), null, Icons.Default.TrendingDown))
         }
     }
 
     Column(modifier = modifier.fillMaxWidth()) {
         Text(
-            text = "Insights",
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 8.dp)
+            text = "Insights · $windowLabel",
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 10.dp)
         )
         Column(verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
             tiles.chunked(2).forEach { pair ->
@@ -468,52 +654,59 @@ private fun InsightsGrid(i: ChartInsights, anchored: Boolean, modifier: Modifier
 }
 
 @Composable
-private fun InsightTile(tile: InsightTileData, modifier: Modifier = Modifier) {
+internal fun InsightTile(tile: InsightTileData, modifier: Modifier = Modifier) {
+    val scheme = MaterialTheme.colorScheme
+    val accent = tile.color ?: scheme.primary
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+            .clip(RoundedCornerShape(16.dp))
+            .background(accent.copy(alpha = 0.09f))
             .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Text(
-            text = tile.label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(tile.icon, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
+            Text(
+                text = tile.label,
+                style = MaterialTheme.typography.labelSmall,
+                color = scheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 4.dp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Text(
             text = tile.value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = tile.color ?: MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = tile.color ?: scheme.onSurface,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 3.dp)
         )
+        if (tile.progress != null) {
+            Box(
+                Modifier
+                    .padding(vertical = 4.dp)
+                    .fillMaxWidth()
+                    .height(4.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.18f))
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth(tile.progress)
+                        .height(4.dp)
+                        .clip(CircleShape)
+                        .background(accent)
+                )
+            }
+        }
         Text(
             text = tile.sub ?: " ",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = scheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun RowScope.Cell(label: String, value: String, color: Color, align: Alignment.Horizontal) {
-    Column(modifier = Modifier.weight(1f), horizontalAlignment = align) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.SemiBold,
-            color = color,
-            maxLines = 1
         )
     }
 }
