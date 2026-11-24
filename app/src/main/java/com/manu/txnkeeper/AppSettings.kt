@@ -84,6 +84,20 @@ class AppSettings(context: Context) {
         prefs.edit().putBoolean(KEY_DOUBLE_CHECK, on).apply()
     }
 
+    /** Debug builds only: hides every debug feature (see DebugMode) to try the release experience. */
+    var hideDebug by mutableStateOf(prefs.getBoolean(KEY_HIDE_DEBUG, false))
+        private set
+
+    init {
+        DebugMode.hidden = hideDebug
+    }
+
+    fun updateHideDebug(on: Boolean) {
+        hideDebug = on
+        DebugMode.hidden = on
+        prefs.edit().putBoolean(KEY_HIDE_DEBUG, on).apply()
+    }
+
     /**
      * Receipt images. When a scanned or picked image is on the Add page, its "Include image" box starts
      * ticked or not ticked according to this. (You can always change the box for one transaction.)
@@ -97,10 +111,22 @@ class AppSettings(context: Context) {
     }
 
     /**
+     * Whether a scanned or attached image fills the form by itself. It is the starting state of the
+     * "Fill from image" box on the Add page (which can be changed for one transaction).
+     */
+    var fillFromImageByDefault by mutableStateOf(prefs.getBoolean(KEY_FILL_FROM_IMAGE, true))
+        private set
+
+    fun updateFillFromImageByDefault(on: Boolean) {
+        fillFromImageByDefault = on
+        prefs.edit().putBoolean(KEY_FILL_FROM_IMAGE, on).apply()
+    }
+
+    /**
      * Whether the Export screen starts with "Include images" switched on (it can still be changed
      * for one export). Only matters once some transactions have images.
      */
-    var exportWithImagesByDefault by mutableStateOf(prefs.getBoolean(KEY_EXPORT_IMAGES, true))
+    var exportWithImagesByDefault by mutableStateOf(prefs.getBoolean(KEY_EXPORT_IMAGES, false))
         private set
 
     fun updateExportWithImagesByDefault(on: Boolean) {
@@ -242,6 +268,8 @@ class AppSettings(context: Context) {
         const val KEY_FAST_VOICE = "fast_voice_google"
         const val KEY_DOUBLE_CHECK = "double_check_whisper"
         const val KEY_INCLUDE_IMAGE = "include_image_default"
+        const val KEY_HIDE_DEBUG = "hide_debug_features"
+        const val KEY_FILL_FROM_IMAGE = "fill_from_image_default"
         const val KEY_EXPORT_IMAGES = "export_with_images_default"
         const val KEY_VOICE_HINT_DONE = "voice_hint_done"
         const val KEY_CAMERA_HINT_DONE = "camera_hint_done"

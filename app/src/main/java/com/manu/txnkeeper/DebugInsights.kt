@@ -46,13 +46,13 @@ object DebugInsights {
     var report by mutableStateOf<DebugReport?>(null)
 
     fun recordScan(rawText: String, parsed: ParsedTransaction, notes: List<String>) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         report = DebugReport("Scan", rawText, listOf(parsed), notes)
         DebugDataLog.addSamples("Scan", rawText, listOf(parsed), notes)
     }
 
     fun recordVoice(heard: String, entries: List<ParsedTransaction>, notes: List<String> = emptyList()) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         report = DebugReport("Voice", heard, entries, notes)
         DebugDataLog.addSamples("Voice", heard, entries, notes)
         VoiceTap.rowCreated()
@@ -60,13 +60,13 @@ object DebugInsights {
 
     /** Adds a line to the card's "Other" notes and to the latest log rows (used by the voice comparison, which finishes a bit later). */
     fun addNote(line: String) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         report = report?.let { DebugReport(it.source, it.rawText, it.entries, it.notes + line) }
         DebugDataLog.appendNote(line)
     }
 
     fun clear() {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         report = null
     }
 }
@@ -88,7 +88,7 @@ private fun fieldRows(p: ParsedTransaction): List<Pair<String, String?>> = listO
 /** Debug-only card for the top of the Add screen. Draws nothing in release builds or with no report. */
 @Composable
 fun DebugInsightsCard(modifier: Modifier = Modifier) {
-    if (!BuildConfig.DEBUG) return
+    if (!DebugMode.on) return
     val context = androidx.compose.ui.platform.LocalContext.current
     var logOpen by remember { mutableStateOf(false) }
     if (logOpen) DebugDataDialog(onDismiss = { logOpen = false })

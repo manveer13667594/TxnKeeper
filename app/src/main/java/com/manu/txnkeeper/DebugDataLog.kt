@@ -126,7 +126,7 @@ object DebugDataLog {
 
     /** Opens (and reads) the log file. Called once when the app starts; does nothing in release. */
     fun attach(context: Context) {
-        if (!BuildConfig.DEBUG || file != null) return
+        if (!DebugMode.on || file != null) return
         val f = File(context.applicationContext.filesDir, "debug_samples.jsonl")
         file = f
         samples = try {
@@ -138,7 +138,7 @@ object DebugDataLog {
 
     /** A scan or recording was read: one row per detected entry (a scan has one). */
     fun addSamples(source: String, rawText: String, entries: List<ParsedTransaction>, notes: List<String>) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         val group = UUID.randomUUID().toString()
         val now = System.currentTimeMillis()
         val created = entries.mapIndexed { i, e ->
@@ -156,7 +156,7 @@ object DebugDataLog {
 
     /** A speech-engine test (no form fields): one row with the heard text and the timing notes. */
     fun addSpeechTest(source: String, heard: String, notes: List<String>) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         val id = UUID.randomUUID().toString()
         val sample = DebugSample(id = id, time = System.currentTimeMillis(), source = source, rawText = heard, detected = null, notes = notes)
         samples = listOf(sample) + samples
@@ -169,7 +169,7 @@ object DebugDataLog {
 
     /** A transaction was saved from the Add screen: keep what was really saved. */
     fun markSaved(entity: com.manu.txnkeeper.data.local.TransactionEntity, entryIndex: Int) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         val id = pending.remove(entryIndex)
         if (id != null) {
             update(id) { it.copy(saved = entity.toFieldMap()) }
@@ -187,7 +187,7 @@ object DebugDataLog {
 
     /** "Save & exit" on a recording: saved ones are matched to the detected entries by amount, then by order. */
     fun markSavedAll(entities: List<com.manu.txnkeeper.data.local.TransactionEntity>) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         entities.forEach { e ->
             val amount = fmtAmount(e.amountPaise / 100.0)
             val index = pending.keys.sorted().firstOrNull { k ->
@@ -199,14 +199,14 @@ object DebugDataLog {
 
     /** Adds a note to the rows of the latest scan / recording. */
     fun appendNote(line: String) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         if (latestGroup.isEmpty()) return
         samples = samples.map { if (it.id in latestGroup) it.copy(notes = it.notes + line) else it }
         persist()
     }
 
     fun delete(ids: Set<String>) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         samples = samples.filter { it.id !in ids }
         pending.entries.removeAll { it.value in ids }
         persist()
@@ -295,7 +295,7 @@ object DebugDataLog {
 
     /** Writes the chosen rows to one file (CSV or JSON) and opens the share sheet. */
     fun share(context: Context, chosen: List<DebugSample>, redact: Boolean, format: DebugExportFormat) {
-        if (!BuildConfig.DEBUG) return
+        if (!DebugMode.on) return
         if (chosen.isEmpty()) {
             Toast.makeText(context, "Nothing to share", Toast.LENGTH_SHORT).show()
             return
@@ -327,7 +327,7 @@ object DebugDataLog {
 /** Debug-only list of the collected samples: tick some (or all), then share or delete them. */
 @Composable
 fun DebugDataDialog(onDismiss: () -> Unit) {
-    if (!BuildConfig.DEBUG) return
+    if (!DebugMode.on) return
     val context = LocalContext.current
     val samples = DebugDataLog.samples
     val selected: SnapshotStateList<String> = remember { emptyList<String>().toMutableStateList() }

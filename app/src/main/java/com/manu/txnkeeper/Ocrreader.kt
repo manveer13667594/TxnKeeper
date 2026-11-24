@@ -96,7 +96,7 @@ class OcrController(
     /** Hands the finished scan to the screen, unless a newer scan has started meanwhile. */
     private fun publish(thisRun: Int, rawText: String, parsed: ParsedTransaction, suggestions: List<String> = emptyList()) {
         if (thisRun != runId) return
-        if (BuildConfig.DEBUG) {
+        if (DebugMode.on) {
             DebugInsights.recordScan(
                 rawText,
                 parsed,
@@ -125,13 +125,13 @@ class OcrController(
     ) {
         // A payment screenshot or bill (it has a title, a payment method or a reference): nothing to guess
         if (parsed.title != null || parsed.paymentMethod != null || parsed.description != null) {
-            if (BuildConfig.DEBUG) debugNotes = listOf("Product guessing skipped (text gave a title, payment method or reference)")
+            if (DebugMode.on) debugNotes = listOf("Product guessing skipped (text gave a title, payment method or reference)")
             publish(thisRun, rawText, parsed)
             return
         }
         fun finishWith(labels: List<Pair<String, Float>>) {
             val guess = ImageTitleGuesser.guess(lines, labels)
-            if (BuildConfig.DEBUG) {
+            if (DebugMode.on) {
                 debugNotes = listOf(
                     "Name from text: " + (ImageTitleGuesser.nameFromLines(lines) ?: "none"),
                     "Type word: " + (ImageTitleGuesser.typeFromText(lines.joinToString(" ") { it.text }) ?: "none"),

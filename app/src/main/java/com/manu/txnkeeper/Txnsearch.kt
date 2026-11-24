@@ -37,7 +37,11 @@ data class TxnQuery(
     val dateTo: Long?,
     val accountId: Long?,
     val search: String,
-    val newestFirst: Boolean
+    val newestFirst: Boolean,
+    /** Only transactions that have ANY of these tags (empty = no tag filter). */
+    val tagIds: Set<Long> = emptySet(),
+    val hasImage: Boolean = false,
+    val hasItems: Boolean = false
 )
 
 object TxnSql {
@@ -56,6 +60,12 @@ object TxnSql {
         q.dateFrom?.let { parts += "dateTime >= ?"; args.add(it) }
         q.dateTo?.let { parts += "dateTime <= ?"; args.add(it) }
         q.accountId?.let { parts += "accountId = ?"; args.add(it) }
+        if (q.tagIds.isNotEmpty()) {
+            parts += "id IN (SELECT transactionId FROM transaction_tags WHERE tagId IN (${q.tagIds.joinToString(",") { "?" }}))"
+            args.addAll(q.tagIds)
+        }
+        if (q.hasImage) parts += "(imageFile IS NOT NULL AND imageFile != '')"
+        if (q.hasItems) parts += "id IN (SELECT transactionId FROM transaction_items)"
         TxnSearch.build(q.search, now, zone)?.let { parts.add(it.sql); args.addAll(it.args) }
         return SqlPart(if (parts.isEmpty()) "1 = 1" else parts.joinToString(" AND "), args)
     }

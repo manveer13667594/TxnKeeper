@@ -240,7 +240,7 @@ object VoiceEngine {
             val google = PhoneRecogniser.result(4_000)
             val googleKey = google?.let { parseKey(it.text) }.orEmpty()
             if (google != null && googleKey.isNotEmpty()) {
-                if (BuildConfig.DEBUG) {
+                if (DebugMode.on) {
                     lastTimings = "Voice engine: Google (phone recogniser), final text %.1f s after Stop, audio %.1f s"
                         .format(google.secondsAfterStop, audioSeconds)
                 }
@@ -254,7 +254,7 @@ object VoiceEngine {
                             if (whisperKey.isNotEmpty() && whisperKey != googleKey) {
                                 alternative = Alternative(w.text, "Whisper")
                             }
-                            if (BuildConfig.DEBUG) {
+                            if (DebugMode.on) {
                                 VoiceTap.publish(
                                     "Whisper (comparison): \"${w.text}\", transcribe %.1f s, audio %.1f s".format(w.seconds, w.audioSeconds)
                                 )
@@ -262,7 +262,7 @@ object VoiceEngine {
                         } catch (e: CancellationException) {
                             throw e
                         } catch (e: Exception) {
-                            if (BuildConfig.DEBUG) VoiceTap.publish("Whisper (comparison): failed (${e.message})")
+                            if (DebugMode.on) VoiceTap.publish("Whisper (comparison): failed (${e.message})")
                         }
                     }
                 }
@@ -272,7 +272,7 @@ object VoiceEngine {
                 )
             }
             // Google heard nothing, or nothing that looks like a transaction: Whisper decides
-            if (BuildConfig.DEBUG) VoiceTap.publish("Google gave no usable transaction: used Whisper instead")
+            if (DebugMode.on) VoiceTap.publish("Google gave no usable transaction: used Whisper instead")
         }
         return transcribeWithWhisper(context, samples, onStatus)
     }
@@ -302,7 +302,7 @@ object VoiceEngine {
                 audioSeconds = samples.size / SAMPLE_RATE.toDouble(),
                 loadSeconds = waitedSeconds
             )
-            if (BuildConfig.DEBUG) {
+            if (DebugMode.on) {
                 val loadNote = when {
                     loadedNow -> "model load %.1f s (during this entry)".format(modelLoadSeconds)
                     waitedSeconds > 0.3 -> "model load %.1f s (preload; waited %.1f s for it)".format(modelLoadSeconds, waitedSeconds)
@@ -581,7 +581,7 @@ internal fun fillFromSpeech(form: TxnFormState, text: String) {
     }
     val found = SpokenTransactionParser.parseAll(text)
     // Debug builds only: what was heard and what the parser made of it
-    if (BuildConfig.DEBUG) {
+    if (DebugMode.on) {
         DebugInsights.recordVoice(
             text,
             found.ifEmpty { listOf(SpokenTransactionParser.parse(text)) },

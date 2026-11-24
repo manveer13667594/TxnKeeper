@@ -3,6 +3,18 @@ package com.manu.txnkeeper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -15,7 +27,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -47,13 +62,6 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-
-/** What the export buttons will export. */
-private enum class ExportKind(val label: String) {
-    ALL("All"),
-    RANGE("Date range"),
-    LATEST("Latest N")
-}
 
 /** Returned by [amountPaiseOrInvalid] for text that is not a usable amount. */
 private const val INVALID_AMOUNT = Long.MIN_VALUE
@@ -97,22 +105,19 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
     fun note(text: String) = listOf(StatusLine(text))
     fun warn(text: String) = listOf(StatusLine(text, warning = true))
 
-    // What to export
-    var kind by remember { mutableStateOf(ExportKind.ALL) }
-    var rangeFrom by remember { mutableStateOf<Long?>(null) }   // start of the first day
-    var rangeTo by remember { mutableStateOf<Long?>(null) }     // end of the last day
+    // What to export: the same filters as the transaction list (period, type, payment, amount, tags...),
+    // an account, and optionally only the newest N of whatever matches
+    var f by remember { mutableStateOf(TxnFilters()) }
+    var accountId by remember { mutableStateOf<Long?>(null) }
+    var limitOn by remember { mutableStateOf(false) }
     var countText by remember { mutableStateOf("50") }
-    var rangeDialogOpen by remember { mutableStateOf(false) }
     var filtersOpen by remember { mutableStateOf(false) }
+    var previewAllOpen by remember { mutableStateOf(false) }
+    // The "how the PDF will look" picture: null = closed, loading while the pages are drawn
+    var pdfPreviewOpen by remember { mutableStateOf(false) }
+    var pdfPreview by remember { mutableStateOf<PdfPreview?>(null) }
     // "Include images" is saved, so the next export starts the way this one was left
     val withImages = settings.exportWithImagesByDefault
-
-    // Optional narrowing down (null / blank = don't filter on it)
-    var accountId by remember { mutableStateOf<Long?>(null) }
-    var payment by remember { mutableStateOf<String?>(null) }
-    var txType by remember { mutableStateOf<String?>(null) }    // "INCOME" / "EXPENSE"
-    var minText by remember { mutableStateOf("") }
-    var maxText by remember { mutableStateOf("") }
 
     // What the file picker was opened for (the picker only gives back the file's Uri)
     var pendingScope by remember { mutableStateOf<ExportScope>(ExportScope.All) }
@@ -124,15 +129,40 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
     val accounts: List<AccountSummary> by accountsFlow.collectAsState(initial = emptyList())
     val methodsFlow = remember(dao) { dao.observePaymentMethodsInUse() }
     val usedMethods: List<String> by methodsFlow.collectAsState(initial = emptyList())
-    // A selected method stays visible even if no transaction uses it any more, so it can be switched off
-    val methodChips = (usedMethods + listOfNotNull(payment)).distinct()
+    val tagsFlow = remember(dao) { dao.observeTags() }
+    val allTags by tagsFlow.collectAsState(initial = emptyList())
+    val methods = remember(settings.paymentMethods, usedMethods) { (settings.paymentMethods + usedMethods).distinct() }
     // How many transactions have an image: the switch only matters (and only shows) when there are some
     val imageCountFlow = remember(dao) { dao.observeImageCount() }
     val imageCount: Int by imageCountFlow.collectAsState(initial = 0)
     val includeImages = withImages && imageCount > 0
 
-    val filtersOn = accountId != null || payment != null || txType != null ||
-            minText.isNotBlank() || maxText.isNotBlank()
+    // What the choices above mean as an export (null limit = everything that matches)
+    val limitN = if (limitOn) countText.trim().toIntOrNull()?.takeIf { it > 0 } else null
+    val scopeNow: ExportScope = run {
+        val (from, to) = f.dateRange()
+        when {
+            from != null && to != null -> ExportScope.DateRange(from, to, limitN)
+            limitN != null -> ExportScope.Latest(limitN)
+            else -> ExportScope.All
+        }
+    }
+    val filtersNow = ExportFilters(
+        accountId = accountId,
+        paymentMethod = f.payment,
+        type = f.type,
+        minAmountPaise = f.minAmount?.toPaise(),
+        maxAmountPaise = f.maxAmount?.toPaise(),
+        tagIds = f.tagIds,
+        withImage = f.withImage,
+        withItems = f.withItems
+    )
+    // Live preview: updates a moment after each change
+    var preview by remember { mutableStateOf<ExportPreview?>(null) }
+    LaunchedEffect(scopeNow, filtersNow) {
+        kotlinx.coroutines.delay(150)
+        preview = try { DataTransfer.preview(database, scopeNow, filtersNow) } catch (e: Exception) { null }
+    }
 
     /** Runs [work] once at a time and shows its returned message (or the error) as the status. */
     fun runTask(work: suspend () -> List<StatusLine>) {
@@ -180,49 +210,52 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
     fun fileName(extension: String): String =
         "txnkeeper_${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.$extension"
 
-    /** The chosen scope, or null (with a message in [status]) when the choice is incomplete. */
-    fun chosenScope(): ExportScope? = when (kind) {
-        ExportKind.ALL -> ExportScope.All
-        ExportKind.RANGE -> {
-            val from = rangeFrom
-            val to = rangeTo
-            if (from == null || to == null) {
-                status = warn("Choose the dates to export first.")
-                null
-            } else {
-                ExportScope.DateRange(from, to)
-            }
-        }
-        ExportKind.LATEST -> {
-            val n = countText.trim().toIntOrNull()
-            if (n == null || n <= 0) {
-                status = warn("Enter how many transactions to export (1 or more).")
-                null
-            } else {
-                ExportScope.Latest(n)
-            }
-        }
-    }
-
-    /** The chosen filters, or null (with a message in [status]) when an amount is not usable. */
-    fun chosenFilters(): ExportFilters? {
-        val min = amountPaiseOrInvalid(minText)
-        val max = amountPaiseOrInvalid(maxText)
-        if (min == INVALID_AMOUNT || max == INVALID_AMOUNT) {
-            status = warn("Type the amounts as plain numbers, like 500 or 1250.50.")
+    /** The choice, or null (with a message in [status]) when it is incomplete. */
+    fun chosenScope(): ExportScope? {
+        if (limitOn && limitN == null) {
+            status = warn("Enter how many transactions to export (1 or more).")
             return null
         }
+        if (f.period == PeriodKind.CUSTOM && (f.customFrom == null || f.customTo == null)) {
+            status = warn("Choose the dates to export first.")
+            return null
+        }
+        return scopeNow
+    }
+
+    fun chosenFilters(): ExportFilters? {
+        val min = filtersNow.minAmountPaise
+        val max = filtersNow.maxAmountPaise
         if (min != null && max != null && min > max) {
             status = warn("The minimum amount is higher than the maximum.")
             return null
         }
-        return ExportFilters(
-            accountId = accountId,
-            paymentMethod = payment,
-            type = txType,
-            minAmountPaise = min,
-            maxAmountPaise = max
-        )
+        return filtersNow
+    }
+
+    /** Draws the PDF's first pages and shows them, so you can see how it will look before saving it. */
+    fun previewPdf() {
+        if (busy) return
+        status = null
+        val scope = chosenScope() ?: return
+        val filters = chosenFilters() ?: return
+        pdfPreview = null
+        pdfPreviewOpen = true
+        coroutines.launch {
+            try {
+                if (DataTransfer.countFor(database, scope, filters) == 0) {
+                    pdfPreviewOpen = false
+                    status = warn("No transactions match those choices, so there is nothing to preview.")
+                } else {
+                    pdfPreview = DataTransfer.renderPdfPreview(context, database, scope, filters)
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                pdfPreviewOpen = false
+                status = warn("Could not build the preview: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
     }
 
     /** Checks the choice, says so when nothing matches, and otherwise opens the "save as" picker. */
@@ -258,171 +291,61 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
         }
 
         // ------------------------------------------------ export
-        Text("Export", style = MaterialTheme.typography.titleMedium)
-
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-            verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-        ) {
-            ExportKind.entries.forEach { option ->
-                ManuChip(
-                    label = option.label,
-                    selected = kind == option,
-                    onClick = {
-                        kind = option
-                        status = null
+        val activeCount = f.activeCount + (if (accountId != null) 1 else 0)
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Export", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            // Same filter icon as the transactions screen: accent colour and a count while filters are on
+            IconButton(onClick = { filtersOpen = true }) {
+                if (activeCount > 0) {
+                    BadgedBox(badge = { Badge { Text("$activeCount") } }) {
+                        Icon(
+                            AppIcons.FilterFunnel,
+                            contentDescription = "Filters applied: $activeCount",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                     }
-                )
+                } else {
+                    Icon(AppIcons.FilterFunnel, contentDescription = "Filters")
+                }
             }
         }
 
-        when (kind) {
-            ExportKind.ALL -> Unit
-            ExportKind.RANGE -> ManuPickerField(
-                value = rangeFrom?.let { from -> rangeTo?.let { to -> "${formatDateLong(from)} - ${formatDateLong(to)}" } }
-                    ?: "Choose dates",
-                leadingIcon = Icons.Default.DateRange,
-                trailingIcon = Icons.Default.KeyboardArrowDown,
-                onClick = { rangeDialogOpen = true }
-            )
-            ExportKind.LATEST -> ManuTextField(
-                value = countText,
-                onValueChange = { countText = it.filter { c -> c.isDigit() }.take(6) },
-                label = { Text("Number of transactions (newest first)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
+        // ---- What to export: one tap opens the same filter sheet as the transaction list
+        ActiveFilterRow(
+            filters = f,
+            tags = allTags,
+            onChange = { f = it; status = null }
+        )
+        if (accountId != null) {
+            val name = accounts.firstOrNull { it.id == accountId }?.name ?: "Account"
+            ManuChip(label = "$name  ✕", selected = true, onClick = { accountId = null; status = null })
         }
 
-        // ---- Filters: folded away until you open them. Everything chosen must match, on top of the choice above.
-        val activeFilters = listOf(
-            accountId != null,
-            payment != null,
-            txType != null,
-            minText.isNotBlank() || maxText.isNotBlank()
-        ).count { it }
+        // Only the newest N of whatever matches
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { filtersOpen = !filtersOpen }
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Filters", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = if (activeFilters == 0) "None" else "$activeFilters on",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Text("Only the newest…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            if (limitOn) {
+                ManuTextField(
+                    value = countText,
+                    onValueChange = { countText = it.filter { c -> c.isDigit() }.take(6); status = null },
+                    label = { Text("How many") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.width(120.dp)
                 )
             }
-            if (filtersOpen && filtersOn) {
-                ManuTextButton(
-                    onClick = {
-                        accountId = null
-                        payment = null
-                        txType = null
-                        minText = ""
-                        maxText = ""
-                        status = null
-                    }
-                ) { Text("Clear") }
-            }
-            Icon(
-                if (filtersOpen) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                contentDescription = if (filtersOpen) "Hide filters" else "Show filters",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            ManuSwitch(checked = limitOn, onCheckedChange = { limitOn = it; status = null })
         }
 
-        if (filtersOpen) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Account (with a single account there is nothing to choose between)
-                if (accounts.size > 1) {
-                    ExportFilterLabel("Account")
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-                    ) {
-                        ManuChip(label = "All", selected = accountId == null, onClick = {
-                            accountId = null
-                            status = null
-                        })
-                        accounts.forEach { account ->
-                            ManuChip(label = account.name, selected = accountId == account.id, onClick = {
-                                accountId = account.id
-                                status = null
-                            })
-                        }
-                    }
-                }
-
-                // Payment method
-                if (methodChips.isNotEmpty()) {
-                    ExportFilterLabel("Payment method")
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                        verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-                    ) {
-                        ManuChip(label = "All", selected = payment == null, onClick = {
-                            payment = null
-                            status = null
-                        })
-                        methodChips.forEach { method ->
-                            ManuChip(label = method, selected = payment == method, onClick = {
-                                payment = method
-                                status = null
-                            })
-                        }
-                    }
-                }
-
-                // Income / expense
-                ExportFilterLabel("Type")
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                    verticalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)
-                ) {
-                    ManuChip(label = "All", selected = txType == null, onClick = {
-                        txType = null
-                        status = null
-                    })
-                    ManuChip(label = "Income", selected = txType == "INCOME", onClick = {
-                        txType = "INCOME"
-                        status = null
-                    })
-                    ManuChip(label = "Expense", selected = txType == "EXPENSE", onClick = {
-                        txType = "EXPENSE"
-                        status = null
-                    })
-                }
-
-                // Amount range
-                ExportFilterLabel("Amount (₹)")
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    ManuTextField(
-                        value = minText,
-                        onValueChange = {
-                            minText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
-                            status = null
-                        },
-                        label = { Text("Min") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
-                    )
-                    ManuTextField(
-                        value = maxText,
-                        onValueChange = {
-                            maxText = it.filter { c -> c.isDigit() || c == '.' }.take(16)
-                            status = null
-                        },
-                        label = { Text("Max") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-            }
-        }
+        // ---- Preview: what the file will hold
+        ExportPreviewCard(
+            preview, accounts.associate { it.id to it.name },
+            onSeeAll = { previewAllOpen = true },
+            onPreviewPdf = { previewPdf() }
+        )
 
         // Images in the export (ZIP and PDF). Always here, so it can be set before any image exists.
         Row(
@@ -494,18 +417,199 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
         )
     }
 
-    // ---- Date range for the export
-    ManuDateRangePicker(
-        expanded = rangeDialogOpen,
-        onDismissRequest = { rangeDialogOpen = false },
-        initialStartDateMillis = rangeFrom?.let { localToPickerDay(it) },
-        initialEndDateMillis = rangeTo?.let { localToPickerDay(it) },
-        onDateRangeSelected = { startUtc, endUtc ->
-            rangeFrom = pickerToLocalDay(startUtc)
-            rangeTo = endOfDay(pickerToLocalDay(endUtc))
-            status = null
+    if (filtersOpen) {
+        FilterSheet(
+            filters = f,
+            onChange = { f = it; status = null },
+            onDismiss = { filtersOpen = false },
+            paymentMethods = methods,
+            tags = allTags,
+            resultCount = preview?.count,
+            showSort = false,
+            accounts = accounts,
+            accountId = accountId,
+            onAccountChange = { accountId = it; status = null }
+        )
+    }
+
+    if (pdfPreviewOpen) {
+        PdfPreviewDialog(
+            preview = pdfPreview,
+            onClose = { pdfPreviewOpen = false; pdfPreview = null },
+            onExport = {
+                pdfPreviewOpen = false
+                pdfPreview = null
+                exportClicked { pdfExport.launch(fileName("pdf")) }
+            }
+        )
+    }
+
+    if (previewAllOpen) {
+        val p = preview
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { previewAllOpen = false },
+            confirmButton = { ManuTextButton(onClick = { previewAllOpen = false }) { Text("Close") } },
+            title = { Text(if (p == null) "Preview" else "${plural(p.count, "transaction")} to export") },
+            text = {
+                if (p != null) {
+                    androidx.compose.foundation.lazy.LazyColumn {
+                        items(p.rows.size) { i -> PreviewRow(p.rows[i]) }
+                        if (p.count > p.rows.size) item {
+                            Text(
+                                "…and ${p.count - p.rows.size} more",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 8.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+/** Full-screen look at the first pages of the PDF, with Export at the bottom. */
+@Composable
+private fun PdfPreviewDialog(preview: PdfPreview?, onClose: () -> Unit, onExport: () -> Unit) {
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onClose,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        androidx.compose.material3.Surface(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("PDF preview", style = MaterialTheme.typography.titleLarge)
+                        if (preview != null) {
+                            Text(
+                                text = if (preview.totalPages > preview.pages.size)
+                                    "First ${preview.pages.size} of ${preview.totalPages} pages · ${plural(preview.transactions, "transaction")}"
+                                else "${plural(preview.totalPages, "page")} · ${plural(preview.transactions, "transaction")}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    ManuTextButton(onClick = onClose) { Text("Close") }
+                }
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    if (preview == null) {
+                        Text("Building the preview…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            items(preview.pages.size) { i ->
+                                androidx.compose.foundation.Image(
+                                    bitmap = preview.pages[i].asImageBitmap(),
+                                    contentDescription = "Page ${i + 1}",
+                                    contentScale = androidx.compose.ui.layout.ContentScale.FillWidth,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .shadow(3.dp, RoundedCornerShape(2.dp))
+                                        .background(androidx.compose.ui.graphics.Color.White)
+                                )
+                            }
+                            if (preview.totalPages > preview.pages.size) item {
+                                Text(
+                                    "…and ${preview.totalPages - preview.pages.size} more pages. Receipt images (if included) follow the table.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                if (preview != null) ManuButton(
+                    onClick = onExport,
+                    modifier = Modifier.fillMaxWidth().padding(16.dp)
+                ) { Text("Export this PDF") }
+            }
         }
-    )
+    }
+}
+
+private val previewDateFormat = SimpleDateFormat("d MMM yy", Locale.getDefault())
+
+@Composable
+private fun PreviewRow(t: com.manu.txnkeeper.data.local.TransactionEntity) {
+    val income = t.type == "INCOME"
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(t.title, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            Text(
+                "${previewDateFormat.format(Date(t.dateTime))} · ${t.paymentMethod}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Text(
+            (if (income) "+" else "-") + formatMoney(t.amountPaise),
+            style = MaterialTheme.typography.bodyMedium,
+            color = if (income) com.manu.txnkeeper.ui.theme.IncomeColor else com.manu.txnkeeper.ui.theme.ExpenseColor
+        )
+    }
+}
+
+/** "What you'll get": count, money in and out, and the first few rows. */
+@Composable
+private fun ExportPreviewCard(
+    preview: ExportPreview?,
+    accountNames: Map<Long, String>,
+    onSeeAll: () -> Unit,
+    onPreviewPdf: () -> Unit
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(scheme.onSurface.copy(alpha = 0.05f))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Text("Preview", style = MaterialTheme.typography.labelLarge, color = scheme.onSurfaceVariant)
+        when {
+            preview == null -> Text("Loading…", style = MaterialTheme.typography.bodyMedium)
+            preview.count == 0 -> Text(
+                "Nothing matches these choices.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = scheme.error
+            )
+            else -> {
+                Text(plural(preview.count, "transaction"), style = MaterialTheme.typography.titleMedium)
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("In ${formatMoney(preview.incomePaise)}", style = MaterialTheme.typography.bodySmall, color = com.manu.txnkeeper.ui.theme.IncomeColor)
+                    Text("Out ${formatMoney(preview.expensePaise)}", style = MaterialTheme.typography.bodySmall, color = com.manu.txnkeeper.ui.theme.ExpenseColor)
+                }
+                val newest = preview.rows.first().dateTime
+                val oldest = preview.rows.last().dateTime
+                Text(
+                    "${previewDateFormat.format(Date(oldest))} – ${previewDateFormat.format(Date(newest))}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = scheme.onSurfaceVariant
+                )
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                preview.rows.take(4).forEach { PreviewRow(it) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (preview.count > 4) ManuTextButton(onClick = onSeeAll) { Text("See all ${preview.count}") }
+                    ManuTextButton(onClick = onPreviewPdf) { Text("Preview as PDF") }
+                }
+            }
+        }
+    }
 }
 
 /** Small grey heading above one group of export filters. */

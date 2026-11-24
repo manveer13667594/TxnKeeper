@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.mapSaver
@@ -114,6 +115,12 @@ class TxnFormState {
 
     /** The lines of a bill (not used for the entries of a voice recording). When there are any, their total is the amount. */
     var items by mutableStateOf<List<ItemDraft>>(emptyList())
+
+    /** The "Fill from image" box: should the image's text fill the form? Starts as set in Settings. */
+    var fillFromImage by mutableStateOf(true)
+
+    /** What was read from the image on this page, so ticking "Fill from image" later can apply it without reading again. */
+    var scanned by mutableStateOf<ParsedTransaction?>(null)
     var payment by mutableStateOf("CASH")
     var dateTime by mutableStateOf(System.currentTimeMillis())
     var description by mutableStateOf("")
@@ -281,6 +288,7 @@ class TxnFormState {
                     "includeImage" to f.includeImage,
                     "tagIds" to ArrayList(f.tagIds),
                     "items" to f.items.map { listOf(it.name, it.qty, it.price) },
+                    "fillImg" to f.fillFromImage,
                     "batchIndex" to f.batchIndex,
                     "batchSaved" to f.batchSaved,
                     "batch" to f.batch.map {
@@ -307,6 +315,7 @@ class TxnFormState {
                     f.tagIds = ((m["tagIds"] as List<Long>?) ?: emptyList()).toSet()
                     @Suppress("UNCHECKED_CAST")
                     f.items = ((m["items"] as List<List<String>>?) ?: emptyList()).map { ItemDraft(name = it[0], qty = it[1], price = it[2]) }
+                    f.fillFromImage = (m["fillImg"] as Boolean?) ?: true
                     f.batchIndex = m["batchIndex"] as Int
                     f.batchSaved = m["batchSaved"] as Int
                     @Suppress("UNCHECKED_CAST")
@@ -354,6 +363,7 @@ class TxnFormState {
         includeImage = true
         tagIds = emptySet()
         items = emptyList()
+        scanned = null
     }
 
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
@@ -446,6 +456,27 @@ fun AddTransactionScreen(
         autoTags = suggestion
     }
 
+    // Reading an image attached on this page (a scan from the camera is read before this page opens)
+    val ocr = rememberOcrController()
+    fun readImage(name: String) {
+        val file = ReceiptStore.file(context, name) ?: return
+        form.notice = "Reading the image…"
+        ocr.run(android.net.Uri.fromFile(file))
+    }
+    LaunchedEffect(Unit) {
+        snapshotFlow { ocr.outcome }.collect { outcome ->
+            if (outcome == null) return@collect
+            ocr.outcome = null
+            if (outcome.text.isBlank() || (outcome.parsed.isEmpty && outcome.suggestions.isEmpty())) {
+                form.notice = "Couldn't find transaction details in this image."
+            } else {
+                form.scanned = outcome.parsed
+                form.fill(outcome.parsed, "Data detected: ${ocrDetectedLine(outcome.parsed)}. Check the form, then save.")
+                form.titleSuggestions = outcome.suggestions
+            }
+        }
+    }
+
     // With bill items, the amount is their total
     LaunchedEffect(form.items) {
         if (form.items.hasValidItems()) form.amount = formatAmountPaise(form.items.validTotalPaise())
@@ -495,7 +526,7 @@ fun AddTransactionScreen(
             ) {
                 // Debug builds only: what the scan or voice found and where it went (nothing in release)
                 DebugInsightsCard()
-                if (BuildConfig.DEBUG) GoogleLiveCard()
+                if (DebugMode.on) GoogleLiveCard()
                 VoiceAlternativeBanner(form)
 
                 form.notice?.let { notice ->
@@ -698,11 +729,22 @@ fun AddTransactionScreen(
                                 include = form.includeImage,
                                 onIncludeChange = { form.includeImage = it },
                                 excludedWarning = "This image won't be saved. It is deleted when you save.",
+                                fill = form.fillFromImage,
+                                onFillChange = { on ->
+                                    form.fillFromImage = on
+                                    if (on && !ocr.busy) {
+                                        val read = form.scanned
+                                        if (read != null) form.fill(read, "Form filled from the image. Check it, then save.")
+                                        else form.imageFile?.let { readImage(it) }
+                                    }
+                                },
                                 onPicked = { name ->
                                     val old = form.imageFile
                                     form.imageFile = name
                                     form.includeImage = true
+                                    form.scanned = null
                                     if (old != null) ReceiptStore.delete(context, old)
+                                    if (form.fillFromImage) readImage(name)
                                 }
                             )
                         }

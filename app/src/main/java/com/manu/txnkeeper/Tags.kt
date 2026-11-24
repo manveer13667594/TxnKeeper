@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -177,49 +179,72 @@ fun TagPicker(
     onNew: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Tags",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        // A block of up to 3 rows that scrolls sideways as one piece. Tags are dealt into the
-        // currently shortest row, so the rows end up about the same length.
-        val items: List<TagEntity?> = tags + listOf(null)          // null = the "+ New tag" chip
-        val rowCount = when {
-            items.size <= 4 -> 1
-            items.size <= 8 -> 2
-            else -> 3
-        }
-        val rows = List(rowCount) { mutableListOf<TagEntity?>() }
-        val lengths = IntArray(rowCount)
-        items.forEach { tag ->
-            val label = tag?.name ?: "+ New tag"
-            val target = lengths.indices.minByOrNull { lengths[it] } ?: 0
-            rows[target].add(tag)
-            lengths[target] += label.length + 4                       // + chip padding
-        }
-        Column(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            rows.forEach { rowTags ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    rowTags.forEach { tag ->
-                        if (tag == null) {
-                            ManuChip(label = "+ New tag", selected = false, onClick = onNew)
-                        } else {
-                            val on = tag.id in selected
-                            ManuChip(
-                                label = tag.name,
-                                selected = on,
-                                onClick = { onChange(if (on) selected - tag.id else selected + tag.id) }
-                            )
-                        }
+    // Slim chips, no heading: a row for a few tags, up to three rows (scrolling sideways as one block) for many.
+    // Tags are dealt into the currently shortest row, so the rows end up about the same length.
+    val items: List<TagEntity?> = tags + listOf(null)          // null = the "+ New" chip
+    val rowCount = when {
+        items.size <= 6 -> 1
+        items.size <= 14 -> 2
+        else -> 3
+    }
+    val rows = List(rowCount) { mutableListOf<TagEntity?>() }
+    val lengths = IntArray(rowCount)
+    items.forEach { tag ->
+        val label = tag?.name ?: "+ New"
+        val target = lengths.indices.minByOrNull { lengths[it] } ?: 0
+        rows[target].add(tag)
+        lengths[target] += label.length + 5                       // + chip padding
+    }
+    Column(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        rows.forEach { rowTags ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                rowTags.forEach { tag ->
+                    if (tag == null) {
+                        SlimTagChip(label = "+ New", dot = null, selected = false, onClick = onNew)
+                    } else {
+                        val on = tag.id in selected
+                        SlimTagChip(
+                            label = tag.name,
+                            dot = tagColor(tag.colorIndex),
+                            selected = on,
+                            onClick = { onChange(if (on) selected - tag.id else selected + tag.id) }
+                        )
                     }
                 }
             }
         }
+    }
+}
+
+/** A small pill for one tag: a colour dot and the name; tinted and outlined when switched on. */
+@Composable
+private fun SlimTagChip(label: String, dot: Color?, selected: Boolean, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(50)
+    Row(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (selected) scheme.primary.copy(alpha = 0.16f) else scheme.onSurface.copy(alpha = 0.06f))
+            .border(1.dp, if (selected) scheme.primary.copy(alpha = 0.55f) else Color.Transparent, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (dot != null) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(dot))
+            Spacer(Modifier.width(6.dp))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) scheme.primary else scheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

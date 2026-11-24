@@ -388,12 +388,22 @@ private fun MainSettings(
         var logOpen by remember { mutableStateOf(false) }
         if (logOpen) DebugDataDialog(onDismiss = { logOpen = false })
         SettingsCard {
-            SettingsRow(
-                title = "Debug logs",
+            SwitchRow(
                 icon = Icons.Default.BugReport,
-                subtitle = "${DebugDataLog.samples.size} saved · view, share as CSV or JSON, delete",
-                onClick = { logOpen = true }
+                title = "Hide debug features",
+                subtitle = "Debug build only. Hides the debug cards and logs and stops debug logging, so the app behaves like the release version.",
+                checked = settings.hideDebug,
+                onCheckedChange = { settings.updateHideDebug(it) }
             )
+            if (DebugMode.on) {
+                HorizontalDivider()
+                SettingsRow(
+                    title = "Debug logs",
+                    icon = Icons.Default.BugReport,
+                    subtitle = "${DebugDataLog.samples.size} saved · view, share as CSV or JSON, delete",
+                    onClick = { logOpen = true }
+                )
+            }
         }
     }
 
@@ -605,6 +615,14 @@ private fun DefaultsPage(
             subtitle = "Keep the scanned or attached image with a new transaction. You can still change it each time.",
             checked = settings.includeImageByDefault,
             onCheckedChange = { settings.updateIncludeImageByDefault(it) }
+        )
+        HorizontalDivider()
+        SwitchRow(
+            icon = Icons.Default.Image,
+            title = "Fill from image",
+            subtitle = "Read the text of a scanned or attached image and fill the form with it. You can still switch it off or on for one transaction on the Add page.",
+            checked = settings.fillFromImageByDefault,
+            onCheckedChange = { settings.updateFillFromImageByDefault(it) }
         )
     }
 

@@ -16,6 +16,11 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import com.manu.txnkeeper.data.local.TransactionItemEntity
@@ -127,6 +132,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import com.manu.manudesignsystem.components.ManuDialogBox
 
 /** How many rows are loaded at a time. More are loaded as you scroll near the end. */
@@ -492,7 +498,13 @@ fun TransactionsScreen(
         }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    // Where the list sits on the screen, so the scroll bar can be drawn at the very edge of the screen
+    // (outside the 20 dp side margin of the page) but only as tall as the list
+    var rootTopPx by remember { mutableFloatStateOf(0f) }
+    var listTopPx by remember { mutableFloatStateOf(0f) }
+    var listHeightPx by remember { mutableIntStateOf(0) }
+
+    Box(modifier = modifier.fillMaxSize().onGloballyPositioned { rootTopPx = it.positionInRoot().y }) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -622,23 +634,13 @@ fun TransactionsScreen(
                 )
             }
 
-            // ---- "2 filters applied  [Clear filters]" (only while filters are on). Sort order is kept.
-            AnimatedVisibility(visible = filters.activeCount > 0) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = if (filters.activeCount == 1) "1 filter applied" else "${filters.activeCount} filters applied",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.weight(1f)
-                    )
-                    ManuTextButton(
-                        onClick = { filters = TxnFilters(newestFirst = filters.newestFirst) }
-                    ) { Text("Clear filters") }
-                }
-            }
+            // ---- Active filters as removable chips (tap one to drop just that filter)
+            ActiveFilterRow(
+                filters = filters,
+                tags = allTags,
+                onChange = { filters = it },
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
 
             // ---- Accounts: All | Main account | PNB ...  (only when there is more than one account)
             AccountChips(
@@ -718,7 +720,12 @@ fun TransactionsScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
+                            .onGloballyPositioned {
+                                listTopPx = it.positionInRoot().y
+                                listHeightPx = it.size.height
+                            }
                     ) {
+                        DisposableEffect(Unit) { onDispose { listHeightPx = 0 } }
                         LazyColumn(
                             state = listState,
                             modifier = Modifier.fillMaxSize(),
@@ -806,21 +813,28 @@ fun TransactionsScreen(
                                 }
                             }
                         }
-
-                        // Scroll bar: shows where you are in the whole list; drag it to jump
-                        TransactionScrollbar(
-                            listState = listState,
-                            dayCounts = dayCounts,
-                            totalCount = totals.count,
-                            // Dragging far down needs more rows than are loaded: load them in steps of 500
-                            onLoadUpTo = { wanted ->
-                                val rounded = (wanted + 499) / 500 * 500
-                                if (rounded > limit) limit = rounded
-                            }
-                        )
                     }
                 }
             }
+        }
+
+        // Scroll bar: shows where you are in the whole list; drag it to jump. It lives here, not inside the
+        // padded page, so it sits at the edge of the screen.
+        if (listHeightPx > 0 && groups.isNotEmpty()) {
+            val density = LocalDensity.current
+            TransactionScrollbar(
+                listState = listState,
+                dayCounts = dayCounts,
+                totalCount = totals.count,
+                // Dragging far down needs more rows than are loaded: load them in steps of 500
+                onLoadUpTo = { wanted ->
+                    val rounded = (wanted + 499) / 500 * 500
+                    if (rounded > limit) limit = rounded
+                },
+                modifier = Modifier
+                    .padding(top = with(density) { (listTopPx - rootTopPx).toDp() })
+                    .height(with(density) { listHeightPx.toDp() })
+            )
         }
 
         // ---- "Back to top" arrow, floating over the list (only while scrolled down)
@@ -864,7 +878,10 @@ fun TransactionsScreen(
             filters = filters,
             onChange = { filters = it },
             onDismiss = { filterSheetOpen = false },
-            paymentMethods = filterMethods
+            paymentMethods = filterMethods,
+            tags = allTags,
+            resultCount = totals.count,
+            totalCount = overall
         )
     }
 
@@ -887,52 +904,52 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-        key(txn.id) {
-            EditTransactionDialog(
-                original = txn,
-                accounts = accounts,
-                settings = settings,
-                onAddAccount = { newAccount, onCreated ->
-                    scope.launch {
-                        var newId = 0L
-                        if (safeWrite(context, "add the account") {
-                                newId = dao.insertAccount(newAccount)
-                            }) {
-                            onCreated(newId)
-                        }
+      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+      key(txn.id) {
+        EditTransactionDialog(
+            original = txn,
+            accounts = accounts,
+            settings = settings,
+            onAddAccount = { newAccount, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the account") {
+                            newId = dao.insertAccount(newAccount)
+                        }) {
+                        onCreated(newId)
                     }
-                },
-                tags = allTags,
-                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-                initialItems = itemMap[txn.id] ?: emptyList(),
-                onAddTag = { name, colorIndex, onCreated ->
-                    scope.launch {
-                        var newId = 0L
-                        if (safeWrite(context, "add the tag") {
-                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                            }) {
-                            onCreated(newId)
-                        }
-                    }
-                },
-                onSave = { updated, tagIds, newItems ->
-                    scope.launch {
-                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
-                            // The image it had before is not used any more if it was removed or replaced
-                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
-                        }
-                    }
-                    // Next one of the queue, or close (a normal single edit has an empty queue)
-                    openNextInQueue()
-                },
-                onDismiss = {
-                    editQueue = emptyList()
-                    editTotal = 0
-                    editing = null
                 }
-            )
-        }
+            },
+            tags = allTags,
+            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+            initialItems = itemMap[txn.id] ?: emptyList(),
+            onAddTag = { name, colorIndex, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the tag") {
+                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                        }) {
+                        onCreated(newId)
+                    }
+                }
+            },
+            onSave = { updated, tagIds, newItems ->
+                scope.launch {
+                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
+                        // The image it had before is not used any more if it was removed or replaced
+                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                    }
+                }
+                // Next one of the queue, or close (a normal single edit has an empty queue)
+                openNextInQueue()
+            },
+            onDismiss = {
+                editQueue = emptyList()
+                editTotal = 0
+                editing = null
+            }
+        )
+      }
     }
 
     deleting?.let { txn ->
@@ -1065,14 +1082,14 @@ private fun TotalsCard(
     val net = totals.incomePaise - totals.expensePaise
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(24.dp)
-    // A soft tint of the accent colour fading into the card, so the balance stands out as the hero of the page
     Box(
         modifier = modifier
             .fillMaxWidth()
+            // A clean surface lifted off the page by a soft shadow, like the transaction cards below it
+            .shadow(4.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
             .clip(shape)
             .background(scheme.surface)
-            .heroGradient(scheme)
-            .border(1.dp, scheme.primary.copy(alpha = 0.12f), shape)
+            .border(1.dp, scheme.onSurface.copy(alpha = 0.06f), shape)
             .padding(horizontal = 14.dp, vertical = 11.dp)
     ) {
         Column {
@@ -1150,29 +1167,6 @@ private fun TotalsCard(
             }
         }
     }
-}
-
-/**
- * The soft accent tint of the hero cards: brightest in the top left corner, deepest in the bottom right.
- * Drawn from the real corners (not the default gradient, which on a wide card just looks left to right).
- */
-internal fun Modifier.heroGradient(scheme: androidx.compose.material3.ColorScheme): Modifier = drawBehind {
-    val colors =
-        if (scheme.background.luminance() > 0.5f)
-        // Light mode: lightest at the top left, deepening towards the bottom right
-            listOf(scheme.primary.copy(alpha = 0.03f), scheme.primary.copy(alpha = 0.16f))
-        else
-        // Dark mode: strongest tint at the top left, fading out towards the bottom right
-            listOf(scheme.primary.copy(alpha = 0.20f), scheme.primary.copy(alpha = 0.03f))
-    // A line from the top left corner to a point lower than the middle of the right edge: the bands tilt
-    // clearly downwards, so the change is seen from top to bottom as well as from left to right
-    drawRect(
-        Brush.linearGradient(
-            colors = colors,
-            start = androidx.compose.ui.geometry.Offset.Zero,
-            end = androidx.compose.ui.geometry.Offset(size.width * 0.55f, size.height)
-        )
-    )
 }
 
 /** One of the three small tinted tiles under the balance: a coloured arrow, the label and the amount. */

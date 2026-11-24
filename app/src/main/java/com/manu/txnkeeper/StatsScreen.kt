@@ -62,6 +62,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -120,7 +121,8 @@ data class StatsRequest(
 
 // Saving the open Stats page across a screen rotation (the request and its filters are plain values)
 private fun TxnFilters.toSaveList(): ArrayList<Any?> =
-    arrayListOf(newestFirst, type, payment, minAmount, maxAmount, period.name, offset, customFrom, customTo)
+    arrayListOf(newestFirst, type, payment, minAmount, maxAmount, period.name, offset, customFrom, customTo,
+        ArrayList(tagIds), withImage, withItems)
 
 private fun filtersFromSaveList(l: List<*>) = TxnFilters(
     newestFirst = l[0] as Boolean,
@@ -131,7 +133,10 @@ private fun filtersFromSaveList(l: List<*>) = TxnFilters(
     period = PeriodKind.valueOf(l[5] as String),
     offset = l[6] as Int,
     customFrom = l[7] as Long?,
-    customTo = l[8] as Long?
+    customTo = l[8] as Long?,
+    tagIds = (l.getOrNull(9) as? List<*>)?.mapNotNull { it as? Long }?.toSet() ?: emptySet(),
+    withImage = l.getOrNull(10) as? Boolean ?: false,
+    withItems = l.getOrNull(11) as? Boolean ?: false
 )
 
 private val FiltersSaver: Saver<TxnFilters, java.io.Serializable> = Saver(
@@ -438,7 +443,9 @@ fun StatsScreen(
             filters = filters,
             onChange = { filters = it },
             onDismiss = { filterSheetOpen = false },
-            paymentMethods = filterMethods
+            paymentMethods = filterMethods,
+            tags = allTags,
+            resultCount = txns?.size
         )
     }
 }
@@ -470,10 +477,11 @@ private fun SummaryCard(
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            // A clean surface lifted off the page by a soft shadow, like the transaction cards below it
+            .shadow(4.dp, shape, ambientColor = Color.Black.copy(alpha = 0.25f), spotColor = Color.Black.copy(alpha = 0.25f))
             .clip(shape)
             .background(scheme.surface)
-            .heroGradient(scheme)
-            .border(1.dp, scheme.primary.copy(alpha = 0.12f), shape)
+            .border(1.dp, scheme.onSurface.copy(alpha = 0.06f), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
         Column {

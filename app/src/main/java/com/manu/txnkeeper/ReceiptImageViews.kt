@@ -233,6 +233,9 @@ fun ReceiptImageField(
     onPicked: (String) -> Unit,
     modifier: Modifier = Modifier,
     includeLabel: String = "Include image",
+    /** When set, a second small box "Fill from image" is shown (ticked = the image's text fills the form). */
+    fill: Boolean? = null,
+    onFillChange: (Boolean) -> Unit = {},
     /** Shown in red under the box while it is unticked, so losing the image is never a surprise. */
     excludedWarning: String? = null
 ) {
@@ -277,6 +280,15 @@ fun ReceiptImageField(
                 ) {
                     Checkbox(checked = include, onCheckedChange = onIncludeChange)
                     Text(includeLabel, style = MaterialTheme.typography.bodyLarge)
+                }
+                if (fill != null) {
+                    Row(
+                        modifier = Modifier.clickable { onFillChange(!fill) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(checked = fill, onCheckedChange = onFillChange)
+                        Text("Fill from image", style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
                 if (!include && excludedWarning != null) {
                     Text(

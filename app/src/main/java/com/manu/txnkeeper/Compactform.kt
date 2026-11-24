@@ -80,7 +80,7 @@ fun AddItemsLink(onClick: () -> Unit, modifier: Modifier = Modifier) {
     ) {
         Icon(Icons.Default.Add, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(18.dp))
         Text(
-            text = "Add items (a bill with many things)",
+            text = "Add items",
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = scheme.primary,

@@ -1,6 +1,27 @@
 package com.manu.txnkeeper
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Switch
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -46,7 +67,7 @@ import com.manu.manudesignsystem.components.ManuDateRangePicker
 
 // ---------------------------------------------------------------- model
 
-enum class PeriodKind { ALL, DAY, WEEK, MONTH, YEAR, CUSTOM }
+enum class PeriodKind { ALL, DAY, WEEK, MONTH, YEAR, CUSTOM, LAST7, LAST30 }
 
 /** Everything the filter icon controls (search is separate, it lives next to the icon). */
 data class TxnFilters(
@@ -58,7 +79,10 @@ data class TxnFilters(
     val period: PeriodKind = PeriodKind.ALL,
     val offset: Int = 0,                 // 0 = this day/week/month/year, -1 = the one before, ...
     val customFrom: Long? = null,        // CUSTOM only: start of first day
-    val customTo: Long? = null           // CUSTOM only: end of last day
+    val customTo: Long? = null,          // CUSTOM only: end of last day
+    val tagIds: Set<Long> = emptySet(),  // has ANY of these tags
+    val withImage: Boolean = false,      // only transactions with a receipt image
+    val withItems: Boolean = false       // only transactions with bill items
 ) {
     /** How many filters are on (sort order doesn't count). Shown as a badge on the filter icon. */
     val activeCount: Int
@@ -66,7 +90,10 @@ data class TxnFilters(
             type != null,
             payment != null,
             minAmount != null || maxAmount != null,
-            period != PeriodKind.ALL
+            period != PeriodKind.ALL,
+            tagIds.isNotEmpty(),
+            withImage,
+            withItems
         ).count { it }
 
     fun dateRange(): Pair<Long?, Long?> {
@@ -74,6 +101,12 @@ data class TxnFilters(
         return when (period) {
             PeriodKind.ALL -> null to null
             PeriodKind.CUSTOM -> customFrom to customTo
+            PeriodKind.LAST7, PeriodKind.LAST30 -> {
+                val days = if (period == PeriodKind.LAST7) 6 else 29
+                cal.add(Calendar.DAY_OF_YEAR, -days)
+                val start = cal.timeInMillis
+                start to endOfDay(System.currentTimeMillis())
+            }
             PeriodKind.DAY -> {
                 cal.add(Calendar.DAY_OF_YEAR, offset)
                 val start = cal.timeInMillis
@@ -129,11 +162,17 @@ fun periodTitle(f: TxnFilters): String {
         PeriodKind.MONTH -> fmt(from, "MMMM yyyy")
         PeriodKind.YEAR -> fmt(from, "yyyy")
         PeriodKind.CUSTOM -> "${fmt(from, "d MMM yyyy")} – ${fmt(to, "d MMM yyyy")}"
+        PeriodKind.LAST7 -> "Last 7 days"
+        PeriodKind.LAST30 -> "Last 30 days"
     }
 }
 
 /** Small second line: the actual dates of "This week" / "Last week". */
 fun periodSubtitle(f: TxnFilters): String? {
+    if (f.period == PeriodKind.LAST7 || f.period == PeriodKind.LAST30) {
+        val (a, b) = f.dateRange()
+        return if (a != null && b != null) "${fmt(a, "d MMM")} – ${fmt(b, "d MMM")}" else null
+    }
     if (f.period != PeriodKind.WEEK || f.offset < -1) return null
     val (from, to) = f.dateRange()
     if (from == null || to == null) return null
@@ -145,7 +184,61 @@ fun periodSubtitle(f: TxnFilters): String? {
 /** TxnQuery (plain values) and the SQL builder live in Txnsearch.kt. */
 fun TxnFilters.toQuery(search: String, accountId: Long? = null): TxnQuery {
     val (from, to) = dateRange()
-    return TxnQuery(type, payment, minAmount, maxAmount, from, to, accountId, search, newestFirst)
+    return TxnQuery(
+        type, payment, minAmount, maxAmount, from, to, accountId, search, newestFirst,
+        tagIds = tagIds, hasImage = withImage, hasItems = withItems
+    )
+}
+
+/** One removable chip in the "active filters" row: its label and what the filters look like without it. */
+class ActiveFilter(val label: String, val without: (TxnFilters) -> TxnFilters)
+
+fun activeFilters(f: TxnFilters, tags: List<com.manu.txnkeeper.data.local.TagEntity>): List<ActiveFilter> {
+    val out = mutableListOf<ActiveFilter>()
+    if (f.period != PeriodKind.ALL) out += ActiveFilter(periodTitle(f)) { it.copy(period = PeriodKind.ALL, offset = 0) }
+    f.type?.let { t -> out += ActiveFilter(if (t == "INCOME") "Income" else "Expense") { it.copy(type = null) } }
+    f.payment?.let { out += ActiveFilter(it) { x -> x.copy(payment = null) } }
+    if (f.minAmount != null || f.maxAmount != null) {
+        val label = when {
+            f.minAmount != null && f.maxAmount != null -> "₹${formatAmount(f.minAmount)}–₹${formatAmount(f.maxAmount)}"
+            f.minAmount != null -> "Over ₹${formatAmount(f.minAmount)}"
+            else -> "Under ₹${formatAmount(f.maxAmount!!)}"
+        }
+        out += ActiveFilter(label) { it.copy(minAmount = null, maxAmount = null) }
+    }
+    f.tagIds.forEach { id ->
+        val name = tags.firstOrNull { it.id == id }?.name ?: "Tag"
+        out += ActiveFilter(name) { it.copy(tagIds = it.tagIds - id) }
+    }
+    if (f.withImage) out += ActiveFilter("Has receipt") { it.copy(withImage = false) }
+    if (f.withItems) out += ActiveFilter("Has items") { it.copy(withItems = false) }
+    return out
+}
+
+/** The row of removable chips under the top bar, plus "Clear". Tap a chip to drop just that filter. */
+@Composable
+fun ActiveFilterRow(
+    filters: TxnFilters,
+    tags: List<com.manu.txnkeeper.data.local.TagEntity>,
+    onChange: (TxnFilters) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val chips = activeFilters(filters, tags)
+    if (chips.isEmpty()) return
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        chips.forEach { c ->
+            ManuChip(label = c.label + "  ✕", selected = true, onClick = { onChange(c.without(filters)) })
+        }
+        if (chips.size > 1) {
+            ManuTextButton(onClick = { onChange(TxnFilters(newestFirst = filters.newestFirst)) }) { Text("Clear all") }
+        }
+    }
 }
 
 /**
@@ -231,7 +324,8 @@ fun PeriodNavigator(
     modifier: Modifier = Modifier
 ) {
     if (filters.period == PeriodKind.ALL) return
-    val steppable = filters.period != PeriodKind.CUSTOM
+    val steppable = filters.period != PeriodKind.CUSTOM &&
+            filters.period != PeriodKind.LAST7 && filters.period != PeriodKind.LAST30
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -289,37 +383,117 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/** The single place for sort, period, type, payment and amount. Changes apply immediately. */
+/** A tappable row "Label            value ▾" that opens a menu (used for Period and Payment). */
+@Composable
+private fun PickerRow(
+    label: String,
+    value: String,
+    highlighted: Boolean,
+    menu: @Composable (close: () -> Unit) -> Unit
+) {
+    var open by remember { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (highlighted) scheme.primary.copy(alpha = 0.10f) else scheme.onSurface.copy(alpha = 0.05f))
+                .clickable { open = true }
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+            Text(
+                value,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = if (highlighted) scheme.primary else scheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = scheme.onSurfaceVariant)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) { menu { open = false } }
+    }
+}
+
+@Composable
+private fun SwitchLine(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onChange(!checked) }
+            .padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        Switch(checked = checked, onCheckedChange = onChange)
+    }
+}
+
+/** How many tags show before "Show more" (about two rows). */
+private val TAGS_COLLAPSED_HEIGHT = 92.dp
+
+/** All filters in one sheet. Changes apply immediately; the count at the top follows them. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FilterSheet(
     filters: TxnFilters,
     onChange: (TxnFilters) -> Unit,
     onDismiss: () -> Unit,
-    /** The payment methods to offer as chips (your list plus any that transactions still use). */
-    paymentMethods: List<String>
+    /** The payment methods to offer (your list plus any that transactions still use). */
+    paymentMethods: List<String>,
+    /** Your tags, to filter by (empty = the Tags section is hidden). */
+    tags: List<com.manu.txnkeeper.data.local.TagEntity> = emptyList(),
+    /** How many transactions match right now (shown at the top). Null = not shown. */
+    resultCount: Int? = null,
+    /** How many transactions exist in all, for "24 of 130". */
+    totalCount: Int? = null,
+    /** False where the order means nothing (export). */
+    showSort: Boolean = true,
+    /** More than one account: shows an Account row. [accountId] null = all accounts. */
+    accounts: List<com.manu.txnkeeper.data.local.AccountSummary> = emptyList(),
+    accountId: Long? = null,
+    onAccountChange: (Long?) -> Unit = {}
 ) {
     var rangeDialogOpen by remember { mutableStateOf(false) }
     var minText by remember { mutableStateOf(filters.minAmount?.let { formatAmount(it) } ?: "") }
     var maxText by remember { mutableStateOf(filters.maxAmount?.let { formatAmount(it) } ?: "") }
+    var tagsExpanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val scheme = MaterialTheme.colorScheme
 
     // ManuBottomSheet scrolls its content and moves up with the keyboard by itself
+    // The sheet stops at 75% of the screen, so the top quarter stays visible (tap it or swipe down to close)
+    val maxSheetHeight = (LocalConfiguration.current.screenHeightDp * 0.75f).dp
     ManuBottomSheet(expanded = true, onDismissRequest = onDismiss) {
+      Box(modifier = Modifier.fillMaxWidth().heightIn(max = maxSheetHeight)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .verticalScroll(rememberScrollState())
+                // tapping empty space drops the cursor from the Min / Max boxes (chips and rows still get their taps)
+                .pointerInput(Unit) { detectTapGestures { focusManager.clearFocus() } }
+                .padding(start = 24.dp, end = 24.dp, bottom = 88.dp),   // room under the floating Done button
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Filters",
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.weight(1f)
-                )
+            // ---- Title, live count, reset
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Filters", style = MaterialTheme.typography.titleLarge)
+                    if (resultCount != null) {
+                        Text(
+                            text = when {
+                                totalCount != null && resultCount != totalCount -> "$resultCount of $totalCount transactions"
+                                resultCount == 1 -> "1 transaction"
+                                else -> "$resultCount transactions"
+                            },
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = scheme.primary
+                        )
+                    }
+                }
                 ManuTextButton(
                     onClick = {
                         onChange(TxnFilters(newestFirst = filters.newestFirst))
@@ -330,62 +504,73 @@ fun FilterSheet(
                 ) { Text("Reset all") }
             }
 
-            // ---- Period tabs
-            SectionLabel("Period")
-            Row(
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OptionChip("All", filters.period == PeriodKind.ALL) {
-                    onChange(filters.copy(period = PeriodKind.ALL, offset = 0))
-                }
-                OptionChip("Today", filters.period == PeriodKind.DAY && filters.offset == 0) {
-                    onChange(filters.copy(period = PeriodKind.DAY, offset = 0))
-                }
-                OptionChip("Yesterday", filters.period == PeriodKind.DAY && filters.offset == -1) {
-                    onChange(filters.copy(period = PeriodKind.DAY, offset = -1))
-                }
-                OptionChip("Week", filters.period == PeriodKind.WEEK) {
-                    onChange(filters.copy(period = PeriodKind.WEEK, offset = 0))
-                }
-                OptionChip("Month", filters.period == PeriodKind.MONTH) {
-                    onChange(filters.copy(period = PeriodKind.MONTH, offset = 0))
-                }
-                OptionChip("Year", filters.period == PeriodKind.YEAR) {
-                    onChange(filters.copy(period = PeriodKind.YEAR, offset = 0))
-                }
-                OptionChip("Custom", filters.period == PeriodKind.CUSTOM) {
-                    rangeDialogOpen = true
+            // ---- Period
+            PickerRow(
+                label = "Period",
+                value = if (filters.period == PeriodKind.ALL) "All time" else periodTitle(filters),
+                highlighted = filters.period != PeriodKind.ALL
+            ) { close ->
+                fun pick(label: String, on: Boolean, action: () -> Unit) = Triple(label, on, action)
+                listOf(
+                    pick("All time", filters.period == PeriodKind.ALL) { onChange(filters.copy(period = PeriodKind.ALL, offset = 0)) },
+                    pick("Today", filters.period == PeriodKind.DAY && filters.offset == 0) { onChange(filters.copy(period = PeriodKind.DAY, offset = 0)) },
+                    pick("Yesterday", filters.period == PeriodKind.DAY && filters.offset == -1) { onChange(filters.copy(period = PeriodKind.DAY, offset = -1)) },
+                    pick("Last 7 days", filters.period == PeriodKind.LAST7) { onChange(filters.copy(period = PeriodKind.LAST7, offset = 0)) },
+                    pick("Last 30 days", filters.period == PeriodKind.LAST30) { onChange(filters.copy(period = PeriodKind.LAST30, offset = 0)) },
+                    pick("This week", filters.period == PeriodKind.WEEK) { onChange(filters.copy(period = PeriodKind.WEEK, offset = 0)) },
+                    pick("This month", filters.period == PeriodKind.MONTH) { onChange(filters.copy(period = PeriodKind.MONTH, offset = 0)) },
+                    pick("This year", filters.period == PeriodKind.YEAR) { onChange(filters.copy(period = PeriodKind.YEAR, offset = 0)) },
+                    pick("Custom range…", filters.period == PeriodKind.CUSTOM) { rangeDialogOpen = true }
+                ).forEach { (label, on, action) ->
+                    DropdownMenuItem(
+                        text = { Text(label, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal) },
+                        onClick = { action(); close() }
+                    )
                 }
             }
             PeriodNavigator(filters = filters, onChange = onChange)
 
-            // ---- Type
-            SectionLabel("Type")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OptionChip("All", filters.type == null) { onChange(filters.copy(type = null)) }
-                OptionChip("Income", filters.type == "INCOME") { onChange(filters.copy(type = "INCOME")) }
-                OptionChip("Expense", filters.type == "EXPENSE") { onChange(filters.copy(type = "EXPENSE")) }
-            }
-
-            // ---- Payment method
-            SectionLabel("Payment")
-            // The chips wrap onto more lines when there are many, so none are hidden off-screen.
-            // A method that is selected but not in the list (e.g. no transaction uses it any more)
-            // is still shown, so the filter can be seen and switched off.
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                OptionChip("All", filters.payment == null) { onChange(filters.copy(payment = null)) }
-                (paymentMethods + listOfNotNull(filters.payment)).distinct().forEach { method ->
-                    OptionChip(method, filters.payment == method) {
-                        onChange(filters.copy(payment = method))
+            // ---- Account (only when there is a choice)
+            if (accounts.size > 1) {
+                PickerRow(
+                    label = "Account",
+                    value = accounts.firstOrNull { it.id == accountId }?.name ?: "All",
+                    highlighted = accountId != null
+                ) { close ->
+                    DropdownMenuItem(text = { Text("All") }, onClick = { onAccountChange(null); close() })
+                    accounts.forEach { a ->
+                        DropdownMenuItem(
+                            text = { Text(a.name, fontWeight = if (a.id == accountId) FontWeight.SemiBold else FontWeight.Normal) },
+                            onClick = { onAccountChange(a.id); close() }
+                        )
                     }
                 }
             }
 
-            // ---- Amount range
+            // ---- Payment
+            PickerRow(
+                label = "Payment",
+                value = filters.payment ?: "All",
+                highlighted = filters.payment != null
+            ) { close ->
+                // a method that is selected but no longer in the list is still shown, so it can be switched off
+                (listOf<String?>(null) + (paymentMethods + listOfNotNull(filters.payment)).distinct()).forEach { m ->
+                    DropdownMenuItem(
+                        text = { Text(m ?: "All", fontWeight = if (filters.payment == m) FontWeight.SemiBold else FontWeight.Normal) },
+                        onClick = { onChange(filters.copy(payment = m)); close() }
+                    )
+                }
+            }
+
+            // ---- Type
+            SegmentedRow(
+                labels = listOf("All", "Income", "Expense"),
+                selectedIndex = when (filters.type) { "INCOME" -> 1; "EXPENSE" -> 2; else -> 0 },
+                onSelect = { onChange(filters.copy(type = when (it) { 1 -> "INCOME"; 2 -> "EXPENSE"; else -> null })) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // ---- Amount
             SectionLabel("Amount (₹)")
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 ManuTextField(
@@ -395,7 +580,7 @@ fun FilterSheet(
                         onChange(filters.copy(minAmount = it.toDoubleOrNull()))
                     },
                     label = { Text("Min") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     modifier = Modifier.weight(1f)
                 )
                 ManuTextField(
@@ -405,25 +590,94 @@ fun FilterSheet(
                         onChange(filters.copy(maxAmount = it.toDoubleOrNull()))
                     },
                     label = { Text("Max") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
                     modifier = Modifier.weight(1f)
                 )
             }
+            val presets = listOf(
+                Triple("<100", null as Double?, 100.0 as Double?),
+                Triple("100–500", 100.0 as Double?, 500.0 as Double?),
+                Triple("500–2k", 500.0 as Double?, 2000.0 as Double?),
+                Triple(">2k", 2000.0 as Double?, null as Double?)
+            )
+            val presetIndex = presets.indexOfFirst { it.second == filters.minAmount && it.third == filters.maxAmount }
+            SegmentedRow(
+                labels = presets.map { it.first },
+                selectedIndex = presetIndex,
+                onSelect = { i ->
+                    focusManager.clearFocus()
+                    val (_, lo, hi) = presets[i]
+                    val off = i == presetIndex          // tapping the selected one switches it off
+                    val nl = if (off) null else lo
+                    val nh = if (off) null else hi
+                    minText = nl?.let { formatAmount(it) } ?: ""
+                    maxText = nh?.let { formatAmount(it) } ?: ""
+                    onChange(filters.copy(minAmount = nl, maxAmount = nh))
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
 
-            // ---- Sort
-            SectionLabel("Sort by date")
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OptionChip("Latest first", filters.newestFirst) { onChange(filters.copy(newestFirst = true)) }
-                OptionChip("Oldest first", !filters.newestFirst) { onChange(filters.copy(newestFirst = false)) }
+            // ---- Tags: a few rows, fading out, then "Show more"
+            if (tags.isNotEmpty()) {
+                SectionLabel("Tags" + if (filters.tagIds.isNotEmpty()) " · ${filters.tagIds.size} selected" else "")
+                // chosen tags first, so they are never hidden below the fade
+                val ordered = remember(tags, filters.tagIds) { tags.sortedByDescending { it.id in filters.tagIds } }
+                val collapsible = tags.size > 6
+                val clipped = collapsible && !tagsExpanded
+                Box {
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (clipped) Modifier.heightIn(max = TAGS_COLLAPSED_HEIGHT).clipToBounds() else Modifier),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        ordered.forEach { tag ->
+                            val on = tag.id in filters.tagIds
+                            OptionChip(tag.name, on) {
+                                onChange(filters.copy(tagIds = if (on) filters.tagIds - tag.id else filters.tagIds + tag.id))
+                            }
+                        }
+                    }
+                    if (clipped) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .background(Brush.verticalGradient(listOf(Color.Transparent, scheme.surface)))
+                        )
+                    }
+                }
+                if (collapsible) {
+                    ManuTextButton(
+                        onClick = { tagsExpanded = !tagsExpanded },
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    ) { Text(if (tagsExpanded) "Show less" else "Show all ${tags.size} tags") }
+                }
             }
 
-            ManuButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp)
-            ) { Text("Done") }
+            // ---- Extras
+            SwitchLine("Only with receipt image", filters.withImage) { onChange(filters.copy(withImage = it)) }
+            SwitchLine("Only with bill items", filters.withItems) { onChange(filters.copy(withItems = it)) }
+
+            // ---- Sort
+            if (showSort) SegmentedRow(
+                labels = listOf("Latest first", "Oldest first"),
+                selectedIndex = if (filters.newestFirst) 0 else 1,
+                onSelect = { onChange(filters.copy(newestFirst = it == 0)) },
+                modifier = Modifier.fillMaxWidth()
+            )
+
         }
+        // Small floating Done button, always in reach while the filters scroll
+        ManuButton(
+            onClick = onDismiss,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 24.dp, bottom = 20.dp)
+        ) { Text("Done") }
+      }
     }
 
     // ---- Custom date range

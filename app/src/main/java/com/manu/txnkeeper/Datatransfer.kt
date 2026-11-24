@@ -1,7 +1,11 @@
 package com.manu.txnkeeper
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.room.withTransaction
 import androidx.sqlite.db.SimpleSQLiteQuery
 import com.manu.txnkeeper.data.local.AccountEntity
@@ -14,6 +18,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileOutputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -65,14 +71,19 @@ data class ImportResult(
 
 /** Which transactions an export contains. */
 sealed interface ExportScope {
+    /** Keep only the newest this-many of the matching transactions (null = no limit). */
+    val limit: Int? get() = null
+
     /** Everything. */
     data object All : ExportScope
 
     /** Transactions from [from] to [to] (milliseconds, both included). */
-    data class DateRange(val from: Long, val to: Long) : ExportScope
+    data class DateRange(val from: Long, val to: Long, override val limit: Int? = null) : ExportScope
 
     /** The newest [count] transactions. */
-    data class Latest(val count: Int) : ExportScope
+    data class Latest(val count: Int) : ExportScope {
+        override val limit: Int get() = count
+    }
 }
 
 /**
@@ -84,7 +95,10 @@ data class ExportFilters(
     val paymentMethod: String? = null,
     val type: String? = null,               // "INCOME" / "EXPENSE"
     val minAmountPaise: Long? = null,
-    val maxAmountPaise: Long? = null
+    val maxAmountPaise: Long? = null,
+    val tagIds: Set<Long> = emptySet(),     // has ANY of these tags
+    val withImage: Boolean = false,
+    val withItems: Boolean = false
 ) {
     /** How many conditions are on (the min / max pair counts as one). */
     val activeCount: Int
@@ -92,7 +106,10 @@ data class ExportFilters(
             accountId != null,
             paymentMethod != null,
             type != null,
-            minAmountPaise != null || maxAmountPaise != null
+            minAmountPaise != null || maxAmountPaise != null,
+            tagIds.isNotEmpty(),
+            withImage,
+            withItems
         ).count { it }
 }
 
@@ -109,7 +126,21 @@ internal fun exportQuery(scope: ExportScope, filters: ExportFilters): TxnQuery =
     dateTo = (scope as? ExportScope.DateRange)?.to,
     accountId = filters.accountId,
     search = "",
-    newestFirst = true
+    newestFirst = true,
+    tagIds = filters.tagIds,
+    hasImage = filters.withImage,
+    hasItems = filters.withItems
+)
+
+/** The first pages of the PDF as pictures, how many pages the whole PDF has, and how many transactions it lists. */
+class PdfPreview(val pages: List<Bitmap>, val totalPages: Int, val transactions: Int)
+
+/** What an export would contain (see [DataTransfer.preview]). [rows] is only the first part of them. */
+data class ExportPreview(
+    val count: Int,
+    val incomePaise: Long,
+    val expensePaise: Long,
+    val rows: List<TransactionEntity>
 )
 
 /** What an export wrote: how many transactions, and how many images went with them. */
@@ -170,6 +201,40 @@ object DataTransfer {
     }
 
     /**
+     * Builds the very same PDF an export would write (without the receipt image pages) and draws its
+     * first [maxPages] pages to bitmaps, so the person sees how it will look before saving.
+     */
+    suspend fun renderPdfPreview(
+        context: Context, database: AppDatabase, scope: ExportScope, filters: ExportFilters,
+        maxPages: Int = 4, widthPx: Int = 1000
+    ): PdfPreview = withContext(Dispatchers.IO) {
+        val rows = loadRows(context, database, scope, filters, withImages = false)
+        val accountName = filters.accountId?.let { id ->
+            database.transactionDao().getAccountsOnce().firstOrNull { it.id == id }?.name
+        }
+        val file = File(context.cacheDir, "pdf_preview.pdf")
+        try {
+            FileOutputStream(file).use { TxnPdf.write(rows, it, scopeLabel = scopeLabel(scope, filters, accountName)) }
+            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+                PdfRenderer(fd).use { renderer ->
+                    val pages = (0 until minOf(renderer.pageCount, maxPages)).map { i ->
+                        renderer.openPage(i).use { page ->
+                            val h = (widthPx.toFloat() * page.height / page.width).toInt()
+                            val bmp = Bitmap.createBitmap(widthPx, h, Bitmap.Config.ARGB_8888)
+                            bmp.eraseColor(Color.WHITE)
+                            page.render(bmp, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            bmp
+                        }
+                    }
+                    PdfPreview(pages, renderer.pageCount, rows.size)
+                }
+            }
+        } finally {
+            file.delete()
+        }
+    }
+
+    /**
      * Writes a ZIP to [uri]: transactions.csv (with an Image column) and an images folder holding every
      * receipt image of those transactions. [importFile] reads it back, images included.
      */
@@ -215,8 +280,36 @@ object DataTransfer {
                 where.args.toTypedArray()
             )
         ).first().count
-        val limit = (scope as? ExportScope.Latest)?.count
+        val limit = scope.limit
         if (limit != null) minOf(matching, limit) else matching
+    }
+
+    /**
+     * What an export would contain, without writing anything: how many, the money in and out, and the
+     * first [maxRows] rows (newest first) so the person can see before saving a file.
+     */
+    suspend fun preview(
+        database: AppDatabase, scope: ExportScope, filters: ExportFilters, maxRows: Int = 200
+    ): ExportPreview = withContext(Dispatchers.IO) {
+        val dao = database.transactionDao()
+        val where = TxnSql.where(exportQuery(scope, filters))
+        val limit = scope.limit
+        val base = "SELECT * FROM transactions WHERE ${where.sql} ORDER BY dateTime DESC, id DESC"
+        val inner = if (limit != null) "$base LIMIT ?" else base
+        val innerArgs = if (limit != null) where.args + limit else where.args
+        val totals = dao.rawTotals(
+            SimpleSQLiteQuery(
+                "SELECT COALESCE(SUM(CASE WHEN type = 'INCOME' THEN amountPaise END), 0) AS incomePaise, " +
+                        "COALESCE(SUM(CASE WHEN type = 'EXPENSE' THEN amountPaise END), 0) AS expensePaise, " +
+                        "COUNT(*) AS count FROM ($inner)",
+                innerArgs.toTypedArray()
+            )
+        ).first()
+        val rowLimit = if (limit != null) minOf(limit, maxRows) else maxRows
+        val rows = dao.rawTransactions(
+            SimpleSQLiteQuery("$base LIMIT ?", (where.args + rowLimit).toTypedArray())
+        ).first()
+        ExportPreview(totals.count, totals.incomePaise, totals.expensePaise, rows)
     }
 
     /** Text shown under the PDF title, or null when everything is exported. */
@@ -228,7 +321,10 @@ object DataTransfer {
         val parts = mutableListOf<String>()
         when (scope) {
             ExportScope.All -> Unit
-            is ExportScope.DateRange -> parts += "${formatDateLong(scope.from)} - ${formatDateLong(scope.to)}"
+            is ExportScope.DateRange -> {
+                parts += "${formatDateLong(scope.from)} - ${formatDateLong(scope.to)}"
+                scope.limit?.let { parts += "Latest $it" }
+            }
             is ExportScope.Latest -> parts += "Latest ${scope.count} transactions"
         }
         filters.accountId?.let { parts += "Account: ${accountName ?: "#$it"}" }
@@ -241,6 +337,9 @@ object DataTransfer {
             min != null -> parts += "Amount at least ${formatMoney(min)}"
             max != null -> parts += "Amount at most ${formatMoney(max)}"
         }
+        if (filters.tagIds.isNotEmpty()) parts += "Tags: ${filters.tagIds.size}"
+        if (filters.withImage) parts += "With receipt image"
+        if (filters.withItems) parts += "With bill items"
         return if (parts.isEmpty()) null else parts.joinToString("  ·  ")
     }
 
@@ -252,7 +351,7 @@ object DataTransfer {
 
         // Same WHERE builder as the list screen; "Latest N" is the first N of the filtered, newest-first rows
         val where = TxnSql.where(exportQuery(scope, filters))
-        val limit = (scope as? ExportScope.Latest)?.count
+        val limit = scope.limit
         val sql = "SELECT * FROM transactions WHERE ${where.sql} ORDER BY dateTime DESC, id DESC" +
                 (if (limit != null) " LIMIT ?" else "")
         val args = if (limit != null) where.args + limit else where.args

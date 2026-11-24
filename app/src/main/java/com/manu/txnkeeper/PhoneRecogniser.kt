@@ -77,7 +77,7 @@ object PhoneRecogniser {
 
     /** Debug only: ask the recogniser to prefer an offline language pack. */
     fun preferOffline(context: Context): Boolean =
-        BuildConfig.DEBUG && prefs(context).getBoolean("debug_google_offline", false)
+        DebugMode.on && prefs(context).getBoolean("debug_google_offline", false)
 
     fun setPreferOffline(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean("debug_google_offline", on).apply()
@@ -143,7 +143,7 @@ object PhoneRecogniser {
                 val end = SystemClock.elapsedRealtime()
                 val first = if (s.firstWordAt > 0) (s.firstWordAt - s.startedAt) / 1000.0 else null
                 val after = if (s.stopAt > 0) maxOf(0.0, (end - s.stopAt) / 1000.0) else null
-                if (BuildConfig.DEBUG) {
+                if (DebugMode.on) {
                     VoiceTap.addGoogle(
                         VoiceTap.GoogleRun(
                             s.id, text, first, after, "en-IN", null, error,

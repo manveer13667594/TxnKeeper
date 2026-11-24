@@ -335,8 +335,15 @@ fun TxnkeeperApp(
                         form.includeImage = settings.includeImageByDefault
                         if (old != null) ReceiptStore.delete(context, old)
                     }
-                    form.fill(outcome.parsed, message = message)
-                    form.titleSuggestions = outcome.suggestions
+                    // "Fill from image" starts as set in Settings; when off, the image is only attached
+                    form.scanned = outcome.parsed
+                    form.fillFromImage = settings.fillFromImageByDefault
+                    if (form.fillFromImage) {
+                        form.fill(outcome.parsed, message = message)
+                        form.titleSuggestions = outcome.suggestions
+                    } else {
+                        form.notice = "Image attached. Tick “Fill from image” to read it into the form."
+                    }
                     showAdd = true
                 }
             }
