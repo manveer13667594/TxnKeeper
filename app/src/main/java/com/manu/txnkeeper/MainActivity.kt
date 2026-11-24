@@ -542,14 +542,14 @@ fun TxnkeeperApp(
                             }
                         }
                     },
-                    onSubmit = { entity, tagIds, stay ->
+                    onSubmit = { entity, tagIds, stay, items ->
                         // Debug builds only: which entry of the scan / recording this is (kept before the form moves on)
                         val debugEntry = if (form.inBatch) form.batchIndex else 0
                         scope.launch {
                             // An image in the form that is not kept ("Include image" unticked) is deleted after saving
                             val unusedImage = form.imageFile?.takeIf { it != entity.imageFile }
                             // If saving fails the form stays open with everything the user typed
-                            if (!safeWrite(context, "save the transaction") { dao.insertWithTags(entity, tagIds) }) return@launch
+                            if (!safeWrite(context, "save the transaction") { dao.insertWithTags(entity, tagIds, items) }) return@launch
                             if (unusedImage != null) ReceiptStore.delete(context, unusedImage)
                             DebugDataLog.markSaved(entity, debugEntry)
                             if (stay) {

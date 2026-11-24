@@ -10,9 +10,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TransactionEntity::class,
         AccountEntity::class,
         TagEntity::class,
-        TransactionTagCrossRef::class
+        TransactionTagCrossRef::class,
+        TransactionItemEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -127,6 +128,27 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_transaction_tags_tagId` ON `transaction_tags` (`tagId`)")
         seedDefaultTags(db)
+    }
+}
+
+/**
+ * Version 5 -> 6: bill items. Adds one table with the lines of a bill; the transactions table is not
+ * touched, so nothing can be lost. (The SQL must produce exactly the table Room expects for TransactionItemEntity.)
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `transaction_items` (" +
+                    "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "`transactionId` INTEGER NOT NULL, " +
+                    "`name` TEXT NOT NULL, " +
+                    "`quantity` REAL NOT NULL, " +
+                    "`unitPricePaise` INTEGER NOT NULL, " +
+                    "`position` INTEGER NOT NULL, " +
+                    "FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) " +
+                    "ON UPDATE NO ACTION ON DELETE CASCADE)"
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_transaction_items_transactionId` ON `transaction_items` (`transactionId`)")
     }
 }
 

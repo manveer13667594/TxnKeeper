@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.manu.txnkeeper.data.local.TransactionItemEntity
 import com.manu.txnkeeper.data.local.TransactionTagCrossRef
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -269,6 +270,10 @@ fun TransactionsScreen(
     val linksFlow = remember { dao.observeTagLinks() }
     val tagLinks by linksFlow.collectAsState(initial = emptyList())
     val tagMap = remember(allTags, tagLinks) { tagsByTransaction(allTags, tagLinks) }
+    // The lines of bills, grouped by transaction (for the "3 items" note and the details)
+    val itemsFlow = remember { dao.observeAllItems() }
+    val allItems by itemsFlow.collectAsState(initial = emptyList())
+    val itemMap = remember(allItems) { allItems.groupBy { it.transactionId } }
 
     // Filter chips: your payment methods, plus any a transaction still uses (e.g. one you removed)
     val usedMethodsFlow = remember { dao.observePaymentMethodsInUse() }
@@ -783,6 +788,7 @@ fun TransactionsScreen(
                                                     txn = txn,
                                                     accountName = if (showAccountOnRows) accountNames[txn.accountId] else null,
                                                     tags = tagMap[txn.id] ?: emptyList(),
+                                                    itemCount = itemMap[txn.id]?.size ?: 0,
                                                     selectionMode = selectionMode,
                                                     selected = txn.id in selectedIds,
                                                     cardWidthPx = cardWidth,
@@ -867,6 +873,7 @@ fun TransactionsScreen(
             txn = txn,
             accountName = accountNames[txn.accountId] ?: "",
             tags = tagMap[txn.id] ?: emptyList(),
+            items = itemMap[txn.id] ?: emptyList(),
             onEdit = {
                 viewing = null
                 editing = txn
@@ -880,51 +887,52 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-        key(txn.id) {
-            EditTransactionDialog(
-                original = txn,
-                accounts = accounts,
-                settings = settings,
-                onAddAccount = { newAccount, onCreated ->
-                    scope.launch {
-                        var newId = 0L
-                        if (safeWrite(context, "add the account") {
-                                newId = dao.insertAccount(newAccount)
-                            }) {
-                            onCreated(newId)
-                        }
+      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+      key(txn.id) {
+        EditTransactionDialog(
+            original = txn,
+            accounts = accounts,
+            settings = settings,
+            onAddAccount = { newAccount, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the account") {
+                            newId = dao.insertAccount(newAccount)
+                        }) {
+                        onCreated(newId)
                     }
-                },
-                tags = allTags,
-                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-                onAddTag = { name, colorIndex, onCreated ->
-                    scope.launch {
-                        var newId = 0L
-                        if (safeWrite(context, "add the tag") {
-                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                            }) {
-                            onCreated(newId)
-                        }
-                    }
-                },
-                onSave = { updated, tagIds ->
-                    scope.launch {
-                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds) }) {
-                            // The image it had before is not used any more if it was removed or replaced
-                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
-                        }
-                    }
-                    // Next one of the queue, or close (a normal single edit has an empty queue)
-                    openNextInQueue()
-                },
-                onDismiss = {
-                    editQueue = emptyList()
-                    editTotal = 0
-                    editing = null
                 }
-            )
-        }
+            },
+            tags = allTags,
+            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+            initialItems = itemMap[txn.id] ?: emptyList(),
+            onAddTag = { name, colorIndex, onCreated ->
+                scope.launch {
+                    var newId = 0L
+                    if (safeWrite(context, "add the tag") {
+                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                        }) {
+                        onCreated(newId)
+                    }
+                }
+            },
+            onSave = { updated, tagIds, newItems ->
+                scope.launch {
+                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
+                        // The image it had before is not used any more if it was removed or replaced
+                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                    }
+                }
+                // Next one of the queue, or close (a normal single edit has an empty queue)
+                openNextInQueue()
+            },
+            onDismiss = {
+                editQueue = emptyList()
+                editTotal = 0
+                editing = null
+            }
+        )
+      }
     }
 
     deleting?.let { txn ->
@@ -1278,6 +1286,8 @@ private fun TransactionRow(
     txn: TransactionEntity,
     accountName: String?,
     tags: List<TagEntity>,
+    /** How many bill items it has (0 = a normal transaction). */
+    itemCount: Int = 0,
     /** Selection mode: a checkbox shows at the left and a tap selects the row instead of opening it. */
     selectionMode: Boolean = false,
     selected: Boolean = false,
@@ -1328,6 +1338,7 @@ private fun TransactionRow(
             TagChipLine(tags = tags, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
             // Line 3: one muted line, time · payment · account · note (the note is cut first when short of space)
             val meta = listOfNotNull(
+                itemCount.takeIf { it > 0 }?.let { if (it == 1) "1 item" else "$it items" },
                 txn.paymentMethod.takeIf { it.isNotBlank() },
                 accountName?.takeIf { it.isNotBlank() },
                 txn.description.takeIf { it.isNotBlank() }?.replace('\n', ' ')
@@ -1387,6 +1398,7 @@ private fun TransactionDetailDialog(
     txn: TransactionEntity,
     accountName: String,
     tags: List<TagEntity>,
+    items: List<TransactionItemEntity> = emptyList(),
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
@@ -1486,6 +1498,17 @@ private fun TransactionDetailDialog(
                         )
                         TagChipRow(tags = tags, modifier = Modifier.weight(1f))
                     }
+                }
+
+                // The lines of a bill
+                if (items.isNotEmpty()) {
+                    Text(
+                        text = "Items (${items.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 16.dp, bottom = 2.dp)
+                    )
+                    ItemsList(items)
                 }
 
                 // Description in its own box, shown in full

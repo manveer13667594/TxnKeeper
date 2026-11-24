@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.ui.Modifier
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
@@ -29,6 +31,8 @@ import com.manu.manudesignsystem.components.ManuDatePicker
 import com.manu.manudesignsystem.components.ManuTimePicker
 import java.util.Calendar
 import com.manu.manudesignsystem.components.ManuDialog
+import com.manu.manudesignsystem.components.ManuOutlineButton
+import com.manu.txnkeeper.data.local.TransactionItemEntity
 import com.manu.manudesignsystem.components.ManuPickerField
 import com.manu.manudesignsystem.components.ManuTextField
 
@@ -37,7 +41,7 @@ import com.manu.manudesignsystem.components.ManuTextField
 fun EditTransactionDialog(
     original: TransactionEntity,
     /** The changed transaction and the ids of the tags it should have now. */
-    onSave: (TransactionEntity, Set<Long>) -> Unit,
+    onSave: (TransactionEntity, Set<Long>, List<TransactionItemEntity>) -> Unit,
     onDismiss: () -> Unit,
     /** Where the payment methods come from (and where a new one is saved). */
     settings: AppSettings,
@@ -47,6 +51,8 @@ fun EditTransactionDialog(
     /** Every tag there is, and the ids this transaction has now. */
     tags: List<TagEntity> = emptyList(),
     initialTagIds: Set<Long> = emptySet(),
+    /** The bill items it has now (empty for a normal transaction). */
+    initialItems: List<TransactionItemEntity> = emptyList(),
     /** Saves a new tag (name, colour number); calls the last function with its id once it exists. */
     onAddTag: (String, Int, (Long) -> Unit) -> Unit = { _, _, _ -> }
 ) {
@@ -65,6 +71,7 @@ fun EditTransactionDialog(
     var addAccountOpen by remember { mutableStateOf(false) }
     var addPaymentOpen by remember { mutableStateOf(false) }
     var tagIds by remember { mutableStateOf(initialTagIds) }
+    var items by remember { mutableStateOf(initialItems.toDrafts()) }
     var addTagOpen by remember { mutableStateOf(false) }
 
     // The receipt image. "Keep image" unticked removes it from the transaction when saved. A newly picked
@@ -86,8 +93,11 @@ fun EditTransactionDialog(
         title = "Edit transaction",
         confirmText = "Save",
         onConfirm = {
-            val value = parsePaise(amountText)
-            if (title.isBlank() || value == null || value <= 0) {
+            val billed = items.hasValidItems()
+            val value = if (billed) items.validTotalPaise() else parsePaise(amountText)
+            if (items.isNotEmpty() && !billed) {
+                error = "Add a price to at least one item, or remove the items."
+            } else if (title.isBlank() || value == null || value <= 0) {
                 error = "Enter a valid title and amount."
             } else {
                 val finalImage = if (keepImage) imageFile else null
@@ -106,7 +116,8 @@ fun EditTransactionDialog(
                         imageFile = finalImage
                     ),
                     // A tag deleted while this dialog was open is dropped here
-                    tagIds.filter { id -> tags.any { it.id == id } }.toSet()
+                    tagIds.filter { id -> tags.any { it.id == id } }.toSet(),
+                    if (billed) items.toEntities() else emptyList()
                 )
             }
         },
@@ -122,12 +133,20 @@ fun EditTransactionDialog(
                 onValueChange = { title = it },
                 label = { Text("Transaction title") }
             )
-            ManuTextField(
-                value = amountText,
-                onValueChange = { amountText = it },
-                label = { Text("Amount (₹)") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-            )
+            if (items.isNotEmpty()) {
+                ItemsEditor(items = items, onChange = { items = it })
+            } else {
+                ManuTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = { Text("Amount (₹)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+                ManuOutlineButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { items = listOf(ItemDraft()) }
+                ) { Text("Add items (a bill with many things)") }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ManuChip(
                     label = "Expense",

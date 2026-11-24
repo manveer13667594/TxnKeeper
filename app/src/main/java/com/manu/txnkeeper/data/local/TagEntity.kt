@@ -67,15 +67,31 @@ val DEFAULT_TAGS = listOf(
     "📱 Recharge" to 5
 )
 
-/** Saves a new transaction together with its tags. */
-suspend fun TransactionDao.insertWithTags(transaction: TransactionEntity, tagIds: Set<Long>) {
+/** Saves a new transaction together with its tags and bill items. */
+suspend fun TransactionDao.insertWithTags(
+    transaction: TransactionEntity,
+    tagIds: Set<Long>,
+    items: List<TransactionItemEntity> = emptyList()
+) {
     val id = insertWithId(transaction).toInt()
     if (tagIds.isNotEmpty()) insertTagLinks(tagIds.map { TransactionTagCrossRef(id, it) })
+    if (items.isNotEmpty()) insertItems(items.mapIndexed { i, it -> it.copy(id = 0, transactionId = id, position = i) })
 }
 
-/** Saves a changed transaction and replaces its tags with [tagIds]. */
-suspend fun TransactionDao.updateWithTags(transaction: TransactionEntity, tagIds: Set<Long>) {
+/**
+ * Saves a changed transaction and replaces its tags with [tagIds]. [items] replaces the bill items;
+ * null leaves them as they are.
+ */
+suspend fun TransactionDao.updateWithTags(
+    transaction: TransactionEntity,
+    tagIds: Set<Long>,
+    items: List<TransactionItemEntity>? = null
+) {
     update(transaction)
     clearTagLinks(transaction.id)
     if (tagIds.isNotEmpty()) insertTagLinks(tagIds.map { TransactionTagCrossRef(transaction.id, it) })
+    if (items != null) {
+        clearItems(transaction.id)
+        if (items.isNotEmpty()) insertItems(items.mapIndexed { i, it -> it.copy(id = 0, transactionId = transaction.id, position = i) })
+    }
 }

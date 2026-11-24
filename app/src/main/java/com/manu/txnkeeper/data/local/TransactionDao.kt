@@ -233,6 +233,18 @@ interface TransactionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTagLinks(links: List<TransactionTagCrossRef>)
+
+    // ---- bill items
+
+    /** Every item of every transaction; the list groups them by transaction for counts and details. */
+    @Query("SELECT * FROM transaction_items ORDER BY transactionId, position, id")
+    fun observeAllItems(): Flow<List<TransactionItemEntity>>
+
+    @Insert
+    suspend fun insertItems(items: List<TransactionItemEntity>)
+
+    @Query("DELETE FROM transaction_items WHERE transactionId = :transactionId")
+    suspend fun clearItems(transactionId: Int)
 }
 
 /** How many transactions carry one tag. */

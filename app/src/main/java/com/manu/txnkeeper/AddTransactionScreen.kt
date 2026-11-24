@@ -61,6 +61,7 @@ import com.manu.txnkeeper.data.local.AccountEntity
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.TagEntity
 import com.manu.txnkeeper.data.local.TransactionEntity
+import com.manu.txnkeeper.data.local.TransactionItemEntity
 import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuOutlineButton
@@ -110,6 +111,9 @@ class TxnFormState {
     var title by mutableStateOf("")
     var amount by mutableStateOf("")
     var type by mutableStateOf(TYPE_EXPENSE)
+
+    /** The lines of a bill (not used for the entries of a voice recording). When there are any, their total is the amount. */
+    var items by mutableStateOf<List<ItemDraft>>(emptyList())
     var payment by mutableStateOf("CASH")
     var dateTime by mutableStateOf(System.currentTimeMillis())
     var description by mutableStateOf("")
@@ -126,7 +130,7 @@ class TxnFormState {
 
     /** True when nothing has been typed, scanned or spoken yet. */
     val isBlank: Boolean
-        get() = title.isBlank() && amount.isBlank() && description.isBlank() && notice == null && !inBatch
+        get() = title.isBlank() && amount.isBlank() && description.isBlank() && items.isEmpty() && notice == null && !inBatch
 
     /** Sets the type and payment method to the defaults (the account is chosen by the app). */
     fun useDefaults() {
@@ -276,6 +280,7 @@ class TxnFormState {
                     "imageFile" to f.imageFile,
                     "includeImage" to f.includeImage,
                     "tagIds" to ArrayList(f.tagIds),
+                    "items" to f.items.map { listOf(it.name, it.qty, it.price) },
                     "batchIndex" to f.batchIndex,
                     "batchSaved" to f.batchSaved,
                     "batch" to f.batch.map {
@@ -300,6 +305,8 @@ class TxnFormState {
                     f.includeImage = (m["includeImage"] as Boolean?) ?: true
                     @Suppress("UNCHECKED_CAST")
                     f.tagIds = ((m["tagIds"] as List<Long>?) ?: emptyList()).toSet()
+                    @Suppress("UNCHECKED_CAST")
+                    f.items = ((m["items"] as List<List<String>>?) ?: emptyList()).map { ItemDraft(name = it[0], qty = it[1], price = it[2]) }
                     f.batchIndex = m["batchIndex"] as Int
                     f.batchSaved = m["batchSaved"] as Int
                     @Suppress("UNCHECKED_CAST")
@@ -346,6 +353,7 @@ class TxnFormState {
         imageFile = null
         includeImage = true
         tagIds = emptySet()
+        items = emptyList()
     }
 
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
@@ -381,7 +389,7 @@ fun AddTransactionScreen(
     suggestTags: suspend (title: String) -> Set<Long> = { emptySet() },
     onClose: () -> Unit,
     /** [stay] = true for "Save & next": save, then show a fresh (or the next) form instead of closing. */
-    onSubmit: (TransactionEntity, tagIds: Set<Long>, stay: Boolean) -> Unit,
+    onSubmit: (TransactionEntity, tagIds: Set<Long>, stay: Boolean, items: List<TransactionItemEntity>) -> Unit,
     /** Save & exit on a recording with several entries: saves every marked one at once, then closes. */
     /** Saves the marked entries of a recording, with the tags of each (same order). */
     onSubmitAll: (List<TransactionEntity>, List<Set<Long>>) -> Unit,
@@ -436,6 +444,11 @@ fun AddTransactionScreen(
         val suggestion = suggestTags(title)
         form.tagIds = suggestion
         autoTags = suggestion
+    }
+
+    // With bill items, the amount is their total
+    LaunchedEffect(form.items) {
+        if (form.items.hasValidItems()) form.amount = formatAmountPaise(form.items.validTotalPaise())
     }
 
     // A recording with several entries: suggest tags for each entry once, then you can change them per entry
@@ -560,7 +573,7 @@ fun AddTransactionScreen(
                             onValueChange = { form.title = it },
                             modifier = Modifier
                                 .focusRequester(titleFocus)
-                                .focusProperties { next = amountFocus },
+                                .focusProperties { next = if (form.items.isNotEmpty() && !form.inBatch) descriptionFocus else amountFocus },
                             placeholder = { Text("Transaction title") },
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         )
@@ -584,18 +597,29 @@ fun AddTransactionScreen(
                             }
                         }
 
-                        ManuTextField(
-                            value = form.amount,
-                            onValueChange = { form.amount = it },
-                            modifier = Modifier
-                                .focusRequester(amountFocus)
-                                .focusProperties { next = descriptionFocus },
-                            placeholder = { Text("Amount") },
-                            leadingContent = {
-                                Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
-                        )
+                        if (!form.inBatch && form.items.isNotEmpty()) {
+                            // A bill: the lines decide the amount
+                            ItemsEditor(items = form.items, onChange = { form.items = it })
+                        } else {
+                            ManuTextField(
+                                value = form.amount,
+                                onValueChange = { form.amount = it },
+                                modifier = Modifier
+                                    .focusRequester(amountFocus)
+                                    .focusProperties { next = descriptionFocus },
+                                placeholder = { Text("Amount") },
+                                leadingContent = {
+                                    Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
+                            )
+                            if (!form.inBatch) {
+                                ManuOutlineButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { form.items = listOf(ItemDraft()) }
+                                ) { Text("Add items (a bill with many things)") }
+                            }
+                        }
 
                         Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
                             ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
@@ -728,7 +752,14 @@ fun AddTransactionScreen(
                                 )
                                 return
                             }
-                            val value = parsePaise(form.amount.replace(",", "").trim())
+                            if (!form.inBatch && form.items.isNotEmpty() && !form.items.hasValidItems()) {
+                                error = "Add a price to at least one item, or remove the items."
+                                return
+                            }
+                            // With bill items the total of the lines is the amount
+                            val billed = !form.inBatch && form.items.hasValidItems()
+                            val value = if (billed) form.items.validTotalPaise()
+                                else parsePaise(form.amount.replace(",", "").trim())
                             if (form.title.isBlank() || value == null || value <= 0) {
                                 error = "Enter a valid title and amount."
                             } else {
@@ -748,7 +779,8 @@ fun AddTransactionScreen(
                                         imageFile = if (form.includeImage) form.imageFile else null
                                     ),
                                     form.tagIds.filter { it in liveTagIds }.toSet(),
-                                    stay
+                                    stay,
+                                    if (billed) form.items.toEntities() else emptyList()
                                 )
                             }
                         }
