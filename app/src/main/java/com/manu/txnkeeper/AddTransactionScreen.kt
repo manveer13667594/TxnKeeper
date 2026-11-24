@@ -565,8 +565,8 @@ fun AddTransactionScreen(
 
                 ManuCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
-                        modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
-                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                        modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         ManuTextField(
                             value = form.title,
@@ -600,30 +600,31 @@ fun AddTransactionScreen(
                         if (!form.inBatch && form.items.isNotEmpty()) {
                             // A bill: the lines decide the amount
                             ItemsEditor(items = form.items, onChange = { form.items = it })
+                            TypeToggle(form.type, { form.type = it }, Modifier.fillMaxWidth())
                         } else {
-                            ManuTextField(
-                                value = form.amount,
-                                onValueChange = { form.amount = it },
-                                modifier = Modifier
-                                    .focusRequester(amountFocus)
-                                    .focusProperties { next = descriptionFocus },
-                                placeholder = { Text("Amount") },
-                                leadingContent = {
-                                    Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                },
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
-                            )
-                            if (!form.inBatch) {
-                                ManuOutlineButton(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    onClick = { form.items = listOf(ItemDraft()) }
-                                ) { Text("Add items (a bill with many things)") }
+                            // The amount with Expense | Income beside it
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                ManuTextField(
+                                    value = form.amount,
+                                    onValueChange = { form.amount = it },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .focusRequester(amountFocus)
+                                        .focusProperties { next = descriptionFocus },
+                                    placeholder = { Text("Amount") },
+                                    leadingContent = {
+                                        Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                    },
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
+                                )
+                                TypeToggle(form.type, { form.type = it }, Modifier.width(156.dp))
                             }
-                        }
-
-                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                            ManuChip(label = "Expense", selected = form.type == "EXPENSE", onClick = { form.type = "EXPENSE" })
-                            ManuChip(label = "Income", selected = form.type == "INCOME", onClick = { form.type = "INCOME" })
+                            if (!form.inBatch) {
+                                AddItemsLink(onClick = { form.items = listOf(ItemDraft()) })
+                            }
                         }
 
                         // Tags: one row that scrolls sideways, tap to switch on or off.
@@ -637,49 +638,44 @@ fun AddTransactionScreen(
                                 addTagOpen = true
                             }
                         )
-                        Column(
-                            modifier = Modifier.width(220.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-
-                        ) {
+                        // Account and payment method, then date and time: two per row
+                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
                             // Account: always shown, so a new one can be added from here
-                            ManuPickerField(
-                                value = account?.name ?: "",
-                                leadingIcon = AppIcons.Wallet,
-                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                            PickChip(
+                                icon = AppIcons.Wallet,
+                                text = account?.name ?: "",
+                                modifier = Modifier.weight(1f),
                                 onClick = {
                                     focusManager.clearFocus()
                                     accountMenuOpen = true
                                 }
                             )
-
                             // Payment method: your list from Settings, plus "+ Add new" at the end
-                            ManuPickerField(
-                                value = form.payment.ifBlank { "Add payment method" },
-                                leadingIcon = Icons.Default.CreditCard,
-                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                            PickChip(
+                                icon = Icons.Default.CreditCard,
+                                text = form.payment.ifBlank { "Payment" },
+                                muted = form.payment.isBlank(),
+                                modifier = Modifier.weight(1f),
                                 onClick = {
                                     focusManager.clearFocus()
                                     payMenuOpen = true
                                 }
                             )
-
-                            // Date
-                            ManuPickerField(
-                                value = formatDateLong(form.dateTime),
-                                leadingIcon = Icons.Default.DateRange,
-                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                            PickChip(
+                                icon = Icons.Default.DateRange,
+                                text = formatDateLong(form.dateTime),
+                                modifier = Modifier.weight(1f),
                                 onClick = {
                                     focusManager.clearFocus()
                                     datePickerOpen = true
                                 }
                             )
-
-                            // Time
-                            ManuPickerField(
-                                value = formatTime(form.dateTime),
-                                leadingIcon = AppIcons.Schedule,
-                                trailingIcon = Icons.Default.KeyboardArrowDown,
+                            PickChip(
+                                icon = AppIcons.Schedule,
+                                text = formatTime(form.dateTime),
+                                modifier = Modifier.weight(1f),
                                 onClick = {
                                     focusManager.clearFocus()
                                     timePickerOpen = true

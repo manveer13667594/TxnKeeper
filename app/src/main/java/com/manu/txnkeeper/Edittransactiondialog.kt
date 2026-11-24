@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
@@ -127,7 +129,7 @@ fun EditTransactionDialog(
             onDismiss()
         }
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ManuTextField(
                 value = title,
                 onValueChange = { title = it },
@@ -135,60 +137,56 @@ fun EditTransactionDialog(
             )
             if (items.isNotEmpty()) {
                 ItemsEditor(items = items, onChange = { items = it })
+                TypeToggle(type, { type = it }, Modifier.fillMaxWidth())
             } else {
-                ManuTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text("Amount (₹)") },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                // The amount with Expense | Income beside it
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ManuTextField(
+                        value = amountText,
+                        onValueChange = { amountText = it },
+                        modifier = Modifier.weight(1f),
+                        label = { Text("Amount (₹)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
+                    TypeToggle(type, { type = it }, Modifier.width(150.dp))
+                }
+                AddItemsLink(onClick = { items = listOf(ItemDraft()) })
+            }
+            // Account and payment method, then date and time: two per row
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Account: always shown, so a new one can be added from here
+                PickChip(
+                    icon = AppIcons.Wallet,
+                    text = accounts.firstOrNull { it.id == accountId }?.name ?: "?",
+                    modifier = Modifier.weight(1f),
+                    onClick = { accountMenuOpen = true }
                 )
-                ManuOutlineButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { items = listOf(ItemDraft()) }
-                ) { Text("Add items (a bill with many things)") }
+                // Payment method: your list from Settings, plus "+ Add new" at the end
+                PickChip(
+                    icon = Icons.Default.CreditCard,
+                    text = payment.ifBlank { "Payment" },
+                    muted = payment.isBlank(),
+                    modifier = Modifier.weight(1f),
+                    onClick = { payMenuOpen = true }
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ManuChip(
-                    label = "Expense",
-                    selected = type == "EXPENSE",
-                    onClick = { type = "EXPENSE" }
+                PickChip(
+                    icon = Icons.Default.DateRange,
+                    text = formatDateLong(dateTime),
+                    modifier = Modifier.weight(1f),
+                    onClick = { datePickerOpen = true }
                 )
-                ManuChip(
-                    label = "Income",
-                    selected = type == "INCOME",
-                    onClick = { type = "INCOME" }
+                PickChip(
+                    icon = AppIcons.Schedule,
+                    text = formatTime(dateTime),
+                    modifier = Modifier.weight(1f),
+                    onClick = { timePickerOpen = true }
                 )
             }
-            // Account: always shown, so a new one can be added from here
-            ManuPickerField(
-                value = accounts.firstOrNull { it.id == accountId }?.name ?: "?",
-                label = { Text("Account") },
-                leadingIcon = AppIcons.Wallet,
-                trailingIcon = Icons.Default.KeyboardArrowDown,
-                onClick = { accountMenuOpen = true }
-            )
-            // Payment method: your list from Settings, plus "+ Add new" at the end
-            ManuPickerField(
-                value = payment.ifBlank { "None" },
-                label = { Text("Payment method") },
-                leadingIcon = Icons.Default.CreditCard,
-                trailingIcon = Icons.Default.KeyboardArrowDown,
-                onClick = { payMenuOpen = true }
-            )
-            ManuPickerField(
-                value = formatDateLong(dateTime),
-                label = { Text("Date") },
-                leadingIcon = Icons.Default.DateRange,
-                trailingIcon = Icons.Default.KeyboardArrowDown,
-                onClick = { datePickerOpen = true }
-            )
-            ManuPickerField(
-                value = formatTime(dateTime),
-                label = { Text("Time") },
-                leadingIcon = AppIcons.Schedule,
-                trailingIcon = Icons.Default.KeyboardArrowDown,
-                onClick = { timePickerOpen = true }
-            )
             ManuTextField(
                 value = description,
                 onValueChange = { description = it },

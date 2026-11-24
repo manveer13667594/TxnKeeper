@@ -472,15 +472,7 @@ private fun SummaryCard(
             .fillMaxWidth()
             .clip(shape)
             .background(scheme.surface)
-            .background(
-                Brush.linearGradient(
-                    // Same look as the home card: light mode deepens towards the bottom right, dark mode fades out
-                    if (scheme.background.luminance() > 0.5f)
-                        listOf(scheme.primary.copy(alpha = 0.03f), scheme.primary.copy(alpha = 0.14f))
-                    else
-                        listOf(scheme.primary.copy(alpha = 0.18f), scheme.primary.copy(alpha = 0.04f))
-                )
-            )
+            .heroGradient(scheme)
             .border(1.dp, scheme.primary.copy(alpha = 0.12f), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {

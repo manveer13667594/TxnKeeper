@@ -887,52 +887,52 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-      key(txn.id) {
-        EditTransactionDialog(
-            original = txn,
-            accounts = accounts,
-            settings = settings,
-            onAddAccount = { newAccount, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the account") {
-                            newId = dao.insertAccount(newAccount)
-                        }) {
-                        onCreated(newId)
+        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+        key(txn.id) {
+            EditTransactionDialog(
+                original = txn,
+                accounts = accounts,
+                settings = settings,
+                onAddAccount = { newAccount, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the account") {
+                                newId = dao.insertAccount(newAccount)
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            tags = allTags,
-            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-            initialItems = itemMap[txn.id] ?: emptyList(),
-            onAddTag = { name, colorIndex, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the tag") {
-                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                        }) {
-                        onCreated(newId)
+                },
+                tags = allTags,
+                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+                initialItems = itemMap[txn.id] ?: emptyList(),
+                onAddTag = { name, colorIndex, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the tag") {
+                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            onSave = { updated, tagIds, newItems ->
-                scope.launch {
-                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
-                        // The image it had before is not used any more if it was removed or replaced
-                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                },
+                onSave = { updated, tagIds, newItems ->
+                    scope.launch {
+                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
+                            // The image it had before is not used any more if it was removed or replaced
+                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                        }
                     }
+                    // Next one of the queue, or close (a normal single edit has an empty queue)
+                    openNextInQueue()
+                },
+                onDismiss = {
+                    editQueue = emptyList()
+                    editTotal = 0
+                    editing = null
                 }
-                // Next one of the queue, or close (a normal single edit has an empty queue)
-                openNextInQueue()
-            },
-            onDismiss = {
-                editQueue = emptyList()
-                editTotal = 0
-                editing = null
-            }
-        )
-      }
+            )
+        }
     }
 
     deleting?.let { txn ->
@@ -1071,18 +1071,9 @@ private fun TotalsCard(
             .fillMaxWidth()
             .clip(shape)
             .background(scheme.surface)
-            .background(
-                Brush.linearGradient(
-                    // Dark mode: strongest tint at the top left. Light mode: the other way round,
-                    // so the card is lightest at the top left and deepens towards the bottom right
-                    if (scheme.background.luminance() > 0.5f)
-                        listOf(scheme.primary.copy(alpha = 0.03f), scheme.primary.copy(alpha = 0.14f))
-                    else
-                        listOf(scheme.primary.copy(alpha = 0.18f), scheme.primary.copy(alpha = 0.04f))
-                )
-            )
+            .heroGradient(scheme)
             .border(1.dp, scheme.primary.copy(alpha = 0.12f), shape)
-            .padding(16.dp)
+            .padding(horizontal = 14.dp, vertical = 11.dp)
     ) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1099,7 +1090,7 @@ private fun TotalsCard(
                         fontWeight = FontWeight.Bold,
                         color = if (balance < 0) ExpenseColor else scheme.onSurface,
                         maxLines = 1,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 0.dp)
                     )
                 }
                 // The top-right corner: a small preview of the Stats chart
@@ -1110,7 +1101,7 @@ private fun TotalsCard(
                     ) {
                         Sparkline(
                             values = trend,
-                            modifier = Modifier.size(width = 110.dp, height = 44.dp)
+                            modifier = Modifier.size(width = 104.dp, height = 36.dp)
                         )
                         if (trendLabel != null) {
                             // What the line covers, and how much the balance moved over that time
@@ -1133,7 +1124,7 @@ private fun TotalsCard(
                 }
             }
             Row(
-                modifier = Modifier.padding(top = 14.dp),
+                modifier = Modifier.padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 StatPill("Income", formatMoney(totals.incomePaise), IncomeColor, Icons.Default.ArrowDownward, Modifier.weight(1f))
@@ -1141,24 +1132,47 @@ private fun TotalsCard(
             }
             // A hint that the whole card opens the charts
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = "Charts & insights",
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelMedium,
                     color = scheme.primary
                 )
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
                     tint = scheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             }
         }
     }
+}
+
+/**
+ * The soft accent tint of the hero cards: brightest in the top left corner, deepest in the bottom right.
+ * Drawn from the real corners (not the default gradient, which on a wide card just looks left to right).
+ */
+internal fun Modifier.heroGradient(scheme: androidx.compose.material3.ColorScheme): Modifier = drawBehind {
+    val colors =
+        if (scheme.background.luminance() > 0.5f)
+        // Light mode: lightest at the top left, deepening towards the bottom right
+            listOf(scheme.primary.copy(alpha = 0.03f), scheme.primary.copy(alpha = 0.16f))
+        else
+        // Dark mode: strongest tint at the top left, fading out towards the bottom right
+            listOf(scheme.primary.copy(alpha = 0.20f), scheme.primary.copy(alpha = 0.03f))
+    // A line from the top left corner to a point lower than the middle of the right edge: the bands tilt
+    // clearly downwards, so the change is seen from top to bottom as well as from left to right
+    drawRect(
+        Brush.linearGradient(
+            colors = colors,
+            start = androidx.compose.ui.geometry.Offset.Zero,
+            end = androidx.compose.ui.geometry.Offset(size.width * 0.55f, size.height)
+        )
+    )
 }
 
 /** One of the three small tinted tiles under the balance: a coloured arrow, the label and the amount. */
@@ -1168,7 +1182,7 @@ private fun StatPill(label: String, value: String, color: Color, icon: ImageVect
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .background(color.copy(alpha = 0.11f))
-            .padding(horizontal = 10.dp, vertical = 9.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(14.dp))
@@ -1186,7 +1200,7 @@ private fun StatPill(label: String, value: String, color: Color, icon: ImageVect
             fontWeight = FontWeight.Bold,
             color = color,
             maxLines = 1,
-            modifier = Modifier.padding(top = 3.dp)
+            modifier = Modifier.padding(top = 1.dp)
         )
     }
 }
