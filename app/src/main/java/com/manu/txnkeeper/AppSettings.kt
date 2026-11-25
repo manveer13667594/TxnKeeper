@@ -66,6 +66,24 @@ class AppSettings(context: Context) {
         prefs.edit().putBoolean(KEY_VOICE_TIPS, on).apply()
     }
 
+    /** Voice screen starts listening by itself when it opens, and stops when you stop speaking. */
+    var voiceAutoListen by mutableStateOf(prefs.getBoolean(KEY_VOICE_AUTO, true))
+        private set
+
+    fun updateVoiceAutoListen(on: Boolean) {
+        voiceAutoListen = on
+        prefs.edit().putBoolean(KEY_VOICE_AUTO, on).apply()
+    }
+
+    /** The little start / stop sounds of voice entry. */
+    var voiceSounds by mutableStateOf(prefs.getBoolean(KEY_VOICE_SOUNDS, true))
+        private set
+
+    fun updateVoiceSounds(on: Boolean) {
+        voiceSounds = on
+        prefs.edit().putBoolean(KEY_VOICE_SOUNDS, on).apply()
+    }
+
     /** Whether voice entry uses the phone's Google speech recogniser first (fast, online), with Whisper as the fallback. */
     var fastVoice by mutableStateOf(prefs.getBoolean(KEY_FAST_VOICE, true))
         private set
@@ -265,6 +283,8 @@ class AppSettings(context: Context) {
         const val KEY_LAST_QUICK_ACTION = "last_quick_widget_action"
         const val KEY_PAYMENT_METHODS = "payment_methods"
         const val KEY_VOICE_TIPS = "voice_tips"
+        const val KEY_VOICE_AUTO = "voice_auto_listen"
+        const val KEY_VOICE_SOUNDS = "voice_sounds"
         const val KEY_FAST_VOICE = "fast_voice_google"
         const val KEY_DOUBLE_CHECK = "double_check_whisper"
         const val KEY_INCLUDE_IMAGE = "include_image_default"

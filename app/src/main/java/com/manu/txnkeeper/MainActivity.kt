@@ -657,6 +657,8 @@ fun TxnkeeperApp(
             ScreenTransition(visible = showVoice) {
                 VoiceScreen(
                     showTips = settings.voiceTips,
+                    autoListen = settings.voiceAutoListen,
+                    sounds = settings.voiceSounds,
                     onClose = { showVoice = false },
                     onHeard = { text ->
                         // Same as the + button: start from your defaults, then fill what was heard

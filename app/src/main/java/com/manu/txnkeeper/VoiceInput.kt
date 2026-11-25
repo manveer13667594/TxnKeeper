@@ -1,5 +1,11 @@
 package com.manu.txnkeeper
 
+import kotlin.math.sqrt
+import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -98,7 +104,9 @@ class VoiceRecorder {
         scope: CoroutineScope,
         onSecond: (Int) -> Unit,
         onLimit: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
+        /** Runs when you stop speaking (about a second of quiet after speech), or nothing was said for a while. */
+        onSilence: (() -> Unit)? = null
     ) {
         size = 0
         job = scope.launch(Dispatchers.IO) {
@@ -127,9 +135,30 @@ class VoiceRecorder {
                 PhoneRecogniser.begin()
                 val buf = ShortArray(4096)
                 var lastSecond = -1
+                // End-of-speech detection: the first half second sets the background noise level
+                var calibrated = 0
+                var floorSum = 0.0
+                var threshold = 900.0
+                var heardSpeech = false
+                var quiet = 0
                 while (isActive) {
                     val n = rec.read(buf, 0, buf.size)
                     if (n <= 0) continue
+                    if (onSilence != null) {
+                        var sum = 0.0
+                        for (i in 0 until n) sum += buf[i].toDouble() * buf[i]
+                        val rms = sqrt(sum / n)
+                        if (calibrated < 2) {
+                            floorSum += rms
+                            calibrated++
+                            if (calibrated == 2) threshold = maxOf((floorSum / 2).coerceAtMost(600.0) * 2.5, 700.0)
+                        } else if (rms > threshold) {
+                            heardSpeech = true
+                            quiet = 0
+                        } else if (heardSpeech) {
+                            quiet += n
+                        }
+                    }
                     if (size + n > pcm.size) pcm = pcm.copyOf(pcm.size * 2)
                     System.arraycopy(buf, 0, pcm, size, n)
                     size += n
@@ -141,6 +170,13 @@ class VoiceRecorder {
                     }
                     if (second >= MAX_RECORD_SECONDS) {
                         withContext(Dispatchers.Main) { onLimit() }
+                        break
+                    }
+                    // ~1.3 s of quiet after you spoke, or 8 s without any speech: stop by itself
+                    if (onSilence != null &&
+                        ((heardSpeech && quiet >= SAMPLE_RATE * 13 / 10) || (!heardSpeech && size >= SAMPLE_RATE * 8))
+                    ) {
+                        withContext(Dispatchers.Main) { onSilence() }
                         break
                     }
                 }
@@ -183,14 +219,41 @@ internal fun downloadStatus(fraction: Float): String {
 
 object VoiceEngine {
     /** The other engine's wording, when it understood the recording differently from the one already used. */
-    class Alternative(val text: String, val engine: String)
+    class Alternative(
+        val text: String, val engine: String,
+        /** The wording the form was filled with first, and the engine that heard it. */
+        val currentText: String, val currentEngine: String,
+        /** True when the app thinks this other wording is the better one (the form is switched to it). */
+        val preferred: Boolean
+    )
 
     var alternative by mutableStateOf<Alternative?>(null)
         private set
 
+    /** Which engine's wording the form holds right now while the two are shown side by side. */
+    var chosenEngine by mutableStateOf("")
+
+    fun showAlternative(alt: Alternative) {
+        alternative = alt
+        chosenEngine = if (alt.preferred) alt.engine else alt.currentEngine
+    }
+
     fun clearAlternative() {
         alternative = null
     }
+
+    /** How complete a wording looks after parsing: amount and title count most, then type and a sensible title length. */
+    private fun completeness(text: String): Int =
+        SpokenTransactionParser.parseAll(text).sumOf { t ->
+            var score = 0
+            if (t.amount != null) score += 3
+            val title = t.title?.trim().orEmpty()
+            if (title.isNotEmpty()) score += 2
+            if (title.split(" ").size in 1..3) score += 1
+            if (title.any { it.isDigit() }) score -= 2
+            if (t.type != null) score += 1
+            score
+        }
 
     /** What the parser makes of a text: amount and title of every transaction (empty = nothing usable). */
     private fun parseKey(text: String): List<String> =
@@ -252,7 +315,9 @@ object VoiceEngine {
                             val w = transcribeWithWhisper(context, samples) { }
                             val whisperKey = parseKey(w.text)
                             if (whisperKey.isNotEmpty() && whisperKey != googleKey) {
-                                alternative = Alternative(w.text, "Whisper")
+                                // the app picks the more complete reading; the person can still switch
+                                val preferred = completeness(w.text) > completeness(google.text)
+                                showAlternative(Alternative(w.text, "Whisper", google.text.trim(), "Google", preferred))
                             }
                             if (DebugMode.on) {
                                 VoiceTap.publish(
@@ -426,7 +491,7 @@ fun VoiceDownloadDialog(
  * Progress and problems are shown in the note above the form ([TxnFormState.notice]).
  */
 @Composable
-fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
+fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean = true) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
@@ -477,6 +542,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         recording = false
         scope.launch {
             val samples = recorder.stop()
+            if (sounds) VoiceSounds.stop()
             if (samples.size < SAMPLE_RATE) {
                 form.notice = "That was too short. Tap and speak for at least a second."
                 return@launch
@@ -501,12 +567,20 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier) {
         focusManager.clearFocus()
         seconds = 0
         recording = true
-        recorder.start(
-            scope = scope,
-            onSecond = { seconds = it },
-            onLimit = { finish() },
-            onError = { recording = false; form.notice = it }
-        )
+        scope.launch {
+            // The start tone plays first and the microphone opens after it, so the tone is not recorded
+            if (sounds) {
+                VoiceSounds.start()
+                kotlinx.coroutines.delay(VoiceSounds.START_MS)
+            }
+            if (!recording) return@launch
+            recorder.start(
+                scope = scope,
+                onSecond = { seconds = it },
+                onLimit = { finish() },
+                onError = { recording = false; form.notice = it }
+            )
+        }
     }
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -608,22 +682,66 @@ internal fun fillFromSpeech(form: TxnFormState, text: String) {
 @Composable
 fun VoiceAlternativeBanner(form: TxnFormState, modifier: Modifier = Modifier) {
     val alt = VoiceEngine.alternative ?: return
+    // When the app thinks the other wording is better, the form switches to it (once, when the card appears)
+    LaunchedEffect(alt) {
+        if (alt.preferred) fillFromSpeech(form, alt.text)
+    }
+    val chosen = VoiceEngine.chosenEngine
+    // Option 1 is the one the app suggests, Option 2 the other (people do not need to know which engine heard what)
+    val options = if (alt.preferred) {
+        listOf(alt.engine to alt.text, alt.currentEngine to alt.currentText)
+    } else {
+        listOf(alt.currentEngine to alt.currentText, alt.engine to alt.text)
+    }
     ManuCard(modifier = modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "${alt.engine} heard it differently:",
-                style = MaterialTheme.typography.labelLarge
-            )
-            Text(text = "\u201C${alt.text}\u201D", style = MaterialTheme.typography.bodyMedium)
-            Row {
-                TextButton(onClick = {
-                    fillFromSpeech(form, alt.text)
-                    VoiceEngine.clearAlternative()
-                }) { Text("Use this") }
-                TextButton(onClick = { VoiceEngine.clearAlternative() }) { Text("Keep current") }
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "We heard it two ways. Pick one:",
+                    style = MaterialTheme.typography.labelLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = { VoiceEngine.clearAlternative() }) { Text("Close") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                options.forEachIndexed { index, (engine, text) ->
+                    val on = chosen == engine
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .background(
+                                if (on) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                                RoundedCornerShape(10.dp)
+                            )
+                            .padding(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Option ${index + 1}" + if (index == 0) " · suggested" else "",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "\u201C$text\u201D",
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 4,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (on) {
+                            Text("In the form \u2713", style = MaterialTheme.typography.labelMedium)
+                        } else {
+                            TextButton(onClick = {
+                                fillFromSpeech(form, text)
+                                VoiceEngine.chosenEngine = engine
+                            }) { Text("Use this") }
+                        }
+                    }
+                }
             }
         }
     }

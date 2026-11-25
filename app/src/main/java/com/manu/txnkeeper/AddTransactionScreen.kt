@@ -44,6 +44,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -366,6 +369,24 @@ class TxnFormState {
         scanned = null
     }
 
+    /**
+     * Takes back what the image filled in ("Fill from image" switched off): every field that still holds
+     * the value read from the image goes back to blank / its default. What you typed over it stays.
+     */
+    fun clearScanFill() {
+        val p = scanned ?: return
+        p.title?.let { if (title == it) title = "" }
+        p.amount?.let { if (amount == formatAmount(it)) amount = "" }
+        p.type?.let { if (type == it) type = defaultType }
+        p.paymentMethod?.let { if (payment == it) payment = defaultPayment }
+        p.dateMillis?.let {
+            if (startOfDay(dateTime) == startOfDay(it)) dateTime = System.currentTimeMillis()
+        }
+        p.description?.let { if (description == it) description = "" }
+        titleSuggestions = emptyList()
+        notice = null
+    }
+
     /** Only fills what the scanner detected; anything unsure keeps its current value. */
     fun fill(
         parsed: ParsedTransaction,
@@ -524,10 +545,14 @@ fun AddTransactionScreen(
                     .padding(horizontal = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Debug builds only: what the scan or voice found and where it went (nothing in release)
-                DebugInsightsCard()
-                if (DebugMode.on) GoogleLiveCard()
-                VoiceAlternativeBanner(form)
+                // The two voice readings, above the title: nothing is covered, the form just slides down
+                // (nothing is composed while there is no second reading, so no empty gap is left at the top)
+                if (VoiceEngine.alternative != null) {
+                    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+                    androidx.compose.animation.AnimatedVisibility(visibleState = shown) {
+                        VoiceAlternativeBanner(form)
+                    }
+                }
 
                 form.notice?.let { notice ->
                     // The "Possible duplicate" paragraph is a warning, so it is red; the rest stays grey
@@ -732,6 +757,7 @@ fun AddTransactionScreen(
                                 fill = form.fillFromImage,
                                 onFillChange = { on ->
                                     form.fillFromImage = on
+                                    if (!on) form.clearScanFill()
                                     if (on && !ocr.busy) {
                                         val read = form.scanned
                                         if (read != null) form.fill(read, "Form filled from the image. Check it, then save.")
@@ -837,6 +863,11 @@ fun AddTransactionScreen(
                     }
                 }
 
+                // Debug builds only: what the scan or voice found and where it went (nothing in release).
+                // Down here, so they appearing never pushes the form around.
+                DebugInsightsCard()
+                if (DebugMode.on) GoogleLiveCard()
+
                 // Room at the bottom so the floating buttons never cover the Save button
                 Spacer(Modifier.height(150.dp))
             }
@@ -857,7 +888,7 @@ fun AddTransactionScreen(
                     horizontalAlignment = Alignment.End,
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    VoiceFab(form)
+                    VoiceFab(form, sounds = settings.voiceSounds)
                     ManuFab(onClick = {
                         focusManager.clearFocus()
                         onScan()

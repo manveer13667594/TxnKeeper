@@ -638,10 +638,26 @@ private fun DefaultsPage(
         HorizontalDivider()
         SwitchRow(
             icon = Icons.Default.Mic,
-            title = "Double-check with Whisper",
-            subtitle = "The on-device model also listens to each recording. If it understood the transaction differently, you can switch to its wording. Uses a little more battery.",
+            title = "Double-check what I said",
+            subtitle = "A second reading of each recording runs on your phone. If it understood the transaction differently, you can pick between the two options. Uses a little more battery.",
             checked = settings.doubleCheckVoice,
             onCheckedChange = { settings.updateDoubleCheckVoice(it) }
+        )
+        HorizontalDivider()
+        SwitchRow(
+            icon = Icons.Default.Mic,
+            title = "Listen automatically",
+            subtitle = "Start listening as soon as the voice screen opens, and stop when you stop speaking",
+            checked = settings.voiceAutoListen,
+            onCheckedChange = { settings.updateVoiceAutoListen(it) }
+        )
+        HorizontalDivider()
+        SwitchRow(
+            icon = Icons.Default.Mic,
+            title = "Voice sounds",
+            subtitle = "A short tone when listening starts and stops",
+            checked = settings.voiceSounds,
+            onCheckedChange = { settings.updateVoiceSounds(it) }
         )
         HorizontalDivider()
         SwitchRow(

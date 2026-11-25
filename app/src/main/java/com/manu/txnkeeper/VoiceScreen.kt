@@ -129,7 +129,11 @@ fun VoiceScreen(
     onClose: () -> Unit,
     onHeard: (String) -> Unit,
     /** False when tips are turned off in Settings. */
-    showTips: Boolean = true
+    showTips: Boolean = true,
+    /** Start listening when the screen opens, and stop when you stop speaking. */
+    autoListen: Boolean = true,
+    /** The tones when listening starts and stops. */
+    sounds: Boolean = true
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -251,6 +255,7 @@ fun VoiceScreen(
         recording = false
         scope.launch {
             val samples = recorder.stop()
+            if (sounds) VoiceSounds.stop()
             if (samples.size < MIN_SAMPLES) {
                 message = "That was too short. Tap the mic and speak for at least a second."
                 return@launch
@@ -277,12 +282,21 @@ fun VoiceScreen(
         focusManager.clearFocus()
         seconds = 0
         recording = true
-        recorder.start(
-            scope = scope,
-            onSecond = { seconds = it },
-            onLimit = { finish() },
-            onError = { recording = false; message = it }
-        )
+        scope.launch {
+            // The start tone plays first and the microphone opens after it, so the tone is not recorded
+            if (sounds) {
+                VoiceSounds.start()
+                delay(VoiceSounds.START_MS)
+            }
+            if (!recording) return@launch
+            recorder.start(
+                scope = scope,
+                onSecond = { seconds = it },
+                onLimit = { finish() },
+                onError = { recording = false; message = it },
+                onSilence = if (autoListen) ({ finish() }) else null
+            )
+        }
     }
 
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -306,6 +320,20 @@ fun VoiceScreen(
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // Opened by the swipe: start listening by itself (not on the very first use, when the speech model
+    // still has to be downloaded, and not while something else is going on)
+    LaunchedEffect(Unit) {
+        if (!autoListen) return@LaunchedEffect
+        delay(450)   // let the screen finish sliding in
+        val idle = !recording && working == null && VoiceEngine.isModelReady(context) &&
+                download !is VoiceDownloadState.Downloading && download !is VoiceDownloadState.Paused &&
+                download !is VoiceDownloadState.Failed
+        if (!idle) return@LaunchedEffect
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) start() else permission.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     VoiceDownloadDialog(
@@ -490,6 +518,7 @@ fun VoiceScreen(
                 val status = when {
                     working != null -> working
                     preparing != null -> preparing
+                    recording && autoListen -> "Listening… just stop speaking when you are done."
                     recording -> "Listening… ${seconds}s. Tap to stop."
                     else -> downloadNote ?: message
                 }

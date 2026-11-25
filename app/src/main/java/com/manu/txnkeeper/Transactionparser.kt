@@ -250,7 +250,11 @@ object TransactionParser {
 
     private val numericDate = Regex("""\b(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{4}|\d{2})\b""")
     private val dayMonthYear = Regex(
-        """\b(\d{1,2})(?:st|nd|rd|th)?[\s\-,]+([A-Za-z]{3,9})\.?[\s\-,]+(\d{4}|\d{2})\b"""
+        """\b(\d{1,2})(?:st|nd|rd|th)?[\s\-,]+([A-Za-z]{3,9})\.?[\s\-,]+(\d{4}|\d{2})\b(?!\s*[:.]\d)"""
+    )
+    // "25 Nov, 08:52 AM": a day and month with no year (UPI apps print it for this year's payments)
+    private val dayMonthNoYear = Regex(
+        """(?i)\b(\d{1,2})(?:st|nd|rd|th)?[\s\-]+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?![\s\-,]*\d{4}\b)"""
     )
     private val monthDayYear = Regex(
         """\b([A-Za-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b"""
@@ -305,6 +309,13 @@ object TransactionParser {
         isoDate.allMatches(text).forEach { m ->
             buildDate(m.groupValues[3].toInt(), m.groupValues[2].toInt(), m.groupValues[1].toInt())
                 ?.let { return it }
+        }
+        // No year printed: this year, or last year when that would be in the future (a December payment seen in January)
+        val thisYear = Calendar.getInstance().get(Calendar.YEAR)
+        dayMonthNoYear.allMatches(text).forEach { m ->
+            val month = monthIndex(m.groupValues[2]) ?: return@forEach
+            val day = m.groupValues[1].toInt()
+            (buildDate(day, month, thisYear) ?: buildDate(day, month, thisYear - 1))?.let { return it }
         }
         return null
     }
@@ -373,8 +384,35 @@ object TransactionParser {
         }
         return when (type) {
             "INCOME" -> fromName ?: toName
-            else -> toName ?: fromName
+            // Money you paid: "From" is you, so it is never the title. Payment screens with no
+            // "To" line (Paytm, PhonePe...) show the shop big under the app name instead.
+            else -> toName ?: if (type == "EXPENSE") payeeHeadline(lines) else fromName
         }
+    }
+
+    private val paymentSuccessHint = Regex(
+        """(?i)\b(paid successfully|payment successful|payment successfully|paid to|sent successfully|transaction successful|payment completed|money sent)\b"""
+    )
+    // Lines at the top of a payment screen that are the app or the status, not the shop
+    private val headlineSkip = Regex(
+        """(?i)^\W*(paytm|phonepe|phone pe|google pay|gpay|g pay|bhim|upi|amazon pay|cred|payment|paid|success\w*|completed|done|received|sent|transaction|from|to|verified merchant)\W*$"""
+    )
+
+    /** The shop or person on a payment-success screen: the first name-like line before the amount. */
+    private fun payeeHeadline(lines: List<OcrLine>): String? {
+        if (!paymentSuccessHint.containsMatchIn(lines.joinToString("\n") { it.text })) return null
+        for (line in lines.take(7)) {
+            val t = line.text
+            // the amount, the "From" block or the status line ends the header
+            if (currencyAmount.containsMatchIn(t) || bareAmountLine.matches(t) || firstFrom.containsMatchIn(t) ||
+                paymentSuccessHint.containsMatchIn(t) || fromLabel.containsMatchIn(t)
+            ) return null
+            if (headlineSkip.matches(t) || t.contains('@') || t.contains(':')) continue
+            if (t.count { it.isDigit() } > 2) continue
+            val name = cleanTitle(t) ?: continue
+            if (name.count { it.isLetter() } >= 3) return name
+        }
+        return null
     }
 
     // ------------------------------------------------------- shop name (bills)
