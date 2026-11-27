@@ -23,6 +23,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Installs next to the release app, with its own data
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             optimization {
                 enable = true
