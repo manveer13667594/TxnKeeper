@@ -4,11 +4,12 @@
     <string name="widget_scan_receipt">Scan receipt</string>
     <string name="widget_search_transactions">Search transactions</string>
     <string name="widget_open_app">Open TxnKeeper</string>
+    <string name="widget_search_label">Search</string>
     <string name="widget_add_label">Add</string>
     <string name="widget_voice_label">Voice</string>
     <string name="widget_scan_label">Scan</string>
     <string name="widget_hint">TxnKeeper</string>
-    <string name="widget_label_search">TxnKeeper search bar</string>
+    <string name="widget_label_search">TxnKeeper actions with search</string>
     <string name="widget_description">Quick add, voice entry and receipt scan for TxnKeeper</string>
-    <string name="widget_search_description">Search-bar style shortcuts: search, add, voice entry and scan a receipt</string>
+    <string name="widget_search_description">Search, quick add, voice entry and receipt scan for TxnKeeper</string>
 </resources>

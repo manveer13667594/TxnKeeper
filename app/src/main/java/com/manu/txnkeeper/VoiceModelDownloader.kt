@@ -5,9 +5,7 @@ import io.whisperkit.WhisperKit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -17,29 +15,22 @@ import kotlinx.coroutines.launch
 sealed interface VoiceDownloadState {
     data object Idle : VoiceDownloadState
     data class Downloading(val fraction: Float) : VoiceDownloadState
-    data class Paused(val fraction: Float) : VoiceDownloadState
-    data class Failed(val message: String, val fraction: Float) : VoiceDownloadState
+    data class Failed(val message: String) : VoiceDownloadState
     data object Done : VoiceDownloadState
 }
 
 /**
- * Downloads the speech model. It lives for as long as the app is running, NOT inside a screen, so
- * leaving the voice screen (or the Add page) no longer stops the download. It only stops when the
- * person pauses it. A paused or failed download keeps the part already downloaded and carries on
- * from there when started again, without asking again.
+ * Downloads the speech model. It starts by itself when the app opens (MainActivity) if the model is
+ * not on the phone yet, and shows its progress as a notification (VoiceDownloadNotification.kt).
+ * It lives for as long as the app is running, NOT inside a screen. A download that stopped keeps the
+ * part already downloaded and carries on from there: at the next app start, or when the mic is tapped.
  */
 object VoiceModelDownloader {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val _state = MutableStateFlow<VoiceDownloadState>(VoiceDownloadState.Idle)
     val state: StateFlow<VoiceDownloadState> = _state.asStateFlow()
 
-    private var job: Job? = null
-
-    /** Bumped on every start / pause so a download that is winding down cannot overwrite the new state. */
-    @Volatile private var generation = 0
-    @Volatile private var lastFraction = 0f
-
-    /** Starts the download, or carries on after a pause or a failure. Does nothing if it is already running. */
+    /** Starts the download, or carries on after a failure. Does nothing if it is running or not needed. */
     @Synchronized
     fun start(context: Context) {
         val app = context.applicationContext
@@ -48,38 +39,23 @@ object VoiceModelDownloader {
             _state.value = VoiceDownloadState.Done
             return
         }
-        val mine = ++generation
-        val previous = job
-        _state.value = VoiceDownloadState.Downloading(lastFraction)
-        job = scope.launch {
-            previous?.cancelAndJoin()
+        _state.value = VoiceDownloadState.Downloading(0f)
+        scope.launch {
+            val notification = VoiceDownloadNotification(app)
+            notification.progress(0f)
             try {
                 WhisperKit.downloadModel(app, VOICE_MODEL) { p ->
-                    if (mine == generation) {
-                        lastFraction = p
-                        _state.value = VoiceDownloadState.Downloading(p)
-                    }
+                    _state.value = VoiceDownloadState.Downloading(p)
+                    notification.progress(p)
                 }
-                if (mine == generation) _state.value = VoiceDownloadState.Done
+                _state.value = VoiceDownloadState.Done
+                notification.ready()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (mine == generation) {
-                    _state.value = VoiceDownloadState.Failed(
-                        e.message ?: "Download failed. Check your internet and try again.",
-                        lastFraction
-                    )
-                }
+                _state.value = VoiceDownloadState.Failed("Voice setup didn't finish. Check your internet.")
+                notification.failed()
             }
         }
-    }
-
-    /** Stops the download but keeps what was downloaded; [start] carries on from there. */
-    @Synchronized
-    fun pause() {
-        if (_state.value !is VoiceDownloadState.Downloading) return
-        generation++
-        _state.value = VoiceDownloadState.Paused(lastFraction)
-        job?.cancel()
     }
 }

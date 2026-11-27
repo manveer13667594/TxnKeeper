@@ -28,3 +28,7 @@
 # Keep line numbers so release stack traces stay readable
 -keepattributes SourceFile,LineNumberTable,*Annotation*,Signature,InnerClasses,EnclosingMethod
 -renamesourcefileattribute SourceFile
+
+# ---- Home screen widgets (Glance draws them through WorkManager) ----
+# WorkManager creates these by reflection. Without the constructor, widgets stay on the loading circle.
+-keep class * extends androidx.work.InputMerger { <init>(); }

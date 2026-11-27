@@ -59,6 +59,8 @@ import com.manu.manudesignsystem.components.ManuTextField
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -182,42 +184,70 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
         }
     }
 
-    val csvExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
-        if (uri != null) runTask {
-            val n = DataTransfer.exportCsv(context, database, uri, pendingScope, pendingFilters)
-            note("Exported $n transaction${if (n == 1) "" else "s"} to CSV.")
-        }
-    }
-    val zipExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
-        if (uri != null) runTask {
-            val r = DataTransfer.exportZip(context, database, uri, pendingScope, pendingFilters)
-            note("Exported ${plural(r.transactions, "transaction")} and ${plural(r.images, "image")} to ZIP.")
-        }
-    }
-    val pdfExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
-        if (uri != null) runTask {
-            val r = DataTransfer.exportPdf(context, database, uri, pendingScope, pendingFilters, withImages = includeImages)
-            note(
-                "Exported ${plural(r.transactions, "transaction")} to PDF" +
-                        (if (includeImages) " with ${plural(r.images, "image")}." else ".")
-            )
-        }
-    }
     val csvImport = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) runTask { DataTransfer.importFile(context, database, uri).summaryLines() }
+    }
+
+    // The "Exporting… / Exported" popup, and the newest export (both in ExportDone.kt)
+    var exportProgress by remember { mutableStateOf<ExportProgress?>(null) }
+    var latestExport by remember { mutableStateOf(lastExport(context)) }
+
+    /** Writes the export while the popup says so, then shows where it went. [work] returns what was exported. */
+    fun runExport(uri: android.net.Uri, mime: String, fallbackName: String, work: suspend () -> String) {
+        if (busy) return
+        busy = true
+        status = null
+        exportProgress = ExportProgress.Working
+        coroutines.launch {
+            try {
+                val started = System.currentTimeMillis()
+                val summary = work()
+                val file = withContext(Dispatchers.IO) { rememberExport(context, uri, mime, fallbackName) }
+                // A very quick export would only flash "Exporting…", so it stays long enough to be read
+                kotlinx.coroutines.delay((700 - (System.currentTimeMillis() - started)).coerceAtLeast(0))
+                latestExport = file
+                exportProgress = ExportProgress.Done(file, summary)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                exportProgress = ExportProgress.Failed(e.message ?: e.javaClass.simpleName)
+            } finally {
+                busy = false
+            }
+        }
     }
 
     fun fileName(extension: String): String =
         "txnkeeper_${SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())}.$extension"
 
+    val csvExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
+        if (uri != null) runExport(uri, "text/csv", "TxnKeeper export.csv") {
+            val n = DataTransfer.exportCsv(context, database, uri, pendingScope, pendingFilters)
+            "${plural(n, "transaction")} saved as CSV."
+        }
+    }
+    val zipExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
+        if (uri != null) runExport(uri, "application/zip", "TxnKeeper export.zip") {
+            val r = DataTransfer.exportZip(context, database, uri, pendingScope, pendingFilters)
+            "${plural(r.transactions, "transaction")} and ${plural(r.images, "image")} saved as ZIP."
+        }
+    }
+    val pdfExport = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri ->
+        if (uri != null) runExport(uri, "application/pdf", "TxnKeeper export.pdf") {
+            val r = DataTransfer.exportPdf(context, database, uri, pendingScope, pendingFilters, withImages = includeImages)
+            "${plural(r.transactions, "transaction")} saved as PDF" +
+                    (if (includeImages) " with ${plural(r.images, "image")}." else ".")
+        }
+    }
+
     /** The choice, or null (with a message in [status]) when it is incomplete. */
     fun chosenScope(): ExportScope? {
         if (limitOn && limitN == null) {
-            status = warn("Enter how many transactions to export (1 or more).")
+            status = warn("Enter a number, 1 or more.")
             return null
         }
         if (f.period == PeriodKind.CUSTOM && (f.customFrom == null || f.customTo == null)) {
-            status = warn("Choose the dates to export first.")
+            status = warn("Choose the dates first.")
             return null
         }
         return scopeNow
@@ -227,7 +257,7 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
         val min = filtersNow.minAmountPaise
         val max = filtersNow.maxAmountPaise
         if (min != null && max != null && min > max) {
-            status = warn("The minimum amount is higher than the maximum.")
+            status = warn("Minimum amount is more than maximum.")
             return null
         }
         return filtersNow
@@ -327,7 +357,7 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Only the newest…", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Text("Latest only", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
             if (limitOn) {
                 ManuTextField(
                     value = countText,
@@ -357,11 +387,9 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
                 Text("Include images", style = MaterialTheme.typography.titleSmall)
                 Text(
                     text = when {
-                        !withImages -> "Transactions only, no images."
-                        imageCount == 0 ->
-                            "No images saved yet. When there are, the ZIP holds the CSV and an images folder, " +
-                                    "and the PDF shows them after the table."
-                        else -> "ZIP with the CSV and an images folder. PDF shows the images after the table."
+                        !withImages -> "Images are left out."
+                        imageCount == 0 -> "No receipt images yet."
+                        else -> "Add receipts to ZIP and PDF."
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -391,6 +419,8 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
             ) { Text("Export PDF", maxLines = 1) }
         }
 
+        latestExport?.let { LastExportCard(it) }
+
         HorizontalDivider()
 
         // ------------------------------------------------ import
@@ -411,10 +441,14 @@ fun DataTransferControls(database: AppDatabase, settings: AppSettings) {
             }
         ) { Text("Import from CSV or ZIP") }
         Text(
-            text = "Importing the same file again never adds a transaction twice. A ZIP also brings back the images.",
+            text = "No duplicates are added. ZIP restores images too.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+    }
+
+    exportProgress?.let { progress ->
+        ExportDialog(progress, onDone = { exportProgress = null })
     }
 
     if (filtersOpen) {

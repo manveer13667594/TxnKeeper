@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colours of the widget list previews, same as ui/theme/Color.kt -->
+<resources>
+    <color name="widget_preview_bar">#242426</color>
+    <color name="widget_preview_card">#1A1A1C</color>
+    <color name="widget_preview_ink">#F2F2F4</color>
+    <color name="widget_preview_icon">#F2F2F4</color>
+    <color name="widget_preview_icon_focused">#000000</color>
+</resources>

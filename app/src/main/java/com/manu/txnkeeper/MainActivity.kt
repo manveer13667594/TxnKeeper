@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -51,6 +52,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.manu.manudesignsystem.components.ManuFab
@@ -85,6 +87,8 @@ class MainActivity : ComponentActivity() {
             recordQuickTap(intent)
         }
         val settings = AppSettings(this)
+        // The voice model downloads by itself; does nothing if it is already on the phone
+        VoiceModelDownloader.start(this)
         setContent {
             // Light / dark comes from Settings; "System default" follows the phone
             val darkTheme = when (settings.themeMode) {
@@ -137,7 +141,7 @@ class MainActivity : ComponentActivity() {
     private fun widgetActionOf(intent: Intent?): String? =
         intent?.action?.takeIf {
             it == WidgetActions.ADD_TRANSACTION || it == WidgetActions.VOICE_ENTRY ||
-                it == WidgetActions.OPEN_CAMERA || it == WidgetActions.OPEN_SEARCH
+                    it == WidgetActions.OPEN_CAMERA || it == WidgetActions.OPEN_SEARCH
         }
 
     private fun handleShareIntent(intent: Intent?) {
@@ -350,17 +354,34 @@ fun TxnkeeperApp(
         }
     }
 
+    // The tutorial: its current step, and where the things it points at are (Tour.kt)
+    val tourTargets = rememberSaveable(saver = TourTargets.Saver) { TourTargets() }
+    SideEffect {
+        tourTargets.active = settings.tourPending
+        tourTargets.onFinish = {
+            tourTargets.active = false
+            settings.finishTour()
+        }
+    }
+    // The user tried search and has now closed the box again: the tour can carry on
+    LaunchedEffect(tourTargets.waitingForSearch) {
+        if (tourTargets.waitingForSearch) {
+            snapshotFlow { tourTargets.searchOpen }.first { it }
+            snapshotFlow { tourTargets.searchOpen }.first { !it }
+            tourTargets.waitingForSearch = false
+        }
+    }
     // Last photo taken in the app; use this later to attach a photo to a transaction
     var lastPhotoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
 
     fun openCamera() {
-        settings.markCameraHintDone()   // they found it: no need to keep explaining it
+        tourTargets.tried(TourTarget.SCAN)
         focusManager.clearFocus()
         showCamera = true
     }
 
     fun openVoice() {
-        settings.markVoiceHintDone()
+        tourTargets.tried(TourTarget.VOICE)
         focusManager.clearFocus()
         showVoice = true
     }
@@ -421,260 +442,306 @@ fun TxnkeeperApp(
     // Declared after Settings, so Back closes Accounts first when it was opened from Settings
     BackHandler(enabled = showAccounts) { showAccounts = false }
 
-    AppBackground {
-        Box(modifier = Modifier.fillMaxSize()) {
+    // The tutorial belongs to the home screen: it waits while anything else is open
+    val homeIsFree = !showAdd && !showCamera && !showVoice && !showSettings && !showAccounts &&
+            !showHelp && !showAbout && !showStats && !selecting && !ocr.busy &&
+            sharedImageUri == null && widgetAction == null && !tourTargets.waitingForSearch
+    // A short pause after coming back, so each step arrives on its own
+    var tourReady by remember { mutableStateOf(false) }
+    LaunchedEffect(homeIsFree) {
+        tourReady = false
+        if (homeIsFree) {
+            delay(600)
+            fabVisible = true
+            tourReady = true
+        }
+    }
 
-            // ---------------- Home: the transactions list, with the Add button at the bottom.
-            // ManuScaffold already insets for the status bar, navigation bar and keyboard.
-            ManuScaffold(
-                snackbarHost = {
-                    ManuSnackbar(
-                        message = snackbarMessage ?: "",
-                        visible = snackbarMessage != null,
-                        onDismiss = { snackbarMessage = null },
-                        type = ManuSnackbarType.Success,
-                        modifier = Modifier.padding(horizontal = 20.dp)
+    // "Show tutorial" (Settings and Help): back to the home screen, where the tutorial happens
+    fun showTutorial() {
+        focusManager.clearFocus()
+        showHelp = false
+        showSettings = false
+        fabVisible = true
+        tourTargets.restart()
+        settings.restartTour()
+    }
+
+    // Asked only after the tutorial is done or skipped, so the question does not get in its way
+    if (!settings.tourPending) AskForDownloadNotification()
+
+    AppBackground {
+        CompositionLocalProvider(LocalTourTargets provides tourTargets) {
+            Box(modifier = Modifier.fillMaxSize()) {
+
+                // ---------------- Home: the transactions list, with the Add button at the bottom.
+                // ManuScaffold already insets for the status bar, navigation bar and keyboard.
+                ManuScaffold(
+                    snackbarHost = {
+                        ManuSnackbar(
+                            message = snackbarMessage ?: "",
+                            visible = snackbarMessage != null,
+                            onDismiss = { snackbarMessage = null },
+                            type = ManuSnackbarType.Success,
+                            modifier = Modifier.padding(horizontal = 20.dp)
+                        )
+                    }
+                ) { _ ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            // Left to right opens the camera, right to left opens voice entry
+                            .swipeHorizontally(
+                                onLeft = { if (!selecting) openVoice() },
+                                onRight = { if (!selecting) openCamera() }
+                            )
+                    ) {
+                        TransactionsScreen(
+                            dao = dao,
+                            settings = settings,
+                            accounts = accounts,
+                            accountId = accountFilter,
+                            onAccountChange = { accountFilter = it },
+                            onOpenSettings = { showSettings = true },
+                            onOpenHelp = { showHelp = true },
+                            onOpenAbout = { showAbout = true },
+                            onScan = { openCamera() },
+                            onOpenStats = { filters, search, account ->
+                                statsRequest = StatsRequest(filters, search, account)
+                                showStats = true
+                            },
+                            onScrollDirection = { fabVisible = it },
+                            onSelectionModeChange = { selecting = it },
+                            searchRequested = searchRequested,
+                            onSearchRequestHandled = { searchRequested = false },
+                            runInTransaction = { block -> database.withTransaction { block() } }
+                        )
+
+                        // Floating + button: opens the Add transaction page. It slips away while you
+                        // scroll down the list, so it never covers a row, and returns on scroll up.
+                        AnimatedVisibility(
+                            visible = fabVisible && !selecting,
+                            enter = fadeIn() + scaleIn(),
+                            exit = fadeOut() + scaleOut(),
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 20.dp, bottom = 16.dp)
+                                .tourTarget(TourTarget.ADD)
+                        ) {
+                            ManuFab(
+                                onClick = {
+                                    tourTargets.tried(TourTarget.ADD)
+                                    // A blank form starts from your defaults (Settings > Defaults)
+                                    if (form.isBlank) form.useDefaults()
+                                    form.accountId = startingAccountId()
+                                    showAdd = true
+                                }
+                            ) { Icon(Icons.Default.Add, contentDescription = "Add transaction") }
+                        }
+                    }
+                }
+
+                // ---------------- Every full-screen page below opens and closes the same way (ScreenTransitions.kt)
+                // ---------------- Add transaction page slides in over the list
+                ScreenTransition(visible = showAdd) {
+                    AddTransactionScreen(
+                        form = form,
+                        accounts = accounts,
+                        settings = settings,
+                        // "+ New account" on the Add page: save it, then the page selects it
+                        onAddAccount = { newAccount, onCreated ->
+                            scope.launch {
+                                var newId = 0L
+                                if (safeWrite(context, "add the account") { newId = dao.insertAccount(newAccount) }) {
+                                    onCreated(newId)
+                                }
+                            }
+                        },
+                        tags = tags,
+                        // Pre-selects the most fitting tag from the title (history first, then keywords)
+                        suggestTags = { title -> suggestTagIds(dao, title, form.description, tags) },
+                        // "+ New tag" on the Add page: save it, then the page switches it on
+                        onAddTag = { name, colorIndex, onCreated ->
+                            scope.launch {
+                                var newId = 0L
+                                if (safeWrite(context, "add the tag") {
+                                        newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                                    }
+                                ) {
+                                    onCreated(newId)
+                                }
+                            }
+                        },
+                        onClose = { showAdd = false },
+                        onScan = { openCamera() },
+                        // Save & exit on a recording with several entries: all marked ones, in one go
+                        onSubmitAll = { entities, tagSets ->
+                            scope.launch {
+                                if (entities.isNotEmpty() &&
+                                    !safeWrite(context, "save the transactions") {
+                                        // The transactions and their tags go in together or not at all
+                                        database.withTransaction {
+                                            val ids = dao.insertAll(entities)
+                                            val links = ids.flatMapIndexed { i, id ->
+                                                tagSets.getOrElse(i) { emptySet() }.map { TransactionTagCrossRef(id.toInt(), it) }
+                                            }
+                                            if (links.isNotEmpty()) dao.insertTagLinks(links)
+                                        }
+                                    }
+                                ) return@launch
+                                DebugDataLog.markSavedAll(entities)   // debug builds only
+                                val account = form.accountId
+                                form.reset()
+                                form.accountId = account
+                                showAdd = false
+                                snackbarMessage = when (entities.size) {
+                                    0 -> "Nothing saved"
+                                    1 -> "Transaction saved"
+                                    else -> "${entities.size} transactions saved"
+                                }
+                            }
+                        },
+                        onSubmit = { entity, tagIds, stay, items ->
+                            // Debug builds only: which entry of the scan / recording this is (kept before the form moves on)
+                            val debugEntry = if (form.inBatch) form.batchIndex else 0
+                            scope.launch {
+                                // An image in the form that is not kept ("Include image" unticked) is deleted after saving
+                                val unusedImage = form.imageFile?.takeIf { it != entity.imageFile }
+                                // If saving fails the form stays open with everything the user typed
+                                if (!safeWrite(context, "save the transaction") { dao.insertWithTags(entity, tagIds, items) }) return@launch
+                                if (unusedImage != null) ReceiptStore.delete(context, unusedImage)
+                                DebugDataLog.markSaved(entity, debugEntry)
+                                if (stay) {
+                                    // Save & next: the next spoken entry, or an empty form
+                                    if (!form.nextFromBatch()) {
+                                        val account = form.accountId
+                                        form.reset()
+                                        form.accountId = account
+                                    }
+                                } else {
+                                    form.reset()
+                                    showAdd = false
+                                }
+                                snackbarMessage = "Transaction saved"
+                            }
+                        }
                     )
                 }
-            ) { _ ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        // Left to right opens the camera, right to left opens voice entry
-                        .swipeHorizontally(
-                            onLeft = { if (!selecting) openVoice() },
-                            onRight = { if (!selecting) openCamera() }
-                        )
-                ) {
-                    TransactionsScreen(
+
+                // ---------------- Stats chart (opened by tapping the balance card)
+                ScreenTransition(visible = showStats) {
+                    StatsScreen(
                         dao = dao,
+                        request = statsRequest,
                         settings = settings,
                         accounts = accounts,
-                        accountId = accountFilter,
-                        onAccountChange = { accountFilter = it },
-                        onOpenSettings = { showSettings = true },
+                        onClose = { showStats = false }
+                    )
+                }
+
+                // ---------------- Settings page
+                ScreenTransition(visible = showSettings) {
+                    SettingsScreen(
+                        settings = settings,
+                        database = database,
+                        onManageAccounts = { showAccounts = true },
+                        // Help and About slide in over Settings, and Back returns to it
                         onOpenHelp = { showHelp = true },
                         onOpenAbout = { showAbout = true },
-                        onScan = { openCamera() },
-                        onOpenStats = { filters, search, account ->
-                            statsRequest = StatsRequest(filters, search, account)
-                            showStats = true
-                        },
-                        onScrollDirection = { fabVisible = it },
-                        onSelectionModeChange = { selecting = it },
-                        searchRequested = searchRequested,
-                        onSearchRequestHandled = { searchRequested = false },
-                        runInTransaction = { block -> database.withTransaction { block() } }
+                        onShowTutorial = { showTutorial() },
+                        onClose = { showSettings = false }
                     )
-
-                    // Floating + button: opens the Add transaction page. It slips away while you
-                    // scroll down the list, so it never covers a row, and returns on scroll up.
-                    AnimatedVisibility(
-                        visible = fabVisible && !selecting,
-                        enter = fadeIn() + scaleIn(),
-                        exit = fadeOut() + scaleOut(),
-                        modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                            .padding(end = 20.dp, bottom = 16.dp)
-                    ) {
-                        ManuFab(
-                            onClick = {
-                                // A blank form starts from your defaults (Settings > Defaults)
-                                if (form.isBlank) form.useDefaults()
-                                form.accountId = startingAccountId()
-                                showAdd = true
-                            }
-                        ) { Icon(Icons.Default.Add, contentDescription = "Add transaction") }
-                    }
                 }
-            }
 
-            // ---------------- Every full-screen page below opens and closes the same way (ScreenTransitions.kt)
-            // ---------------- Add transaction page slides in over the list
-            ScreenTransition(visible = showAdd) {
-                AddTransactionScreen(
-                    form = form,
-                    accounts = accounts,
-                    settings = settings,
-                    // "+ New account" on the Add page: save it, then the page selects it
-                    onAddAccount = { newAccount, onCreated ->
-                        scope.launch {
-                            var newId = 0L
-                            if (safeWrite(context, "add the account") { newId = dao.insertAccount(newAccount) }) {
-                                onCreated(newId)
-                            }
-                        }
-                    },
-                    tags = tags,
-                    // Pre-selects the most fitting tag from the title (history first, then keywords)
-                    suggestTags = { title -> suggestTagIds(dao, title, form.description, tags) },
-                    // "+ New tag" on the Add page: save it, then the page switches it on
-                    onAddTag = { name, colorIndex, onCreated ->
-                        scope.launch {
-                            var newId = 0L
-                            if (safeWrite(context, "add the tag") {
-                                    newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                                }
-                            ) {
-                                onCreated(newId)
-                            }
-                        }
-                    },
-                    onClose = { showAdd = false },
-                    onScan = { openCamera() },
-                    // Save & exit on a recording with several entries: all marked ones, in one go
-                    onSubmitAll = { entities, tagSets ->
-                        scope.launch {
-                            if (entities.isNotEmpty() &&
-                                !safeWrite(context, "save the transactions") {
-                                    // The transactions and their tags go in together or not at all
+                // ---------------- Accounts page (over Settings, which opens it)
+                ScreenTransition(visible = showAccounts) {
+                    AccountsScreen(
+                        accounts = accounts,
+                        onClose = { showAccounts = false },
+                        onAdd = { scope.launch { safeWrite(context, "add the account") { dao.insertAccount(it) } } },
+                        onUpdate = { scope.launch { safeWrite(context, "save the account") { dao.updateAccount(it) } } },
+                        onDelete = { id ->
+                            scope.launch {
+                                // Delete the transactions, then the account, as one step: either both happen or neither
+                                var images = emptyList<String>()
+                                val deleted = safeWrite(context, "delete the account") {
                                     database.withTransaction {
-                                        val ids = dao.insertAll(entities)
-                                        val links = ids.flatMapIndexed { i, id ->
-                                            tagSets.getOrElse(i) { emptySet() }.map { TransactionTagCrossRef(id.toInt(), it) }
-                                        }
-                                        if (links.isNotEmpty()) dao.insertTagLinks(links)
+                                        images = dao.imageFilesOfAccount(id)
+                                        dao.deleteTransactionsOfAccount(id)
+                                        dao.deleteAccount(id)
                                     }
                                 }
-                            ) return@launch
-                            DebugDataLog.markSavedAll(entities)   // debug builds only
-                            val account = form.accountId
-                            form.reset()
-                            form.accountId = account
-                            showAdd = false
-                            snackbarMessage = when (entities.size) {
-                                0 -> "Nothing saved"
-                                1 -> "Transaction saved"
-                                else -> "${entities.size} transactions saved"
-                            }
-                        }
-                    },
-                    onSubmit = { entity, tagIds, stay, items ->
-                        // Debug builds only: which entry of the scan / recording this is (kept before the form moves on)
-                        val debugEntry = if (form.inBatch) form.batchIndex else 0
-                        scope.launch {
-                            // An image in the form that is not kept ("Include image" unticked) is deleted after saving
-                            val unusedImage = form.imageFile?.takeIf { it != entity.imageFile }
-                            // If saving fails the form stays open with everything the user typed
-                            if (!safeWrite(context, "save the transaction") { dao.insertWithTags(entity, tagIds, items) }) return@launch
-                            if (unusedImage != null) ReceiptStore.delete(context, unusedImage)
-                            DebugDataLog.markSaved(entity, debugEntry)
-                            if (stay) {
-                                // Save & next: the next spoken entry, or an empty form
-                                if (!form.nextFromBatch()) {
-                                    val account = form.accountId
-                                    form.reset()
-                                    form.accountId = account
-                                }
-                            } else {
-                                form.reset()
-                                showAdd = false
-                            }
-                            snackbarMessage = "Transaction saved"
-                        }
-                    }
-                )
-            }
-
-            // ---------------- Stats chart (opened by tapping the balance card)
-            ScreenTransition(visible = showStats) {
-                StatsScreen(
-                    dao = dao,
-                    request = statsRequest,
-                    settings = settings,
-                    accounts = accounts,
-                    onClose = { showStats = false }
-                )
-            }
-
-            // ---------------- Settings page
-            ScreenTransition(visible = showSettings) {
-                SettingsScreen(
-                    settings = settings,
-                    database = database,
-                    onManageAccounts = { showAccounts = true },
-                    // Help and About slide in over Settings, and Back returns to it
-                    onOpenHelp = { showHelp = true },
-                    onOpenAbout = { showAbout = true },
-                    onClose = { showSettings = false }
-                )
-            }
-
-            // ---------------- Accounts page (over Settings, which opens it)
-            ScreenTransition(visible = showAccounts) {
-                AccountsScreen(
-                    accounts = accounts,
-                    onClose = { showAccounts = false },
-                    onAdd = { scope.launch { safeWrite(context, "add the account") { dao.insertAccount(it) } } },
-                    onUpdate = { scope.launch { safeWrite(context, "save the account") { dao.updateAccount(it) } } },
-                    onDelete = { id ->
-                        scope.launch {
-                            // Delete the transactions, then the account, as one step: either both happen or neither
-                            var images = emptyList<String>()
-                            val deleted = safeWrite(context, "delete the account") {
-                                database.withTransaction {
-                                    images = dao.imageFilesOfAccount(id)
-                                    dao.deleteTransactionsOfAccount(id)
-                                    dao.deleteAccount(id)
+                                // Their images go too (after the database change worked)
+                                if (deleted && images.isNotEmpty()) {
+                                    withContext(Dispatchers.IO) { ReceiptStore.deleteAll(context, images) }
                                 }
                             }
-                            // Their images go too (after the database change worked)
-                            if (deleted && images.isNotEmpty()) {
-                                withContext(Dispatchers.IO) { ReceiptStore.deleteAll(context, images) }
-                            }
                         }
+                    )
+                }
+
+                // ---------------- Help page
+                ScreenTransition(visible = showHelp) {
+                    HelpScreen(
+                        onClose = { showHelp = false },
+                        onShowTutorial = { showTutorial() }
+                    )
+                }
+
+                // ---------------- About page
+                ScreenTransition(visible = showAbout) {
+                    AboutScreen(onClose = { showAbout = false })
+                }
+
+                // ---------------- Camera slides in over everything from the left (the swipe that opens it
+                // goes left to right) and leaves the same way. The camera itself starts only once the
+                // slide has finished, so starting it never makes the animation stutter.
+                ScreenTransition(visible = showCamera, enter = CameraEnter, exit = CameraExit) {
+                    CameraScreen(
+                        isOpen = showCamera,
+                        enterFinished = transition.currentState == EnterExitState.Visible,
+                        onClose = { showCamera = false },
+                        onPhotoSaved = { lastPhotoUri = it },
+                        onImageReady = { uri ->
+                            showCamera = false   // back first
+                            startScan(uri)       // then the Add page opens, filled in
+                        }
+                    )
+                }
+
+                // ---------------- Voice entry, over everything
+                ScreenTransition(visible = showVoice) {
+                    VoiceScreen(
+                        showTips = settings.voiceTips,
+                        autoListen = settings.voiceAutoListen,
+                        sounds = settings.voiceSounds,
+                        onClose = { showVoice = false },
+                        onHeard = { text ->
+                            // Same as the + button: start from your defaults, then fill what was heard
+                            if (form.isBlank) form.useDefaults()
+                            form.accountId = startingAccountId()
+                            fillFromSpeech(form, text)
+                            showVoice = false
+                            showAdd = true
+                        }
+                    )
+                }
+
+                // ---------------- Shown briefly while a scanned image is being read
+                if (ocr.busy) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
                     }
-                )
-            }
+                }
 
-            // ---------------- Help page
-            ScreenTransition(visible = showHelp) {
-                HelpScreen(onClose = { showHelp = false })
-            }
-
-            // ---------------- About page
-            ScreenTransition(visible = showAbout) {
-                AboutScreen(onClose = { showAbout = false })
-            }
-
-            // ---------------- Camera slides in over everything from the left (the swipe that opens it
-            // goes left to right) and leaves the same way. The camera itself starts only once the
-            // slide has finished, so starting it never makes the animation stutter.
-            ScreenTransition(visible = showCamera, enter = CameraEnter, exit = CameraExit) {
-                CameraScreen(
-                    isOpen = showCamera,
-                    enterFinished = transition.currentState == EnterExitState.Visible,
-                    onClose = { showCamera = false },
-                    onPhotoSaved = { lastPhotoUri = it },
-                    onImageReady = { uri ->
-                        showCamera = false   // back first
-                        startScan(uri)       // then the Add page opens, filled in
-                    }
-                )
-            }
-
-            // ---------------- Voice entry, over everything
-            ScreenTransition(visible = showVoice) {
-                VoiceScreen(
-                    showTips = settings.voiceTips,
-                    autoListen = settings.voiceAutoListen,
-                    sounds = settings.voiceSounds,
-                    onClose = { showVoice = false },
-                    onHeard = { text ->
-                        // Same as the + button: start from your defaults, then fill what was heard
-                        if (form.isBlank) form.useDefaults()
-                        form.accountId = startingAccountId()
-                        fillFromSpeech(form, text)
-                        showVoice = false
-                        showAdd = true
-                    }
-                )
-            }
-
-            // ---------------- Shown briefly while a scanned image is being read
-            if (ocr.busy) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                // ---------------- First-run tutorial, on top of the home screen (Tour.kt)
+                if (settings.tourPending && homeIsFree && tourReady) {
+                    HomeTour(
+                        targets = tourTargets,
+                        onSkip = { settings.finishTour() },
+                        onSwipeLeft = { openVoice() },
+                        onSwipeRight = { openCamera() }
+                    )
                 }
             }
         }

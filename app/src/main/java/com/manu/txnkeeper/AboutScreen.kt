@@ -27,6 +27,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,7 +56,7 @@ import com.manu.manudesignsystem.components.ManuTopBar
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import java.util.Calendar
 
- const val PRIVACY_POLICY_URL = "https://txnkeeper.github.io/txnkeeper-privacy/"
+const val PRIVACY_POLICY_URL = "https://txnkeeper.github.io/txnkeeper-privacy/"
 
 /**
  * The address that "Send feedback" writes to. Put yours here.
@@ -66,17 +68,20 @@ const val FEEDBACK_EMAIL = "txnkeeper@gmail.com"
 private class Highlight(val icon: ImageVector, val title: String, val detail: String)
 
 private val HIGHLIGHTS = listOf(
-    Highlight(Icons.Default.CloudOff, "Works offline", "No account and no internet needed."),
-    Highlight(AppIcons.CameraAlt, "Scan receipts", "Fill a transaction from a photo or screenshot."),
-    Highlight(Icons.Default.Mic, "Voice entry", "Say a transaction instead of typing it."),
-    Highlight(Icons.Default.Lock, "Private", "Everything stays on your phone.")
+    Highlight(Icons.Default.CloudOff, "Works offline", "Add and manage transactions without internet. No sign-up."),
+    Highlight(AppIcons.CameraAlt, "Scan receipts", "Add details from a photo or screenshot."),
+    Highlight(Icons.Default.Mic, "Voice entry", "Say one or more transactions."),
+    Highlight(Icons.Default.Widgets, "Widgets", "Add entries from your home screen."),
+    Highlight(Icons.Default.Share, "Export and share", "Share entries, or save them as CSV, PDF or ZIP."),
+    Highlight(Icons.Default.Lock, "Your records", "Saved on your phone.")
 )
 
 /** The libraries the app is built with, and their licenses. Shown by "Open-source licenses". */
 private val LICENSES = listOf(
     "Jetpack Compose, Room, CameraX, Material Icons (AndroidX)" to "Apache License 2.0",
     "Kotlin and kotlinx.coroutines" to "Apache License 2.0",
-    "Google ML Kit Text Recognition" to "ML Kit Terms of Service",
+    "Google ML Kit (text and image recognition)" to "ML Kit Terms of Service",
+    "Lottie" to "Apache License 2.0",
     "whisper.cpp" to "MIT License",
     "OpenAI Whisper speech model" to "MIT License"
 )
@@ -179,7 +184,9 @@ fun AboutScreen(
             // ---- Privacy
             AboutSection(title = "Privacy") {
                 Text(
-                    text = "Your data stays on your phone. The privacy policy explains the details.",
+                    text = "Your transactions and receipt images are saved on your phone.\n\n" +
+                            "Voice entry needs a one-time download. Fast voice entry may send audio online " +
+                            "through your phone's speech service. You can turn it off in Settings, then Defaults.",
                     style = MaterialTheme.typography.bodyMedium
                 )
                 ManuOutlineButton(

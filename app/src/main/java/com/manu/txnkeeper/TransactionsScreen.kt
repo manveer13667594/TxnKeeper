@@ -73,6 +73,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -124,6 +125,7 @@ import com.manu.txnkeeper.ui.theme.IncomeColor
 import com.manu.manudesignsystem.theme.ManuDesignSystem
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.AccountCircle
@@ -214,6 +216,9 @@ fun TransactionsScreen(
 
     var filters by remember { mutableStateOf(TxnFilters()) }
     var searchOpen by remember { mutableStateOf(false) }
+    // The tutorial (Tour.kt) waits while the search box is open
+    val tour = LocalTourTargets.current
+    SideEffect { tour?.searchOpen = searchOpen }
     var searchText by remember { mutableStateOf("") }
     var search by remember { mutableStateOf("") }          // searchText after a short pause
     var filterSheetOpen by remember { mutableStateOf(false) }
@@ -396,6 +401,17 @@ fun TransactionsScreen(
         }
     }
 
+    /** The share button in the popup of one transaction. */
+    fun shareOne(txn: TransactionEntity, format: ShareFormat) {
+        scope.launch {
+            if (format != ShareFormat.TEXT) toast(if (format == ShareFormat.PDF) "Preparing PDF..." else "Preparing CSV...")
+            safeWrite(context, "share the transaction") {
+                val tagNames = mapOf(txn.id to (tagMap[txn.id] ?: emptyList()).map { it.name })
+                shareTransactions(context, format, listOf(txn), accountNames, tagNames)
+            }
+        }
+    }
+
     /** Opens the next transaction of the edit queue, or closes the editor when the queue is empty. */
     fun openNextInQueue() {
         val next = editQueue.firstOrNull()
@@ -540,13 +556,17 @@ fun TransactionsScreen(
 //                    {
 //                        Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt")
 //                    }
-                    IconButton(onClick = {
-                        if (searchOpen) {
-                            searchText = ""
-                            focusManager.clearFocus()
-                        }
-                        searchOpen = !searchOpen
-                    }) {
+                    IconButton(
+                        onClick = {
+                            if (searchOpen) {
+                                searchText = ""
+                                focusManager.clearFocus()
+                            }
+                            searchOpen = !searchOpen
+                            if (searchOpen) tour?.tried(TourTarget.SEARCH)
+                        },
+                        modifier = Modifier.tourTarget(TourTarget.SEARCH)
+                    ) {
                         Icon(
                             if (searchOpen) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = if (searchOpen) "Close search" else "Search"
@@ -554,7 +574,13 @@ fun TransactionsScreen(
                     }
                     // Three-dot menu
                     Box {
-                        IconButton(onClick = { menuOpen = true }) {
+                        IconButton(
+                            onClick = {
+                                menuOpen = true
+                                tour?.tried(TourTarget.MENU)
+                            },
+                            modifier = Modifier.tourTarget(TourTarget.MENU)
+                        ) {
                             Icon(Icons.Default.MoreVert, contentDescription = "More")
                         }
                         ManuDropdownMenu(
@@ -669,24 +695,6 @@ fun TransactionsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 14.dp, bottom = 2.dp)
                 )
-            }
-
-            // ---- First-use shortcut hints, one at a time (gone once closed, or once you use the shortcut).
-            // Takes no space: the card floats over the top of the list (or the empty message) instead.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(0.dp)
-                    .zIndex(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .wrapContentHeight(align = Alignment.CenterVertically, unbounded = true)
-                        .absoluteOffset(0.dp, 350.dp)
-                    //.height(50.dp)
-                ) {
-                    SwipeHintCard(settings = settings, modifier = Modifier.padding(top = 8.dp))
-                }
             }
 
             // ---- The list, or a message when there is nothing to show
@@ -891,6 +899,7 @@ fun TransactionsScreen(
             accountName = accountNames[txn.accountId] ?: "",
             tags = tagMap[txn.id] ?: emptyList(),
             items = itemMap[txn.id] ?: emptyList(),
+            onShare = { format -> shareOne(txn, format) },
             onEdit = {
                 viewing = null
                 editing = txn
@@ -904,52 +913,52 @@ fun TransactionsScreen(
     }
 
     editing?.let { txn ->
-      // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
-      key(txn.id) {
-        EditTransactionDialog(
-            original = txn,
-            accounts = accounts,
-            settings = settings,
-            onAddAccount = { newAccount, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the account") {
-                            newId = dao.insertAccount(newAccount)
-                        }) {
-                        onCreated(newId)
+        // key: each transaction of the queue gets a fresh dialog (otherwise it would keep the previous one's input)
+        key(txn.id) {
+            EditTransactionDialog(
+                original = txn,
+                accounts = accounts,
+                settings = settings,
+                onAddAccount = { newAccount, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the account") {
+                                newId = dao.insertAccount(newAccount)
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            tags = allTags,
-            initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
-            initialItems = itemMap[txn.id] ?: emptyList(),
-            onAddTag = { name, colorIndex, onCreated ->
-                scope.launch {
-                    var newId = 0L
-                    if (safeWrite(context, "add the tag") {
-                            newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
-                        }) {
-                        onCreated(newId)
+                },
+                tags = allTags,
+                initialTagIds = (tagMap[txn.id] ?: emptyList()).map { it.id }.toSet(),
+                initialItems = itemMap[txn.id] ?: emptyList(),
+                onAddTag = { name, colorIndex, onCreated ->
+                    scope.launch {
+                        var newId = 0L
+                        if (safeWrite(context, "add the tag") {
+                                newId = dao.insertTag(TagEntity(name = name, colorIndex = colorIndex))
+                            }) {
+                            onCreated(newId)
+                        }
                     }
-                }
-            },
-            onSave = { updated, tagIds, newItems ->
-                scope.launch {
-                    if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
-                        // The image it had before is not used any more if it was removed or replaced
-                        txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                },
+                onSave = { updated, tagIds, newItems ->
+                    scope.launch {
+                        if (safeWrite(context, "save the changes") { dao.updateWithTags(updated, tagIds, newItems) }) {
+                            // The image it had before is not used any more if it was removed or replaced
+                            txn.imageFile?.takeIf { it != updated.imageFile }?.let { ReceiptStore.delete(context, it) }
+                        }
                     }
+                    // Next one of the queue, or close (a normal single edit has an empty queue)
+                    openNextInQueue()
+                },
+                onDismiss = {
+                    editQueue = emptyList()
+                    editTotal = 0
+                    editing = null
                 }
-                // Next one of the queue, or close (a normal single edit has an empty queue)
-                openNextInQueue()
-            },
-            onDismiss = {
-                editQueue = emptyList()
-                editTotal = 0
-                editing = null
-            }
-        )
-      }
+            )
+        }
     }
 
     deleting?.let { txn ->
@@ -1407,10 +1416,12 @@ private fun TransactionDetailDialog(
     accountName: String,
     tags: List<TagEntity>,
     items: List<TransactionItemEntity> = emptyList(),
+    onShare: (ShareFormat) -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    var shareMenuOpen by remember { mutableStateOf(false) }
     val income = txn.type == "INCOME"
     val sign = if (income) "+" else "−"
     val typeColor = if (income) IncomeColor else ExpenseColor
@@ -1433,7 +1444,7 @@ private fun TransactionDetailDialog(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                // Top: what it is, and Edit / Delete at the right
+                // Top: what it is, and Share / Edit / Delete at the right
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
                         painter = painterResource(if (income) R.drawable.ic_income else R.drawable.ic_expense),
@@ -1451,6 +1462,33 @@ private fun TransactionDetailDialog(
                             .weight(1f)
                             .padding(start = 8.dp)
                     )
+                    Box {
+                        IconButton(onClick = { shareMenuOpen = true }) {
+                            Icon(Icons.Default.Share, contentDescription = "Share")
+                        }
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = shareMenuOpen,
+                            onDismissRequest = { shareMenuOpen = false }
+                        ) {
+                            ShareFormat.entries.forEach { format ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            when (format) {
+                                                ShareFormat.TEXT -> "Share as text"
+                                                ShareFormat.PDF -> "Share as PDF"
+                                                ShareFormat.CSV -> "Share as CSV"
+                                            }
+                                        )
+                                    },
+                                    onClick = {
+                                        shareMenuOpen = false
+                                        onShare(format)
+                                    }
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = onEdit) {
                         Icon(Icons.Default.Edit, contentDescription = "Edit")
                     }

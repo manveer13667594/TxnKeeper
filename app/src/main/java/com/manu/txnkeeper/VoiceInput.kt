@@ -3,7 +3,6 @@ package com.manu.txnkeeper
 import kotlin.math.sqrt
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import android.Manifest
@@ -21,12 +20,6 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.Text
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
@@ -58,7 +51,6 @@ import com.manu.manudesignsystem.components.ManuCard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
-import com.manu.manudesignsystem.components.ManuDialog
 import com.manu.manudesignsystem.components.ManuFab
 import com.manu.txnkeeper.ui.theme.ExpenseColor
 import io.whisperkit.TranscribeOptions
@@ -82,7 +74,7 @@ import kotlinx.coroutines.withContext
  *   BaseEnQ5  ~57 MB, fastest, English only
  *   BaseQ5    ~57 MB, fast, multilingual
  *   SmallQ5   ~181 MB, about 4x slower, slightly better punctuation/words
- * The model is downloaded once, the first time voice input is used (needs internet that one time).
+ * The model is downloaded once, starting when the app first opens (needs internet that one time).
  */
 val VOICE_MODEL = WhisperModel.BaseEnQ5
 
@@ -433,56 +425,6 @@ object VoiceEngine {
     }
 }
 
-// ------------------------------------------------------------------ the download question
-
-/**
- * Asked before the speech model is downloaded for the first time: what it is, how big, that it needs
- * internet once. Used by the voice screen and by the mic button on the Add page.
- */
-@Composable
-fun VoiceDownloadDialog(
-    visible: Boolean,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    ManuDialog(
-        visible = visible,
-        title = "Download essential resources?",
-        confirmText = "Download",
-        dismissText = "Not now",
-        onConfirm = onConfirm,
-        onDismiss = onDismiss
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Voice entry needs some resources of about ${VOICE_MODEL.approxSizeMb} MB. Click Download to continue.")
-            Text(
-                text = "(Required to process data on your phone)",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            // "privacy policy" is a link: tapping it opens the policy page in the browser
-            Text(
-                text = buildAnnotatedString {
-                    append("To know more, read the ")
-                    withLink(
-                        LinkAnnotation.Url(
-                            url = PRIVACY_POLICY_URL,
-                            styles = TextLinkStyles(
-                                style = SpanStyle(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                            )
-                        )
-                    ) { append("privacy policy") }
-                    append(".")
-                },
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-    }
-}
-
 // ------------------------------------------------------------------ the button
 
 /**
@@ -501,26 +443,20 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean 
     var seconds by remember { mutableIntStateOf(0) }
     var working by remember { mutableStateOf<String?>(null) }
 
-    // The download runs in VoiceModelDownloader, not on this page, so it keeps going when you leave
+    // The download runs in VoiceModelDownloader. This page only talks about it after the mic was
+    // tapped, so it does not overwrite other notes (for example from a scan).
     val download by VoiceModelDownloader.state.collectAsState()
-    var sawDownload by remember { mutableStateOf(false) }
-    LaunchedEffect(download) {
+    var wantsVoice by remember { mutableStateOf(false) }
+    LaunchedEffect(download, wantsVoice) {
+        if (!wantsVoice) return@LaunchedEffect
         when (val d = download) {
-            is VoiceDownloadState.Downloading -> {
-                sawDownload = true
-                form.notice = downloadStatus(d.fraction) + " Tap the mic to pause."
+            is VoiceDownloadState.Downloading -> form.notice = downloadStatus(d.fraction)
+            is VoiceDownloadState.Done -> {
+                wantsVoice = false
+                form.notice = "Voice entry is ready. Tap the mic and speak."
             }
-            // The messages below only appear when the change happens while this page is open
-            is VoiceDownloadState.Done -> if (sawDownload) {
-                sawDownload = false
-                form.notice = "Voice model ready. Tap the mic and speak."
-            }
-            is VoiceDownloadState.Paused -> if (sawDownload) {
-                sawDownload = false
-                form.notice = "Download paused at ${(d.fraction * 100).toInt()}%. Tap the mic to resume."
-            }
-            is VoiceDownloadState.Failed -> if (sawDownload) {
-                sawDownload = false
+            is VoiceDownloadState.Failed -> {
+                wantsVoice = false
                 form.notice = d.message + " Tap the mic to try again."
             }
             VoiceDownloadState.Idle -> Unit
@@ -587,36 +523,20 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean 
         if (granted) start() else form.notice = "Microphone permission is needed for voice input."
     }
 
-    var askDownload by remember { mutableStateOf(false) }
-
     fun onClick() {
         when {
             working != null -> Unit
-            download is VoiceDownloadState.Downloading -> VoiceModelDownloader.pause()
             recording -> finish()
             !VoiceEngine.isModelReady(context) -> {
-                // Already agreed to the download before: carry on without asking again
-                if (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) {
-                    form.notice = null
-                    VoiceModelDownloader.start(context)
-                } else {
-                    askDownload = true
-                }
+                // Not downloaded yet: show the progress, and start again if it had stopped
+                wantsVoice = true
+                VoiceModelDownloader.start(context)
             }
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
-
-    VoiceDownloadDialog(
-        visible = askDownload,
-        onConfirm = {
-            askDownload = false
-            VoiceModelDownloader.start(context)
-        },
-        onDismiss = { askDownload = false }
-    )
 
     ManuFab(
         onClick = { onClick() },
@@ -627,7 +547,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean 
         contentPadding = if (recording) PaddingValues(horizontal = 20.dp, vertical = 16.dp) else PaddingValues(16.dp)
     ) {
         when {
-            working != null || download is VoiceDownloadState.Downloading -> CircularProgressIndicator(
+            working != null || (wantsVoice && download is VoiceDownloadState.Downloading) -> CircularProgressIndicator(
                 modifier = Modifier.size(24.dp),
                 color = LocalContentColor.current,
                 strokeWidth = 2.dp

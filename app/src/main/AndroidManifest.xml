@@ -12,6 +12,9 @@
         </intent>
     </queries>
 
+    <!-- Progress of the voice model download -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"

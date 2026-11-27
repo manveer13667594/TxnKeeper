@@ -153,24 +153,45 @@ class AppSettings(context: Context) {
     }
 
     /**
-     * The first-use hints on the home screen ("swipe left for voice", "swipe right for the camera").
-     * Each is shown until it is closed or the shortcut has been used once.
+     * The home screen tutorial (Tour.kt): true while it still has to be shown. It starts as true only
+     * on a new install; people who update the app only see it if they ask for it in Help.
      */
-    var voiceHintDone by mutableStateOf(prefs.getBoolean(KEY_VOICE_HINT_DONE, false))
-        private set
-    var cameraHintDone by mutableStateOf(prefs.getBoolean(KEY_CAMERA_HINT_DONE, false))
+    var tourPending by mutableStateOf(readTourPending())
         private set
 
-    fun markVoiceHintDone() {
-        if (voiceHintDone) return
-        voiceHintDone = true
-        prefs.edit().putBoolean(KEY_VOICE_HINT_DONE, true).apply()
+    private fun readTourPending(): Boolean {
+        if (prefs.contains(KEY_TOUR_PENDING)) return prefs.getBoolean(KEY_TOUR_PENDING, false)
+        // Decided once, then remembered. A new user has no transaction database yet (it is made
+        // after this runs). This also covers "Clear data", while people updating the app keep theirs.
+        val newInstall = !appContext.getDatabasePath("txnkeeper_database").exists()
+        prefs.edit().putBoolean(KEY_TOUR_PENDING, newInstall).apply()
+        return newInstall
     }
 
-    fun markCameraHintDone() {
-        if (cameraHintDone) return
-        cameraHintDone = true
-        prefs.edit().putBoolean(KEY_CAMERA_HINT_DONE, true).apply()
+    /**
+     * The tutorial for a recording with several entries (BatchTour.kt): true until it has been seen
+     * or skipped. It waits until that first happens, so people who update the app get it too.
+     */
+    var batchTourPending by mutableStateOf(prefs.getBoolean(KEY_BATCH_TOUR_PENDING, true))
+        private set
+
+    fun finishBatchTour() {
+        batchTourPending = false
+        prefs.edit().putBoolean(KEY_BATCH_TOUR_PENDING, false).apply()
+    }
+
+    /** "Show tutorial" in Help. */
+    fun restartTour() {
+        batchTourPending = true
+        prefs.edit().putBoolean(KEY_BATCH_TOUR_PENDING, true).apply()
+        tourPending = true
+        prefs.edit().putBoolean(KEY_TOUR_PENDING, true).apply()
+    }
+
+    /** Done or Skip. */
+    fun finishTour() {
+        tourPending = false
+        prefs.edit().putBoolean(KEY_TOUR_PENDING, false).apply()
     }
 
     /**
@@ -291,8 +312,8 @@ class AppSettings(context: Context) {
         const val KEY_HIDE_DEBUG = "hide_debug_features"
         const val KEY_FILL_FROM_IMAGE = "fill_from_image_default"
         const val KEY_EXPORT_IMAGES = "export_with_images_default"
-        const val KEY_VOICE_HINT_DONE = "voice_hint_done"
-        const val KEY_CAMERA_HINT_DONE = "camera_hint_done"
+        const val KEY_TOUR_PENDING = "home_tour_pending"
+        const val KEY_BATCH_TOUR_PENDING = "batch_tour_pending"
     }
 }
 

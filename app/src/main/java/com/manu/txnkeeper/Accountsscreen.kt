@@ -34,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -58,8 +59,8 @@ private const val MAX_ACCOUNT_NAME = 30
  * It is laid out like the home screen and Settings: a balance card on top, then one card with a row
  * per account (initial, name and number of transactions on the left, balance on the right).
  *
- * Deleting an account also deletes all of its transactions (after a clear confirmation that says
- * how many). The last account can't be deleted.
+ * Deleting an account also deletes all of its transactions. The confirmation says how many, and the
+ * same phrase as on the "Delete data" page has to be typed. The last account can't be deleted.
  */
 @Composable
 fun AccountsScreen(
@@ -107,7 +108,7 @@ fun AccountsScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Tap an account to edit it. Deleting an account also deletes its transactions.",
+                text = "Tap an account to edit it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -348,12 +349,21 @@ private fun DeleteAccountDialog(
     onDismiss: () -> Unit
 ) {
     val hasTransactions = account.txnCount > 0
+    var typed by remember(account.id) { mutableStateOf("") }
+    var error by remember(account.id) { mutableStateOf<String?>(null) }
 
     ManuDialog(
         visible = true,
         title = "Delete \"${account.name}\"?",
-        confirmText = if (hasTransactions) "Delete all" else "Delete",
-        onConfirm = onConfirm,
+        confirmText = "Delete",
+        onConfirm = {
+            // Same check as the "Delete data" page (DeleteData.kt)
+            if (confirmationMatches(typed, DELETE_ACCOUNT_PHRASE)) {
+                onConfirm()
+            } else {
+                error = "Type \"$DELETE_ACCOUNT_PHRASE\" to continue."
+            }
+        },
         onDismiss = onDismiss,
         destructive = true
     ) {
@@ -368,6 +378,21 @@ private fun DeleteAccountDialog(
                 Text("This account has no transactions.")
             }
             Text("This can't be undone.", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+
+            Text("To confirm, type:", style = MaterialTheme.typography.bodyMedium)
+            Text(DELETE_ACCOUNT_PHRASE, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            ManuTextField(
+                value = typed,
+                onValueChange = {
+                    typed = it
+                    error = null
+                },
+                placeholder = { Text(DELETE_ACCOUNT_PHRASE) },
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None)
+            )
+            error?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

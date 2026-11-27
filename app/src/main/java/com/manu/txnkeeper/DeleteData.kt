@@ -118,15 +118,12 @@ fun DeleteDataControls(settings: AppSettings, database: AppDatabase) {
                 )
             }
             Text(
-                text = "Permanently delete what you have entered in this app: everything, or just one account. " +
-                        "There is no cloud backup, so deleted data can't be recovered. " +
-                        "Export a CSV first (Settings > Export & import) if you want a copy.",
+                text = "Deleted data can't be recovered. To keep a copy, use Export & import first.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = "Images are kept inside the app. Copies you saved to your gallery (Pictures/TxnKeeper) " +
-                        "are not deleted here.",
+                text = "Images you saved to your gallery will stay there.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

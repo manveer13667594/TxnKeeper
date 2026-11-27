@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.manu.manudesignsystem.components.ManuButton
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuTopBar
@@ -45,67 +46,79 @@ private class Faq(val question: String, val answer: String)
 private val FAQS = listOf(
     Faq(
         question = "How do I add a transaction?",
-        answer = "Tap the + button on the home screen. Enter a title and amount, choose Expense or Income, " +
-                "and add a description if you like.\n" +
-                "Save & next keeps the page open for another entry. Save & exit goes back to the list."
+        answer = "Tap + on the home screen. Enter a title and amount, choose Expense or Income, then add any other details.\n" +
+                "Save & next lets you add another. Save & exit takes you back."
     ),
     Faq(
         question = "How do I scan a receipt or payment screenshot?",
-        answer = "Tap the camera icon at the top of the home screen, or swipe from left to right. " +
-                "Take a photo or pick an image. You can also share an image to TxnKeeper from your gallery or a payment app.\n" +
-                "The amount, date, time, type and title are filled in for you. Check the form before you save.\n" +
-                "The image stays inside the app. To keep a copy in your gallery, open the image from the transaction and tap Save to gallery."
+        answer = "Swipe from left to right on the home screen, then take a photo or pick an image. You can also share an image to TxnKeeper from another app.\n" +
+                "TxnKeeper fills in the details it can find. Check them before you save.\n" +
+                "To copy a saved receipt to your gallery, open its image and tap Save to gallery."
     ),
     Faq(
         question = "How does voice entry work?",
-        answer = "Swipe from right to left on the home screen. Tap the mic button at the bottom and say one or more transactions, " +
-                "like \"paid 500 to Rahul, got 2000 salary\". Tap it again to stop, and the Add page opens filled in. " +
-                "The mic button on the Add page works too.\n" +
-                "The first time, a speech model is downloaded, so you need internet that once. After that it works offline."
+        answer = "Swipe from right to left on the home screen, or tap the mic on the Add page. Say something like \"paid 500 to Rahul, got 2000 salary\".\n" +
+                "Check the details before you save.\n" +
+                "Voice files (about 57 MB) download automatically using Wi-Fi or mobile data. A notification shows the progress if notifications are allowed.\n" +
+                "After the download, voice entry can work offline. Fast voice entry may use the internet; you can turn it off in Settings, then Defaults."
     ),
     Faq(
-        question = "How do I manage accounts?",
-        answer = "Open the ⋮ menu, then Settings, then Accounts. You can add, edit or delete accounts.\n" +
-                "With more than one account, chips under the title let you switch between All and a single account. " +
-                "Deleting an account also deletes its transactions."
+        question = "What if I say more than one transaction?",
+        answer = "Use the arrows to check each entry. Untick any you don't want, then tap Save & exit to save the ticked ones."
     ),
     Faq(
-        question = "How do I add or remove payment methods?",
-        answer = "When adding or editing a transaction, open the payment method dropdown and tap + Add new. " +
-                "Type a name and tap Add.\n" +
-                "To remove one, open the ⋮ menu, then Settings, then Payment methods, and tap the X next to it. " +
-                "Transactions that already use it keep their label."
+        question = "How do I view, edit, share or delete a transaction?",
+        answer = "Tap a transaction to see its details. Use the buttons at the top to share, edit or delete it.\n" +
+                "You can share it as text, PDF or CSV. Delete asks you to confirm."
+    ),
+    Faq(
+        question = "How do I select several transactions?",
+        answer = "Touch and hold a transaction, then tap others to add them. Touch and hold a date to select that whole day.\n" +
+                "Use the buttons at the side to share, edit, move, tag, change the payment method or delete."
     ),
     Faq(
         question = "How do I search or filter?",
-        answer = "Tap the magnifier to search by title, amount, date or time of day, for example \"evening\".\n" +
-                "Open the ⋮ menu, then Filters, to narrow the list by account, payment method, amount or dates. " +
-                "The totals at the top follow your search and filters."
+        answer = "Tap the search icon and type a title, amount, date, time or payment method, for example \"evening\" or \"upi\".\n" +
+                "Tap the filter icon to narrow the list. The totals follow your search and filters."
     ),
     Faq(
-        question = "How do I edit or delete a transaction?",
-        answer = "Tap a transaction to edit it. The ⋮ on each row also has Edit and Delete.\n" +
-                "Delete asks first, and it can't be undone."
+        question = "How do I add home screen widgets?",
+        answer = "Open ⋮, then Settings, then Home screen widgets, and tap Add to home screen.\n" +
+                "You can also touch and hold your home screen, tap Widgets and find TxnKeeper. Touch and hold a widget to resize it."
     ),
     Faq(
-        question = "How do I export or import my data?",
-        answer = "Open the ⋮ menu, then Settings, then Export & import.\n" +
-                "Export as CSV, PDF, or a ZIP that also holds the images: everything, a date range, or the latest transactions. " +
-                "You can narrow it down by account, payment method, income or expense, and an amount range.\n" +
-                "The Include images switch there decides whether the images go into the ZIP and the PDF.\n" +
-                "Import reads a CSV file or a ZIP made by the export (a ZIP brings back the images), and it is all or nothing.\n" +
-                "Opening balances are not in the CSV, so set them again in Accounts if needed."
+        question = "How do I manage accounts?",
+        answer = "Open ⋮, then Settings, then Accounts. Tap an account to edit it, or use its ⋮ to delete it.\n" +
+                "Deleting an account also deletes its transactions and their images. To confirm, type delete account. The last account can't be deleted.\n" +
+                "With more than one account, use the chips on the home screen to switch between them."
+    ),
+    Faq(
+        question = "How do I add or remove payment methods?",
+        answer = "Open the payment method list while adding or editing a transaction, then tap + Add new.\n" +
+                "To remove one, open ⋮, then Settings, then Payment methods, and tap its X. Past transactions keep their label."
+    ),
+    Faq(
+        question = "How do I export my data?",
+        answer = "Open ⋮, then Settings, then Export & import. Choose what to export, then export it as CSV or PDF. With Include images on, CSV becomes a ZIP that holds your images.\n" +
+                "Pick where to save the file. When it's done, you can open or share it. Last export shows the newest file and where it was saved."
+    ),
+    Faq(
+        question = "How do I import my data?",
+        answer = "Open ⋮, then Settings, then Export & import, and tap Import from CSV or ZIP. Use a CSV or a ZIP made by TxnKeeper. A ZIP brings back images too.\n" +
+                "Opening balances are not included, so set them again in Accounts if needed."
     ),
     Faq(
         question = "Where is my data stored?",
-        answer = "On your phone. Export a CSV from Settings now and then to keep a backup."
+        answer = "Your transactions and receipt images are saved on your phone. Export a CSV now and then as a backup, or a ZIP if you have images. Keep it somewhere safe."
     ),
     Faq(
         question = "How do I delete my data?",
-        answer = "Open the ⋮ menu, then Settings, then Delete data. Choose All data or a single account, " +
-                "then type the phrase shown to confirm.\n" +
-                "This can't be undone, so export a CSV first if you want a copy. " +
-                "Images are kept inside the app. Copies you saved to your gallery are not deleted."
+        answer = "Open ⋮, then Settings, then Delete data. Choose All data or one account, then type the phrase shown to confirm.\n" +
+                "This can't be undone, so export a copy first if you need one. Exported files and images saved to your gallery are not deleted."
+    ),
+    Faq(
+        question = "Can I see the tutorial again?",
+        answer = "Tap Show tutorial at the top of this page or in Settings."
     ),
 )
 
@@ -117,6 +130,7 @@ private val FAQS = listOf(
 @Composable
 fun HelpScreen(
     onClose: () -> Unit,
+    onShowTutorial: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Which question is open (null = all closed)
@@ -141,6 +155,9 @@ fun HelpScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            ManuButton(modifier = Modifier.fillMaxWidth(), onClick = onShowTutorial) {
+                Text("Show tutorial")
+            }
             FAQS.forEachIndexed { index, faq ->
                 FaqItem(
                     faq = faq,

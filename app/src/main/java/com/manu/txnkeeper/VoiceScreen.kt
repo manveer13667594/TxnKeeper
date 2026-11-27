@@ -144,21 +144,14 @@ fun VoiceScreen(
     var seconds by remember { mutableIntStateOf(0) }
     var working by remember { mutableStateOf<String?>(null) }
     var message by remember { mutableStateOf<String?>(null) }
-    // First use only: the question "download the speech model?", and the download itself
-    var askDownload by remember { mutableStateOf(false) }
     // The download runs in VoiceModelDownloader, not in this screen, so it keeps going when you leave
     val download by VoiceModelDownloader.state.collectAsState()
-    val preparing: String? = (download as? VoiceDownloadState.Downloading)
-        ?.let { "${downloadStatus(it.fraction)}\nTap the mic to pause." }
-    val downloadNote: String? = when (val d = download) {
-        is VoiceDownloadState.Paused -> "Download paused at ${(d.fraction * 100).toInt()}%. Tap the mic to resume."
-        is VoiceDownloadState.Failed -> "${d.message} Tap the mic to try again."
-        else -> null
-    }
+    val preparing: String? = (download as? VoiceDownloadState.Downloading)?.let { downloadStatus(it.fraction) }
+    val downloadNote: String? = (download as? VoiceDownloadState.Failed)?.let { "${it.message} Tap the mic to try again." }
     // Says "ready" only when the download finishes while this screen is open
     var sawDownload by remember { mutableStateOf(false) }
-    // First use only: the recording made before the speech model existed. It waits here while the
-    // download question is answered and the download runs, then it is transcribed (see finish()).
+    // First use only: a recording made before the speech model was there. It waits here while the
+    // download finishes, then it is transcribed (see finish()).
     var pendingSamples by remember { mutableStateOf<FloatArray?>(null) }
 
     // Today's tip: the next one in the list each time this screen opens
@@ -261,15 +254,10 @@ fun VoiceScreen(
                 return@launch
             }
             if (!VoiceEngine.isModelReady(context)) {
-                // First use: keep the recording, ask about the download now, and transcribe the
-                // recording as soon as the download is done
+                // First use: keep the recording and transcribe it as soon as the download is done
                 pendingSamples = samples
-                if (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) {
-                    message = null
-                    VoiceModelDownloader.start(context)
-                } else if (download !is VoiceDownloadState.Downloading) {
-                    askDownload = true
-                }
+                message = null
+                VoiceModelDownloader.start(context)
                 return@launch
             }
             transcribeAndHandle(samples)
@@ -306,16 +294,15 @@ fun VoiceScreen(
     fun onMicClick() {
         when {
             working != null -> Unit
-            download is VoiceDownloadState.Downloading -> VoiceModelDownloader.pause()
             recording -> finish()
-            // Already agreed to the download before and it stopped part-way: carry on without asking again
-            (download is VoiceDownloadState.Paused || download is VoiceDownloadState.Failed) &&
-                    !VoiceEngine.isModelReady(context) -> {
+            // A recording is already waiting for the download: carry the download on, don't record over it
+            pendingSamples != null -> VoiceModelDownloader.start(context)
+            // The download had stopped: try it again
+            download is VoiceDownloadState.Failed && !VoiceEngine.isModelReady(context) -> {
                 message = null
                 VoiceModelDownloader.start(context)
             }
-            // Otherwise record straight away, even if the speech model is not on the phone yet:
-            // the download question comes after the recording (see finish())
+            // Otherwise record straight away, even if the speech model is still downloading
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
                     PackageManager.PERMISSION_GRANTED -> start()
             else -> permission.launch(Manifest.permission.RECORD_AUDIO)
@@ -327,36 +314,12 @@ fun VoiceScreen(
     LaunchedEffect(Unit) {
         if (!autoListen) return@LaunchedEffect
         delay(450)   // let the screen finish sliding in
-        val idle = !recording && working == null && VoiceEngine.isModelReady(context) &&
-                download !is VoiceDownloadState.Downloading && download !is VoiceDownloadState.Paused &&
-                download !is VoiceDownloadState.Failed
+        val idle = !recording && working == null && VoiceEngine.isModelReady(context)
         if (!idle) return@LaunchedEffect
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
         ) start() else permission.launch(Manifest.permission.RECORD_AUDIO)
     }
-
-    VoiceDownloadDialog(
-        visible = askDownload,
-        onConfirm = {
-            askDownload = false
-            message = null
-            VoiceModelDownloader.start(context)
-        },
-        onDismiss = {
-            askDownload = false
-            // "Not now": nothing can be transcribed without the model, so the recording is dropped.
-            // The dialog also reports a dismiss right after "Download" is tapped, so this only discards
-            // when no download has started a moment later; otherwise the recording must be kept.
-            scope.launch {
-                delay(300)
-                if (VoiceModelDownloader.state.value is VoiceDownloadState.Idle && !askDownload) {
-                    pendingSamples = null
-                    message = "Download skipped, so that recording was discarded. Tap the mic to try again."
-                }
-            }
-        }
-    )
 
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
         Column(
@@ -517,9 +480,9 @@ fun VoiceScreen(
                 // The space is always kept, so the face and the mic do not move when it appears.
                 val status = when {
                     working != null -> working
-                    preparing != null -> preparing
                     recording && autoListen -> "Listening… just stop speaking when you are done."
                     recording -> "Listening… ${seconds}s. Tap to stop."
+                    preparing != null -> preparing
                     else -> downloadNote ?: message
                 }
                 Box(
@@ -546,7 +509,7 @@ fun VoiceScreen(
                     contentPadding = PaddingValues(20.dp)
                 ) {
                     when {
-                        working != null || preparing != null -> CircularProgressIndicator(
+                        working != null || (pendingSamples != null && preparing != null) -> CircularProgressIndicator(
                             modifier = Modifier.size(28.dp),
                             color = LocalContentColor.current,
                             strokeWidth = 2.dp

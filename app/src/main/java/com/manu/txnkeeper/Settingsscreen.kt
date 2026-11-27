@@ -1,6 +1,25 @@
 package com.manu.txnkeeper
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.content.Context
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.painterResource
+import com.manu.txnkeeper.ui.theme.DarkInk
+import com.manu.txnkeeper.ui.theme.DarkOnSurface
+import com.manu.txnkeeper.ui.theme.DarkSurface
+import com.manu.txnkeeper.ui.theme.DarkSurfaceVariant
+import com.manu.txnkeeper.ui.theme.LightInk
+import com.manu.txnkeeper.ui.theme.LightOnSurface
+import com.manu.txnkeeper.ui.theme.LightSurface
+import com.manu.txnkeeper.ui.theme.LightSurfaceVariant
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,9 +49,11 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Sell
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,6 +74,8 @@ import com.manu.manudesignsystem.components.ManuButton
 import com.manu.txnkeeper.data.local.AccountSummary
 import com.manu.txnkeeper.data.local.AppDatabase
 import com.manu.txnkeeper.data.local.TagEntity
+import com.manu.txnkeeper.widget.QuickActionsWidgetReceiver
+import com.manu.txnkeeper.widget.SearchBarWidgetReceiver
 import kotlinx.coroutines.launch
 import com.manu.manudesignsystem.components.ManuCard
 import com.manu.manudesignsystem.components.ManuChip
@@ -75,6 +98,7 @@ private enum class SettingsPage(val title: String) {
     PAYMENT("Payment methods"),
     TAGS("Tags"),
     DEFAULTS("Defaults"),
+    WIDGETS("Home screen widgets"),
     DATA("Export & import"),
     DELETE("Delete data")
 }
@@ -93,6 +117,7 @@ fun SettingsScreen(
     onManageAccounts: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenAbout: () -> Unit,
+    onShowTutorial: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -161,10 +186,12 @@ fun SettingsScreen(
                         tagCount = tags.size,
                         onOpenTags = { page = SettingsPage.TAGS },
                         onOpenDefaults = { page = SettingsPage.DEFAULTS },
+                        onOpenWidgets = { page = SettingsPage.WIDGETS },
                         onOpenData = { page = SettingsPage.DATA },
                         onOpenDelete = { page = SettingsPage.DELETE },
                         onOpenHelp = onOpenHelp,
-                        onOpenAbout = onOpenAbout
+                        onOpenAbout = onOpenAbout,
+                        onShowTutorial = onShowTutorial
                     )
 
                     SettingsPage.PAYMENT -> PaymentMethodsPage(
@@ -182,6 +209,8 @@ fun SettingsScreen(
                     )
 
                     SettingsPage.DEFAULTS -> DefaultsPage(settings = settings, accounts = accounts)
+
+                    SettingsPage.WIDGETS -> WidgetsPage()
 
                     SettingsPage.DATA -> SettingsCard {
                         Column(modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg)) {
@@ -302,10 +331,12 @@ private fun MainSettings(
     tagCount: Int,
     onOpenTags: () -> Unit,
     onOpenDefaults: () -> Unit,
+    onOpenWidgets: () -> Unit,
     onOpenData: () -> Unit,
     onOpenDelete: () -> Unit,
     onOpenHelp: () -> Unit,
-    onOpenAbout: () -> Unit
+    onOpenAbout: () -> Unit,
+    onShowTutorial: () -> Unit
 ) {
     // Look of the app: the theme, changed right here
     SettingsCard {
@@ -335,11 +366,28 @@ private fun MainSettings(
         }
     }
 
+    // Widgets get their own card near the top, with a picture, so they are easy to discover
+    SettingsCard {
+        SettingsRow(
+            title = "Home screen widgets",
+            icon = Icons.Default.Widgets,
+            subtitle = "Add from your home screen",
+            onClick = onOpenWidgets
+        )
+        WidgetPreview(
+            icons = SEARCH_WIDGET_ICONS,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .clickable(onClickLabel = "Open home screen widgets", onClick = onOpenWidgets)
+        )
+        Spacer(Modifier.height(14.dp))
+    }
+
     SettingsCard {
         SettingsRow(
             title = "Accounts",
             icon = Icons.Default.AccountBalanceWallet,
-            subtitle = "Add, edit or delete",
+            subtitle = "Accounts and balances",
             onClick = onManageAccounts
         )
         HorizontalDivider()
@@ -361,7 +409,7 @@ private fun MainSettings(
         SettingsRow(
             title = "Defaults",
             icon = Icons.Default.Tune,
-            subtitle = "Type, account, payment method, images and voice tips",
+            subtitle = "Your usual choices and voice options",
             onClick = onOpenDefaults
         )
     }
@@ -370,14 +418,14 @@ private fun MainSettings(
         SettingsRow(
             title = "Export & import",
             icon = Icons.Default.ImportExport,
-            subtitle = "CSV, ZIP with images, and PDF",
+            subtitle = "Back up, share or restore",
             onClick = onOpenData
         )
         HorizontalDivider()
         SettingsRow(
             title = "Delete data",
             icon = Icons.Default.DeleteForever,
-            subtitle = "Everything, or one account",
+            subtitle = "Delete an account or all data",
             titleColor = MaterialTheme.colorScheme.error,
             onClick = onOpenDelete
         )
@@ -411,11 +459,139 @@ private fun MainSettings(
         SettingsRow(title = "Help", icon = Icons.AutoMirrored.Filled.HelpOutline, onClick = onOpenHelp)
         HorizontalDivider()
         SettingsRow(
+            title = "Show tutorial",
+            icon = Icons.Default.PlayCircle,
+            subtitle = "See how the app works",
+            onClick = onShowTutorial
+        )
+        HorizontalDivider()
+        SettingsRow(
             title = "About",
             icon = Icons.Default.Info,
             subtitle = "Version and privacy policy",
             onClick = onOpenAbout
         )
+    }
+}
+
+/** The two home screen widgets, each with a picture of it and a button that adds it. */
+@Composable
+private fun WidgetsPage() {
+    val context = LocalContext.current
+    Text(
+        text = "Add entries from your home screen.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+    WidgetChoice(
+        title = "Quick actions",
+        description = "Add, speak or scan",
+        icons = QUICK_WIDGET_ICONS,
+        onAdd = { pinWidget(context, QuickActionsWidgetReceiver::class.java) }
+    )
+    WidgetChoice(
+        title = "Quick actions with search",
+        description = "Search, add, speak or scan",
+        icons = SEARCH_WIDGET_ICONS,
+        onAdd = { pinWidget(context, SearchBarWidgetReceiver::class.java) }
+    )
+    Text(
+        text = "Touch and hold a widget to resize it.\n\n" +
+                "Not added? Touch and hold your home screen, tap Widgets and find TxnKeeper.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
+}
+
+/** One widget on the Widgets page: what it does, what it looks like, and a button to add it. */
+@Composable
+private fun WidgetChoice(
+    title: String,
+    description: String,
+    icons: List<Int>,
+    onAdd: () -> Unit
+) {
+    SettingsCard {
+        Column(
+            modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Column {
+                Text(title, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            WidgetPreview(icons = icons, modifier = Modifier.align(Alignment.CenterHorizontally))
+            ManuButton(modifier = Modifier.fillMaxWidth(), onClick = onAdd) {
+                Text("Add to home screen")
+            }
+        }
+    }
+}
+
+private val QUICK_WIDGET_ICONS =
+    listOf(R.drawable.ic_widget_add, R.drawable.ic_widget_mic, R.drawable.ic_widget_camera)
+private val SEARCH_WIDGET_ICONS = listOf(R.drawable.ic_widget_search) + QUICK_WIDGET_ICONS
+
+/**
+ * A picture of a widget's row of round buttons, drawn with the widget's own sizes and colours
+ * (see widget/WidgetBar.kt). The mic is highlighted, as an example of the last used button.
+ */
+@Composable
+private fun WidgetPreview(icons: List<Int>, modifier: Modifier = Modifier) {
+    val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    Row(
+        modifier = modifier
+            .clip(CircleShape)
+            .background(if (dark) DarkSurfaceVariant else LightSurfaceVariant)
+            .padding(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        icons.forEach { icon ->
+            val focused = icon == R.drawable.ic_widget_mic
+            val fill = when {
+                focused -> if (dark) DarkInk else LightInk
+                else -> if (dark) DarkSurface else LightSurface
+            }
+            val tint = when {
+                focused -> if (dark) Color.Black else Color.White
+                else -> if (dark) DarkOnSurface else LightOnSurface
+            }
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(fill),
+                contentAlignment = Alignment.Center
+            ) {
+                // Only a picture: the text next to it already says what the widget does
+                Icon(
+                    painter = painterResource(icon),
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Opens the phone's own "add this widget" prompt. Not every home screen app supports it. */
+private fun pinWidget(context: Context, receiver: Class<*>) {
+    val manager = AppWidgetManager.getInstance(context)
+    val asked = runCatching {
+        manager.isRequestPinAppWidgetSupported &&
+                manager.requestPinAppWidget(ComponentName(context, receiver), null, null)
+    }.getOrDefault(false)
+    if (!asked) {
+        Toast.makeText(
+            context,
+            "Add it from your home screen's Widgets list.",
+            Toast.LENGTH_LONG
+        ).show()
     }
 }
 
@@ -427,7 +603,7 @@ private fun PaymentMethodsPage(
     onRemove: (String) -> Unit
 ) {
     Text(
-        text = "The choices shown when you add or edit a transaction.",
+        text = "Shown when you add a transaction.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -438,7 +614,7 @@ private fun PaymentMethodsPage(
         ) {
             if (settings.paymentMethods.isEmpty()) {
                 Text(
-                    text = "No payment methods. Transactions are saved without one.",
+                    text = "No payment methods yet.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -476,7 +652,7 @@ private fun TagsPage(
     onDelete: (TagEntity) -> Unit
 ) {
     Text(
-        text = "Labels like Groceries or Savings. Put them on a transaction when you add or edit it.",
+        text = "Labels like Groceries or Savings.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -534,7 +710,7 @@ private fun DefaultsPage(
     accounts: List<AccountSummary>
 ) {
     Text(
-        text = "New transactions start with these. You can still change them on the Add page.",
+        text = "Used for new entries. You can change them anytime.",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
@@ -563,7 +739,7 @@ private fun DefaultsPage(
     DefaultsSection(
         title = "Account",
         icon = Icons.Default.AccountBalanceWallet,
-        caption = "Last used: the account you are viewing, or the one you used last."
+        caption = "Last used: the account you viewed or used last."
     ) {
         FlowRow(
             horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
@@ -588,7 +764,7 @@ private fun DefaultsPage(
     DefaultsSection(title = "Payment method", icon = Icons.Default.CreditCard) {
         if (settings.paymentMethods.isEmpty()) {
             Text(
-                text = "No payment methods. Add one on the Payment methods page first.",
+                text = "Add a payment method in Settings first.",
                 style = MaterialTheme.typography.bodyMedium
             )
         } else {
@@ -612,7 +788,7 @@ private fun DefaultsPage(
         SwitchRow(
             icon = Icons.Default.Image,
             title = "Include images",
-            subtitle = "Keep the scanned or attached image with a new transaction. You can still change it each time.",
+            subtitle = "Keep receipts with transactions",
             checked = settings.includeImageByDefault,
             onCheckedChange = { settings.updateIncludeImageByDefault(it) }
         )
@@ -620,7 +796,7 @@ private fun DefaultsPage(
         SwitchRow(
             icon = Icons.Default.Image,
             title = "Fill from image",
-            subtitle = "Read the text of a scanned or attached image and fill the form with it. You can still switch it off or on for one transaction on the Add page.",
+            subtitle = "Add details from receipts",
             checked = settings.fillFromImageByDefault,
             onCheckedChange = { settings.updateFillFromImageByDefault(it) }
         )
@@ -630,16 +806,16 @@ private fun DefaultsPage(
     SettingsCard {
         SwitchRow(
             icon = Icons.Default.Mic,
-            title = "Fast voice (Google)",
-            subtitle = "Uses your phone's Google speech service for quick, accurate text. It needs internet and Android 13+; otherwise, or if it fails, the on-device model is used.",
+            title = "Fast voice entry",
+            subtitle = "Get voice results quicker",
             checked = settings.fastVoice,
             onCheckedChange = { settings.updateFastVoice(it) }
         )
         HorizontalDivider()
         SwitchRow(
             icon = Icons.Default.Mic,
-            title = "Double-check what I said",
-            subtitle = "A second reading of each recording runs on your phone. If it understood the transaction differently, you can pick between the two options. Uses a little more battery.",
+            title = "Double-check voice",
+            subtitle = "Choose the right one if results differ",
             checked = settings.doubleCheckVoice,
             onCheckedChange = { settings.updateDoubleCheckVoice(it) }
         )
@@ -647,7 +823,7 @@ private fun DefaultsPage(
         SwitchRow(
             icon = Icons.Default.Mic,
             title = "Listen automatically",
-            subtitle = "Start listening as soon as the voice screen opens, and stop when you stop speaking",
+            subtitle = "Starts and stops as you speak",
             checked = settings.voiceAutoListen,
             onCheckedChange = { settings.updateVoiceAutoListen(it) }
         )
@@ -655,7 +831,7 @@ private fun DefaultsPage(
         SwitchRow(
             icon = Icons.Default.Mic,
             title = "Voice sounds",
-            subtitle = "A short tone when listening starts and stops",
+            subtitle = "Beep on start and stop",
             checked = settings.voiceSounds,
             onCheckedChange = { settings.updateVoiceSounds(it) }
         )
@@ -663,7 +839,7 @@ private fun DefaultsPage(
         SwitchRow(
             icon = Icons.Default.Mic,
             title = "Voice tips",
-            subtitle = "Show a tip on the voice screen",
+            subtitle = "Show examples of what to say",
             checked = settings.voiceTips,
             onCheckedChange = { settings.updateVoiceTips(it) }
         )

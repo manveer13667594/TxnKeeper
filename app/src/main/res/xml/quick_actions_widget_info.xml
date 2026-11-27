@@ -1,16 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The slim "+ / mic / camera" pill. Only its width can be changed, up to maxResizeWidth; it stays one row high. -->
+<!-- Can be resized both ways: wider than tall shows a row, taller than wide shows a column (WidgetBar.kt) -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:description="@string/widget_description"
+    android:previewLayout="@layout/widget_preview_quick"
+    android:previewImage="@drawable/widget_preview_quick_image"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="150dp"
     android:minHeight="55dp"
-    android:minResizeWidth="150dp"
+    android:minResizeWidth="57dp"
     android:minResizeHeight="55dp"
     android:maxResizeWidth="300dp"
-    android:maxResizeHeight="80dp"
-    android:resizeMode="horizontal"
+    android:maxResizeHeight="320dp"
+    android:resizeMode="horizontal|vertical"
     android:updatePeriodMillis="0"
     android:widgetCategory="home_screen"
     android:targetCellWidth="3"

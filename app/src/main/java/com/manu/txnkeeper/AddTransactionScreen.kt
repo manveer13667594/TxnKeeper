@@ -78,6 +78,15 @@ import com.manu.manudesignsystem.components.ManuPickerField
 import com.manu.manudesignsystem.components.ManuScaffold
 import com.manu.manudesignsystem.components.ManuDatePicker
 import com.manu.manudesignsystem.components.ManuTimePicker
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import kotlinx.coroutines.delay
 import java.util.Calendar
 
 /** One spoken transaction, ready to be shown in the form. */
@@ -204,8 +213,8 @@ class TxnFormState {
         batchSaved = 0
         load(batch[0])
         batchTagsPending = true
-        notice = "Heard: \"$heard\". Use the arrows to move between the ${list.size} entries, " +
-                "check each one, untick any you don't want, then Save & exit."
+        // How to use the entries is shown once by the tutorial (BatchTour.kt), not written here
+        notice = "Heard: \"$heard\""
     }
 
     /** Shows another entry of the batch (what you changed in the current one is kept). */
@@ -404,6 +413,7 @@ class TxnFormState {
 }
 
 /** Full-screen page for adding a transaction by hand (opened by the + button or after a scan). */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AddTransactionScreen(
     form: TxnFormState,
@@ -519,9 +529,45 @@ fun AddTransactionScreen(
         if (form.payment !in methods) form.payment = methods.firstOrNull() ?: ""
     }
 
+    // The tutorial for several entries (BatchTour.kt): shown once, the first time they appear
+    var tourStep by rememberSaveable { mutableStateOf(BatchTourStep.NEXT) }
+    var tourReady by remember { mutableStateOf(false) }
+    val tourBounds = remember { mutableStateMapOf<BatchTourStep, Rect>() }
+    val saveInView = remember { BringIntoViewRequester() }
+    val tourWanted = settings.batchTourPending && form.batch.size > 1
+    LaunchedEffect(tourWanted) {
+        tourReady = false
+        if (tourWanted) {
+            tourStep = BatchTourStep.NEXT
+            focusManager.clearFocus()
+            delay(700)   // the page has finished sliding in
+            tourReady = true
+        }
+    }
+    val showTour = tourWanted && tourReady
+    // Brings the thing being explained into view
+    LaunchedEffect(showTour, tourStep) {
+        if (!showTour) return@LaunchedEffect
+        if (tourStep == BatchTourStep.SAVE) saveInView.bringIntoView() else scrollState.animateScrollTo(0)
+    }
+    // Trying the → button moves the tutorial on
+    LaunchedEffect(form.batchIndex) {
+        if (showTour && tourStep == BatchTourStep.NEXT && form.batchIndex > 0) tourStep = BatchTourStep.INCLUDE
+    }
+    // Practising must not change what gets saved: the box that was tried is ticked again
+    fun undoPractice() {
+        if (tourStep == BatchTourStep.INCLUDE) form.include = true
+    }
+    fun endTour() {
+        undoPractice()
+        form.goToEntry(0)
+        settings.finishBatchTour()
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
     // ManuScaffold already insets for the status bar, navigation bar and keyboard
     ManuScaffold(
-        modifier = modifier.swipeRightTo(onScan),
+        modifier = if (tourWanted) Modifier else Modifier.swipeRightTo(onScan),
         contentPadding = PaddingValues(horizontal = 20.dp),
         topBar = {
             ManuTopBar(
@@ -605,10 +651,16 @@ fun AddTransactionScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // Marked by default; untick to leave this entry out when saving
                             Checkbox(
+                                modifier = Modifier.onGloballyPositioned {
+                                    tourBounds[BatchTourStep.INCLUDE] = it.boundsInRoot()
+                                },
                                 checked = form.include,
                                 onCheckedChange = { form.include = it }
                             )
                             FilledIconButton(
+                                modifier = Modifier.onGloballyPositioned {
+                                    tourBounds[BatchTourStep.NEXT] = it.boundsInRoot()
+                                },
                                 onClick = {
                                     focusManager.clearFocus()
                                     form.goToEntry(form.batchIndex + 1)
@@ -852,7 +904,13 @@ fun AddTransactionScreen(
                             ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
                                 Text(if (form.inBatch && !form.include) "Skip & next" else "Save & next", maxLines = 1)
                             }
-                            ManuButton(modifier = Modifier.weight(1f), onClick = { submit(false) }) {
+                            ManuButton(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .bringIntoViewRequester(saveInView)
+                                    .onGloballyPositioned { tourBounds[BatchTourStep.SAVE] = it.boundsInRoot() },
+                                onClick = { submit(false) }
+                            ) {
                                 Text("Save & exit", maxLines = 1)
                             }
                         }
@@ -878,7 +936,7 @@ fun AddTransactionScreen(
             var fabsVisible by remember { mutableStateOf(true) }
             FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
             AnimatedVisibility(
-                visible = fabsVisible,
+                visible = fabsVisible && !showTour,
                 enter = fadeIn() + scaleIn(),
                 exit = fadeOut() + scaleOut(),
                 modifier = Modifier.align(Alignment.BottomEnd)
@@ -896,6 +954,20 @@ fun AddTransactionScreen(
                 }
             }
         }
+    }
+
+    if (showTour) {
+        BatchTour(
+            step = tourStep,
+            bounds = tourBounds[tourStep],
+            onSkip = { endTour() },
+            onNext = {
+                undoPractice()
+                val following = BatchTourStep.entries.getOrNull(tourStep.ordinal + 1)
+                if (following == null) endTour() else tourStep = following
+            }
+        )
+    }
     }
 
     // Account and payment method lists open as a card in the middle of the screen
