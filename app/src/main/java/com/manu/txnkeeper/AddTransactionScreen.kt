@@ -564,259 +564,178 @@ fun AddTransactionScreen(
         settings.finishBatchTour()
     }
 
+    // The two voice readings belong to one recording. They are dropped when the form is empty again
+    // (saved or closed), and once an entry of it is saved, as switching then could save it twice.
+    val formDone = form.notice == null || form.batchSaved > 0
+    LaunchedEffect(formDone, VoiceEngine.alternative) {
+        if (formDone) VoiceEngine.clearAlternative()
+    }
+
     Box(modifier = modifier.fillMaxSize()) {
-    // ManuScaffold already insets for the status bar, navigation bar and keyboard
-    ManuScaffold(
-        modifier = if (tourWanted) Modifier else Modifier.swipeRightTo(onScan),
-        contentPadding = PaddingValues(horizontal = 20.dp),
-        topBar = {
-            ManuTopBar(
-                title = "Add Transaction",
-                modifier = Modifier.padding(horizontal = 20.dp),
-                navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
-                onNavigationClick = {
-                    focusManager.clearFocus()
-                    onClose()
-                }
-            )
-        }
-    ) { _ ->
-        Box(modifier = Modifier.fillMaxSize()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
-                    // Tapping empty space closes the keyboard (fields and buttons still get their own taps)
-                    .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
-                    .padding(horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // The two voice readings, above the title: nothing is covered, the form just slides down
-                // (nothing is composed while there is no second reading, so no empty gap is left at the top)
-                if (VoiceEngine.alternative != null) {
-                    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
-                    androidx.compose.animation.AnimatedVisibility(visibleState = shown) {
-                        VoiceAlternativeBanner(form)
-                    }
-                }
-
-                form.notice?.let { notice ->
-                    // The "Possible duplicate" paragraph is a warning, so it is red; the rest stays grey
-                    notice.split("\n\n").forEach { paragraph ->
-                        Text(
-                            text = paragraph,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (paragraph.startsWith("Possible duplicate")) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
-                }
-
-                // Several spoken entries: arrows to move between them
-                if (form.inBatch) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        FilledIconButton(
-                            onClick = {
-                                focusManager.clearFocus()
-                                form.goToEntry(form.batchIndex - 1)
-                            },
-                            enabled = form.batchIndex > 0
-                        ) { Icon(Icons.AutoMirrored.Filled.MirroredArrowBack, contentDescription = "Previous entry") }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // ManuScaffold already insets for the status bar, navigation bar and keyboard
+        ManuScaffold(
+            modifier = if (tourWanted) Modifier else Modifier.swipeRightTo(onScan),
+            contentPadding = PaddingValues(horizontal = 20.dp),
+            topBar = {
+                ManuTopBar(
+                    title = "Add Transaction",
+                    modifier = Modifier.padding(horizontal = 20.dp),
+                    navigationIcon = Icons.AutoMirrored.Filled.ArrowBack,
+                    onNavigationClick = {
+                        focusManager.clearFocus()
+                        onClose()
+                    },
+                    // Only there when a recording was heard two ways (VoiceInput.kt)
+                    actions = { VoiceOptionsButton(form) }
+                )
+            }
+        ) { _ ->
+            Box(modifier = Modifier.fillMaxSize()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState)
+                        // Tapping empty space closes the keyboard (fields and buttons still get their own taps)
+                        .pointerInput(Unit) { detectTapGestures(onTap = { focusManager.clearFocus() }) }
+                        .padding(horizontal = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    form.notice?.let { notice ->
+                        // The "Possible duplicate" paragraph is a warning, so it is red; the rest stays grey
+                        notice.split("\n\n").forEach { paragraph ->
                             Text(
-                                text = "Entry ${form.batchIndex + 1} of ${form.batch.size}",
-                                style = MaterialTheme.typography.titleMedium
+                                text = paragraph,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (paragraph.startsWith("Possible duplicate")) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
                             )
-                            if (!form.include) {
-                                Text(
-                                    text = "Won't be saved",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            } else if (form.batchSaved > 0) {
-                                Text(
-                                    text = "${form.batchSaved} saved",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            // Marked by default; untick to leave this entry out when saving
-                            Checkbox(
-                                modifier = Modifier.onGloballyPositioned {
-                                    tourBounds[BatchTourStep.INCLUDE] = it.boundsInRoot()
-                                },
-                                checked = form.include,
-                                onCheckedChange = { form.include = it }
-                            )
-                            FilledIconButton(
-                                modifier = Modifier.onGloballyPositioned {
-                                    tourBounds[BatchTourStep.NEXT] = it.boundsInRoot()
-                                },
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    form.goToEntry(form.batchIndex + 1)
-                                },
-                                enabled = form.batchIndex < form.batch.lastIndex
-                            ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next entry") }
                         }
                     }
-                }
 
-                ManuCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        ManuTextField(
-                            value = form.title,
-                            onValueChange = { form.title = it },
-                            modifier = Modifier
-                                .focusRequester(titleFocus)
-                                .focusProperties { next = if (form.items.isNotEmpty() && !form.inBatch) descriptionFocus else amountFocus },
-                            placeholder = { Text("Transaction title") },
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        )
-
-                        // Other guesses for what the photographed product is: tap one to use it
-                        val titleChips = form.titleSuggestions.filter { !it.equals(form.title.trim(), ignoreCase = true) }
-                        if (titleChips.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier.horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Is it:",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                titleChips.forEach { suggestion ->
-                                    ManuChip(label = suggestion, selected = false, onClick = { form.title = suggestion })
-                                }
-                            }
-                        }
-
-                        if (!form.inBatch && form.items.isNotEmpty()) {
-                            // A bill: the lines decide the amount
-                            ItemsEditor(items = form.items, onChange = { form.items = it })
-                            TypeToggle(form.type, { form.type = it }, Modifier.fillMaxWidth())
-                        } else {
-                            // The amount with Expense | Income beside it
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                ManuTextField(
-                                    value = form.amount,
-                                    onValueChange = { form.amount = it },
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .focusRequester(amountFocus)
-                                        .focusProperties { next = descriptionFocus },
-                                    placeholder = { Text("Amount") },
-                                    leadingContent = {
-                                        Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                                    },
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
-                                )
-                                TypeToggle(form.type, { form.type = it }, Modifier.width(156.dp))
-                            }
-                            if (!form.inBatch) {
-                                AddItemsLink(onClick = { form.items = listOf(ItemDraft()) })
-                            }
-                        }
-
-                        // Tags: one row that scrolls sideways, tap to switch on or off.
-                        // For a recording with several entries, each entry has its own tags.
-                        TagPicker(
-                            tags = tags,
-                            selected = form.tagIds,
-                            onChange = { form.tagIds = it },
-                            onNew = {
-                                focusManager.clearFocus()
-                                addTagOpen = true
-                            }
-                        )
-                        // Account and payment method, then date and time: two per row
-                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                            // Account: always shown, so a new one can be added from here
-                            PickChip(
-                                icon = AppIcons.Wallet,
-                                text = account?.name ?: "",
-                                modifier = Modifier.weight(1f),
+                    // Several spoken entries: arrows to move between them
+                    if (form.inBatch) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            FilledIconButton(
                                 onClick = {
                                     focusManager.clearFocus()
-                                    accountMenuOpen = true
-                                }
-                            )
-                            // Payment method: your list from Settings, plus "+ Add new" at the end
-                            PickChip(
-                                icon = Icons.Default.CreditCard,
-                                text = form.payment.ifBlank { "Payment" },
-                                muted = form.payment.isBlank(),
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    payMenuOpen = true
-                                }
-                            )
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                            PickChip(
-                                icon = Icons.Default.DateRange,
-                                text = formatDateLong(form.dateTime),
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    datePickerOpen = true
-                                }
-                            )
-                            PickChip(
-                                icon = AppIcons.Schedule,
-                                text = formatTime(form.dateTime),
-                                modifier = Modifier.weight(1f),
-                                onClick = {
-                                    focusManager.clearFocus()
-                                    timePickerOpen = true
-                                }
-                            )
-                        }
-
-                        ManuTextField(
-                            value = form.description,
-                            onValueChange = { form.description = it },
-                            modifier = Modifier.focusRequester(descriptionFocus),
-                            placeholder = { Text("Description (optional)") },
-                            singleLine = false
-                        )
-
-                        // Receipt image: from a scan, or attached here. Not for the entries of a voice recording.
-                        if (!form.inBatch) {
-                            ReceiptImageField(
-                                imageFile = form.imageFile,
-                                include = form.includeImage,
-                                onIncludeChange = { form.includeImage = it },
-                                excludedWarning = "This image won't be saved. It is deleted when you save.",
-                                fill = form.fillFromImage,
-                                onFillChange = { on ->
-                                    form.fillFromImage = on
-                                    if (!on) form.clearScanFill()
-                                    if (on && !ocr.busy) {
-                                        val read = form.scanned
-                                        if (read != null) form.fill(read, "Form filled from the image. Check it, then save.")
-                                        else form.imageFile?.let { readImage(it) }
-                                    }
+                                    form.goToEntry(form.batchIndex - 1)
                                 },
-                                onPicked = { name ->
+                                enabled = form.batchIndex > 0
+                            ) { Icon(Icons.AutoMirrored.Filled.MirroredArrowBack, contentDescription = "Previous entry") }
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "Entry ${form.batchIndex + 1} of ${form.batch.size}",
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                                if (!form.include) {
+                                    Text(
+                                        text = "Won't be saved",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                } else if (form.batchSaved > 0) {
+                                    Text(
+                                        text = "${form.batchSaved} saved",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Marked by default; untick to leave this entry out when saving
+                                Checkbox(
+                                    modifier = Modifier.onGloballyPositioned {
+                                        tourBounds[BatchTourStep.INCLUDE] = it.boundsInRoot()
+                                    },
+                                    checked = form.include,
+                                    onCheckedChange = { form.include = it }
+                                )
+                                FilledIconButton(
+                                    modifier = Modifier.onGloballyPositioned {
+                                        tourBounds[BatchTourStep.NEXT] = it.boundsInRoot()
+                                    },
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        form.goToEntry(form.batchIndex + 1)
+                                    },
+                                    enabled = form.batchIndex < form.batch.lastIndex
+                                ) { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next entry") }
+                            }
+                        }
+                    }
+
+                    ManuCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(vertical = ManuDesignSystem.spacing.md),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            ManuTextField(
+                                value = form.title,
+                                onValueChange = { form.title = it },
+                                modifier = Modifier
+                                    .focusRequester(titleFocus)
+                                    .focusProperties { next = if (form.items.isNotEmpty() && !form.inBatch) descriptionFocus else amountFocus },
+                                placeholder = { Text("Transaction title") },
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                            )
+
+                            // Other guesses for what the photographed product is: tap one to use it
+                            val titleChips = form.titleSuggestions.filter { !it.equals(form.title.trim(), ignoreCase = true) }
+                            if (titleChips.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Is it:",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    titleChips.forEach { suggestion ->
+                                        ManuChip(label = suggestion, selected = false, onClick = { form.title = suggestion })
+                                    }
+                                }
+                            }
+
+                            if (!form.inBatch && form.items.isNotEmpty()) {
+                                // A bill: the lines decide the amount
+                                ItemsEditor(items = form.items, onChange = { form.items = it })
+                                TypeToggle(form.type, { form.type = it }, Modifier.fillMaxWidth())
+                            } else {
+                                // The amount with Expense | Income beside it
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    ManuTextField(
+                                        value = form.amount,
+                                        onValueChange = { form.amount = it },
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .focusRequester(amountFocus)
+                                            .focusProperties { next = descriptionFocus },
+                                        placeholder = { Text("Amount") },
+                                        leadingContent = {
+                                            Text("₹", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                                        },
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next)
+                                    )
+                                    TypeToggle(form.type, { form.type = it }, Modifier.width(156.dp))
+                                }
+                            }
+
+                            // "Add items" and "Attach image" share a row; an attached image shows right under it.
+                            // Neither is for the entries of a voice recording.
+                            if (!form.inBatch) {
+                                val onImagePicked: (String) -> Unit = { name ->
                                     val old = form.imageFile
                                     form.imageFile = name
                                     form.includeImage = true
@@ -824,150 +743,242 @@ fun AddTransactionScreen(
                                     if (old != null) ReceiptStore.delete(context, old)
                                     if (form.fillFromImage) readImage(name)
                                 }
-                            )
-                        }
-
-                        fun toEntity(e: BatchEntry, value: Long) = TransactionEntity(
-                            title = e.title.trim(),
-                            amountPaise = value,
-                            type = e.type,
-                            paymentMethod = e.payment,
-                            dateTime = e.dateTime,
-                            description = e.description.trim(),
-                            accountId = account?.id ?: 1L
-                        )
-                        fun amountOf(e: BatchEntry) = parsePaise(e.amount.replace(",", "").trim())
-
-                        // "Save & next" saves the one on screen and moves on (one by one);
-                        // "Save & exit" saves it, or in a recording with several entries, every marked one.
-                        fun submit(stay: Boolean) {
-                            // Unmarked entry in a batch: nothing to save, "Save & next" just skips it
-                            if (form.inBatch && !form.include && stay) {
-                                error = null
-                                focusManager.clearFocus()
-                                if (!form.skipCurrentInBatch()) form.reset()
-                                return
-                            }
-                            if (form.inBatch && !stay) {
-                                val badNumber = form.firstInvalidMarked { e ->
-                                    val v = amountOf(e)
-                                    e.title.isNotBlank() && v != null && v > 0
+                                if (form.items.isEmpty() || form.imageFile == null) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (form.items.isEmpty()) {
+                                            AddItemsLink(onClick = { form.items = listOf(ItemDraft()) })
+                                        }
+                                        Spacer(Modifier.weight(1f))
+                                        if (form.imageFile == null) AttachImagePill(onPicked = onImagePicked)
+                                    }
                                 }
-                                if (badNumber != null) {
-                                    error = "Entry $badNumber: enter a valid title and amount."
+                                ReceiptImageField(
+                                    imageFile = form.imageFile,
+                                    include = form.includeImage,
+                                    onIncludeChange = { form.includeImage = it },
+                                    excludedWarning = "This image won't be saved. It is deleted when you save.",
+                                    fill = form.fillFromImage,
+                                    onFillChange = { on ->
+                                        form.fillFromImage = on
+                                        if (!on) form.clearScanFill()
+                                        if (on && !ocr.busy) {
+                                            val read = form.scanned
+                                            if (read != null) form.fill(read, "Form filled from the image. Check it, then save.")
+                                            else form.imageFile?.let { readImage(it) }
+                                        }
+                                    },
+                                    onPicked = onImagePicked
+                                )
+                            }
+
+                            // Tags: one row that scrolls sideways, tap to switch on or off.
+                            // For a recording with several entries, each entry has its own tags.
+                            TagPicker(
+                                tags = tags,
+                                selected = form.tagIds,
+                                onChange = { form.tagIds = it },
+                                onNew = {
+                                    focusManager.clearFocus()
+                                    addTagOpen = true
+                                }
+                            )
+                            // Account and payment method, then date and time: two per row
+                            Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                                // Account: always shown, so a new one can be added from here
+                                PickChip(
+                                    icon = AppIcons.Wallet,
+                                    text = account?.name ?: "",
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        accountMenuOpen = true
+                                    }
+                                )
+                                // Payment method: your list from Settings, plus "+ Add new" at the end
+                                PickChip(
+                                    icon = Icons.Default.CreditCard,
+                                    text = form.payment.ifBlank { "Payment" },
+                                    muted = form.payment.isBlank(),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        payMenuOpen = true
+                                    }
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                                PickChip(
+                                    icon = Icons.Default.DateRange,
+                                    text = formatDateLong(form.dateTime),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        datePickerOpen = true
+                                    }
+                                )
+                                PickChip(
+                                    icon = AppIcons.Schedule,
+                                    text = formatTime(form.dateTime),
+                                    modifier = Modifier.weight(1f),
+                                    onClick = {
+                                        focusManager.clearFocus()
+                                        timePickerOpen = true
+                                    }
+                                )
+                            }
+
+                            ManuTextField(
+                                value = form.description,
+                                onValueChange = { form.description = it },
+                                modifier = Modifier.focusRequester(descriptionFocus),
+                                placeholder = { Text("Description (optional)") },
+                                singleLine = false
+                            )
+
+                            fun toEntity(e: BatchEntry, value: Long) = TransactionEntity(
+                                title = e.title.trim(),
+                                amountPaise = value,
+                                type = e.type,
+                                paymentMethod = e.payment,
+                                dateTime = e.dateTime,
+                                description = e.description.trim(),
+                                accountId = account?.id ?: 1L
+                            )
+                            fun amountOf(e: BatchEntry) = parsePaise(e.amount.replace(",", "").trim())
+
+                            // "Save & next" saves the one on screen and moves on (one by one);
+                            // "Save & exit" saves it, or in a recording with several entries, every marked one.
+                            fun submit(stay: Boolean) {
+                                // Unmarked entry in a batch: nothing to save, "Save & next" just skips it
+                                if (form.inBatch && !form.include && stay) {
+                                    error = null
+                                    focusManager.clearFocus()
+                                    if (!form.skipCurrentInBatch()) form.reset()
                                     return
                                 }
-                                error = null
-                                focusManager.clearFocus()
-                                val marked = form.markedEntries()
-                                // A tag deleted while this page was open is dropped here
-                                val liveIds = tags.map { it.id }.toSet()
-                                onSubmitAll(
-                                    marked.map { toEntity(it, amountOf(it)!!) },
-                                    marked.map { e -> e.tagIds.filter { it in liveIds }.toSet() }
-                                )
-                                return
-                            }
-                            if (!form.inBatch && form.items.isNotEmpty() && !form.items.hasValidItems()) {
-                                error = "Add a price to at least one item, or remove the items."
-                                return
-                            }
-                            // With bill items the total of the lines is the amount
-                            val billed = !form.inBatch && form.items.hasValidItems()
-                            val value = if (billed) form.items.validTotalPaise()
+                                if (form.inBatch && !stay) {
+                                    val badNumber = form.firstInvalidMarked { e ->
+                                        val v = amountOf(e)
+                                        e.title.isNotBlank() && v != null && v > 0
+                                    }
+                                    if (badNumber != null) {
+                                        error = "Entry $badNumber: enter a valid title and amount."
+                                        return
+                                    }
+                                    error = null
+                                    focusManager.clearFocus()
+                                    val marked = form.markedEntries()
+                                    // A tag deleted while this page was open is dropped here
+                                    val liveIds = tags.map { it.id }.toSet()
+                                    onSubmitAll(
+                                        marked.map { toEntity(it, amountOf(it)!!) },
+                                        marked.map { e -> e.tagIds.filter { it in liveIds }.toSet() }
+                                    )
+                                    return
+                                }
+                                if (!form.inBatch && form.items.isNotEmpty() && !form.items.hasValidItems()) {
+                                    error = "Add a price to at least one item, or remove the items."
+                                    return
+                                }
+                                // With bill items the total of the lines is the amount
+                                val billed = !form.inBatch && form.items.hasValidItems()
+                                val value = if (billed) form.items.validTotalPaise()
                                 else parsePaise(form.amount.replace(",", "").trim())
-                            if (form.title.isBlank() || value == null || value <= 0) {
-                                error = "Enter a valid title and amount."
-                            } else {
-                                error = null
-                                focusManager.clearFocus()
-                                // A tag deleted while this page was open is dropped here
-                                val liveTagIds = tags.map { it.id }.toSet()
-                                onSubmit(
-                                    TransactionEntity(
-                                        title = form.title.trim(),
-                                        amountPaise = value,
-                                        type = form.type,
-                                        paymentMethod = form.payment,
-                                        dateTime = form.dateTime,
-                                        description = form.description.trim(),
-                                        accountId = account?.id ?: 1L,
-                                        imageFile = if (form.includeImage) form.imageFile else null
-                                    ),
-                                    form.tagIds.filter { it in liveTagIds }.toSet(),
-                                    stay,
-                                    if (billed) form.items.toEntities() else emptyList()
-                                )
+                                if (form.title.isBlank() || value == null || value <= 0) {
+                                    error = "Enter a valid title and amount."
+                                } else {
+                                    error = null
+                                    focusManager.clearFocus()
+                                    // A tag deleted while this page was open is dropped here
+                                    val liveTagIds = tags.map { it.id }.toSet()
+                                    onSubmit(
+                                        TransactionEntity(
+                                            title = form.title.trim(),
+                                            amountPaise = value,
+                                            type = form.type,
+                                            paymentMethod = form.payment,
+                                            dateTime = form.dateTime,
+                                            description = form.description.trim(),
+                                            accountId = account?.id ?: 1L,
+                                            imageFile = if (form.includeImage) form.imageFile else null
+                                        ),
+                                        form.tagIds.filter { it in liveTagIds }.toSet(),
+                                        stay,
+                                        if (billed) form.items.toEntities() else emptyList()
+                                    )
+                                }
                             }
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
-                            ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
-                                Text(if (form.inBatch && !form.include) "Skip & next" else "Save & next", maxLines = 1)
+                            Row(horizontalArrangement = Arrangement.spacedBy(ManuDesignSystem.spacing.sm)) {
+                                ManuOutlineButton(modifier = Modifier.weight(1f), onClick = { submit(true) }) {
+                                    Text(if (form.inBatch && !form.include) "Skip & next" else "Save & next", maxLines = 1)
+                                }
+                                ManuButton(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .bringIntoViewRequester(saveInView)
+                                        .onGloballyPositioned { tourBounds[BatchTourStep.SAVE] = it.boundsInRoot() },
+                                    onClick = { submit(false) }
+                                ) {
+                                    Text("Save & exit", maxLines = 1)
+                                }
                             }
-                            ManuButton(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .bringIntoViewRequester(saveInView)
-                                    .onGloballyPositioned { tourBounds[BatchTourStep.SAVE] = it.boundsInRoot() },
-                                onClick = { submit(false) }
-                            ) {
-                                Text("Save & exit", maxLines = 1)
-                            }
-                        }
 
-                        error?.let {
-                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                            error?.let {
+                                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
+
+                    // Debug builds only: what the scan or voice found and where it went (nothing in release).
+                    // Down here, so they appearing never pushes the form around.
+                    DebugInsightsCard()
+                    if (DebugMode.on) GoogleLiveCard()
+
+                    // Room at the bottom so the floating buttons never cover the Save button
+                    Spacer(Modifier.height(150.dp))
                 }
 
-                // Debug builds only: what the scan or voice found and where it went (nothing in release).
-                // Down here, so they appearing never pushes the form around.
-                DebugInsightsCard()
-                if (DebugMode.on) GoogleLiveCard()
-
-                // Room at the bottom so the floating buttons never cover the Save button
-                Spacer(Modifier.height(150.dp))
-            }
-
-            // Floating buttons: mic (speak a transaction) and camera (scan a receipt).
-            // They stay visible (just above the keyboard) when the page opens, and hide only while
-            // scrolling down, so they never sit on top of fields or buttons
-            var fabsVisible by remember { mutableStateOf(true) }
-            FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
-            AnimatedVisibility(
-                visible = fabsVisible && !showTour,
-                enter = fadeIn() + scaleIn(),
-                exit = fadeOut() + scaleOut(),
-                modifier = Modifier.align(Alignment.BottomEnd)
-            ) {
-                Column(
-                    modifier = Modifier.padding(end = 20.dp, bottom = 16.dp),
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                // Floating buttons: mic (speak a transaction) and camera (scan a receipt).
+                // They stay visible (just above the keyboard) when the page opens, and hide only while
+                // scrolling down, so they never sit on top of fields or buttons
+                var fabsVisible by remember { mutableStateOf(true) }
+                FabAutoHide(position = { scrollState.value }, onVisible = { fabsVisible = it })
+                AnimatedVisibility(
+                    visible = fabsVisible && !showTour,
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut(),
+                    modifier = Modifier.align(Alignment.BottomEnd)
                 ) {
-                    VoiceFab(form, sounds = settings.voiceSounds)
-                    ManuFab(onClick = {
-                        focusManager.clearFocus()
-                        onScan()
-                    }) { Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt") }
+                    Column(
+                        modifier = Modifier.padding(end = 20.dp, bottom = 16.dp),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        VoiceFab(form, sounds = settings.voiceSounds)
+                        ManuFab(onClick = {
+                            focusManager.clearFocus()
+                            onScan()
+                        }) { Icon(AppIcons.CameraAlt, contentDescription = "Scan receipt") }
+                    }
                 }
             }
         }
-    }
 
-    if (showTour) {
-        BatchTour(
-            step = tourStep,
-            bounds = tourBounds[tourStep],
-            onSkip = { endTour() },
-            onNext = {
-                undoPractice()
-                val following = BatchTourStep.entries.getOrNull(tourStep.ordinal + 1)
-                if (following == null) endTour() else tourStep = following
-            }
-        )
-    }
+        if (showTour) {
+            BatchTour(
+                step = tourStep,
+                bounds = tourBounds[tourStep],
+                onSkip = { endTour() },
+                onNext = {
+                    undoPractice()
+                    val following = BatchTourStep.entries.getOrNull(tourStep.ordinal + 1)
+                    if (following == null) endTour() else tourStep = following
+                }
+            )
+        }
     }
 
     // Account and payment method lists open as a card in the middle of the screen

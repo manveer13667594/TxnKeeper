@@ -96,6 +96,19 @@ class WhisperKit private constructor(
     }
 
     companion object {
+        /**
+         * False on phones this library has no native code for (it is built for 64-bit only). Nothing else
+         * in WhisperKit that needs the native code may be used then.
+         */
+        val isSupported: Boolean by lazy {
+            try {
+                System.loadLibrary("whisperkit")
+                true
+            } catch (e: UnsatisfiedLinkError) {
+                false
+            }
+        }
+
         /** Loads [model], downloading it first if needed. [onDownloadProgress] gets 0f..1f. */
         suspend fun create(
             context: Context,
@@ -105,6 +118,7 @@ class WhisperKit private constructor(
 
         /** Loads your own ggml model file (e.g. a different quantization). */
         suspend fun create(context: Context, modelFile: File): WhisperKit = withContext(Dispatchers.IO) {
+            if (!isSupported) throw WhisperException("Offline voice is not supported on this phone")
             if (!modelFile.isFile) throw WhisperException("Model file not found: ${modelFile.path}")
             val h = NativeWhisper.nInit(modelFile.absolutePath)
             if (h == 0L) throw WhisperException("Could not load model ${modelFile.name} (corrupt or not a whisper ggml model)")

@@ -17,6 +17,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.layout.positionInRoot
@@ -203,6 +205,8 @@ fun TransactionsScreen(
     onSelectionModeChange: (Boolean) -> Unit = {},
     /** true when something outside (the widget's search icon) asks for the search box to open. */
     searchRequested: Boolean = false,
+    /** false while another page covers the list, so Back is left to that page. */
+    isOnTop: Boolean = true,
     onSearchRequestHandled: () -> Unit = {},
     /** Runs the given changes as one database transaction (all or nothing). */
     runInTransaction: suspend (suspend () -> Unit) -> Unit = { it() },
@@ -241,6 +245,33 @@ fun TransactionsScreen(
     LaunchedEffect(selectionMode) { onSelectionModeChange(selectionMode) }
     // Back leaves selection mode first
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
+
+    fun closeSearch() {
+        searchOpen = false
+        searchText = ""
+        focusManager.clearFocus()
+    }
+    // Back closes the search box (the first Back only hides the keyboard, if it is showing)
+    BackHandler(enabled = isOnTop && searchOpen && !selectionMode) { closeSearch() }
+    // Putting the keyboard away with nothing typed closes the search box too. With something typed
+    // it stays open, so the results can be looked through.
+    val keyboard = WindowInsets.ime
+    val keyboardDensity = LocalDensity.current
+    // derivedStateOf: redraw only when it shows or hides, not on every frame while it slides
+    val keyboardVisible by remember(keyboard, keyboardDensity) {
+        derivedStateOf { keyboard.getBottom(keyboardDensity) > 0 }
+    }
+    var keyboardWasShown by remember { mutableStateOf(false) }
+    LaunchedEffect(keyboardVisible, searchOpen) {
+        if (!searchOpen) {
+            keyboardWasShown = false
+        } else if (keyboardVisible) {
+            keyboardWasShown = true
+        } else if (keyboardWasShown) {
+            keyboardWasShown = false
+            if (searchText.isBlank()) closeSearch()
+        }
+    }
 
     // Wait a moment after typing so we don't query on every keystroke
     LaunchedEffect(searchText) {
@@ -559,11 +590,11 @@ fun TransactionsScreen(
                     IconButton(
                         onClick = {
                             if (searchOpen) {
-                                searchText = ""
-                                focusManager.clearFocus()
+                                closeSearch()
+                            } else {
+                                searchOpen = true
+                                tour?.tried(TourTarget.SEARCH)
                             }
-                            searchOpen = !searchOpen
-                            if (searchOpen) tour?.tried(TourTarget.SEARCH)
                         },
                         modifier = Modifier.tourTarget(TourTarget.SEARCH)
                     ) {

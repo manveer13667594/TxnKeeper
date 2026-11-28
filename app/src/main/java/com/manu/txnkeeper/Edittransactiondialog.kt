@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.Alignment
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -153,8 +154,35 @@ fun EditTransactionDialog(
                     )
                     TypeToggle(type, { type = it }, Modifier.width(150.dp))
                 }
-                AddItemsLink(onClick = { items = listOf(ItemDraft()) })
             }
+            // "Add items" and "Attach image" share a row; an attached image shows right under it
+            val onImagePicked: (String) -> Unit = { name ->
+                // Replacing an image picked here earlier: the earlier one is not needed
+                added?.let { ReceiptStore.delete(context, it) }
+                added = name
+                imageFile = name
+                keepImage = true
+            }
+            if (items.isEmpty() || imageFile == null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (items.isEmpty()) {
+                        AddItemsLink(onClick = { items = listOf(ItemDraft()) })
+                    }
+                    Spacer(Modifier.weight(1f))
+                    if (imageFile == null) AttachImagePill(onPicked = onImagePicked)
+                }
+            }
+            ReceiptImageField(
+                imageFile = imageFile,
+                include = keepImage,
+                includeLabel = "Keep image",
+                excludedWarning = "The image will be deleted from this transaction when you save.",
+                onIncludeChange = { keepImage = it },
+                onPicked = onImagePicked
+            )
             // Account and payment method, then date and time: two per row
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 // Account: always shown, so a new one can be added from here
@@ -198,20 +226,6 @@ fun EditTransactionDialog(
                 selected = tagIds,
                 onChange = { tagIds = it },
                 onNew = { addTagOpen = true }
-            )
-            ReceiptImageField(
-                imageFile = imageFile,
-                include = keepImage,
-                includeLabel = "Keep image",
-                excludedWarning = "The image will be deleted from this transaction when you save.",
-                onIncludeChange = { keepImage = it },
-                onPicked = { name ->
-                    // Replacing an image picked here earlier: the earlier one is not needed
-                    added?.let { ReceiptStore.delete(context, it) }
-                    added = name
-                    imageFile = name
-                    keepImage = true
-                }
             )
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)

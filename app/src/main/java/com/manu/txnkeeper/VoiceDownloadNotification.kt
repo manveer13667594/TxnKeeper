@@ -17,6 +17,7 @@ import androidx.core.app.NotificationChannelCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import io.whisperkit.WhisperKit
 
 private const val CHANNEL_ID = "voice_setup"
 private const val NOTIFICATION_ID = 4101
@@ -97,7 +98,7 @@ fun AskForDownloadNotification() {
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
     LaunchedEffect(Unit) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val needed = !VoiceEngine.isModelReady(context) &&
+        val needed = WhisperKit.isSupported && !VoiceEngine.isModelReady(context) &&
                 !prefs.getBoolean(KEY_ASKED, false) &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED

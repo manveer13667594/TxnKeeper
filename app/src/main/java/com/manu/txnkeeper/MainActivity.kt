@@ -513,6 +513,8 @@ fun TxnkeeperApp(
                             onScrollDirection = { fabVisible = it },
                             onSelectionModeChange = { selecting = it },
                             searchRequested = searchRequested,
+                            isOnTop = !showAdd && !showCamera && !showVoice && !showSettings &&
+                                    !showAccounts && !showHelp && !showAbout && !showStats,
                             onSearchRequestHandled = { searchRequested = false },
                             runInTransaction = { block -> database.withTransaction { block() } }
                         )

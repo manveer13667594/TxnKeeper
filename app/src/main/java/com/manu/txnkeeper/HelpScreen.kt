@@ -60,7 +60,9 @@ private val FAQS = listOf(
         answer = "Swipe from right to left on the home screen, or tap the mic on the Add page. Say something like \"paid 500 to Rahul, got 2000 salary\".\n" +
                 "Check the details before you save.\n" +
                 "Voice files (about 57 MB) download automatically using Wi-Fi or mobile data. A notification shows the progress if notifications are allowed.\n" +
-                "After the download, voice entry can work offline. Fast voice entry may use the internet; you can turn it off in Settings, then Defaults."
+                "Until then, voice uses your phone's speech service if Fast voice entry is on. This may need internet.\n" +
+                "After the download, voice entry can work offline. Some phones can't use offline voice and always need Fast voice entry.\n" +
+                "Fast voice entry may send audio online; you can turn it off in Settings, then Defaults."
     ),
     Faq(
         question = "What if I say more than one transaction?",

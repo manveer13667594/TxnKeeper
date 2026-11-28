@@ -34,6 +34,8 @@ object VoiceModelDownloader {
     @Synchronized
     fun start(context: Context) {
         val app = context.applicationContext
+        // Phones that cannot run Whisper never download it
+        if (!WhisperKit.isSupported) return
         if (_state.value is VoiceDownloadState.Downloading) return
         if (VoiceEngine.isModelReady(app)) {
             _state.value = VoiceDownloadState.Done

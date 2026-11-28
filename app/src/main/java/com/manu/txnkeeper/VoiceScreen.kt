@@ -99,12 +99,9 @@ private const val WAITING_ANIM_MS = 2500L                 // how long each waiti
  */
 private val VOICE_TIPS = listOf(
     "Try saying: \u201CPaid 500 to Rahul\u201D",
-    "Recordings are not saved and nothing is uploaded.",
     "Try saying: \u201CPetrol 800, lunch 250\u201D.",
     "Try saying words like: \u201Cyesterday\u201D, \u201Ctwo days ago\u201D or \u201Con Monday\u201D.",
-    "No financial data leaves your phone.",
     "Try saying how you paid: \u201Cby UPI\u201D, \u201Cby card\u201D or \u201Cin cash\u201D.",
-    "Voice entry works without internet.",
     "Numbers can be words: \u201Ctwo thousand five hundred\u201D, \u201C5k\u201D or \u201C1.5 lakh\u201D.",
     "Money coming in? Say \u201Creceived 2000 from Amit\u201D or \u201Csalary credited 30000\u201D."
 )
@@ -146,8 +143,12 @@ fun VoiceScreen(
     var message by remember { mutableStateOf<String?>(null) }
     // The download runs in VoiceModelDownloader, not in this screen, so it keeps going when you leave
     val download by VoiceModelDownloader.state.collectAsState()
-    val preparing: String? = (download as? VoiceDownloadState.Downloading)?.let { downloadStatus(it.fraction) }
-    val downloadNote: String? = (download as? VoiceDownloadState.Failed)?.let { "${it.message} Tap the mic to try again." }
+    // While Google stands in for Whisper, voice works, so the download is not mentioned here
+    val googleStandsIn = remember(download) { VoiceEngine.usesGoogleOnly(context) }
+    val preparing: String? = (download as? VoiceDownloadState.Downloading)
+        ?.takeUnless { googleStandsIn }?.let { downloadStatus(it.fraction) }
+    val downloadNote: String? = (download as? VoiceDownloadState.Failed)
+        ?.takeUnless { googleStandsIn }?.let { "${it.message} Tap the mic to try again." }
     // Says "ready" only when the download finishes while this screen is open
     var sawDownload by remember { mutableStateOf(false) }
     // First use only: a recording made before the speech model was there. It waits here while the
@@ -238,7 +239,7 @@ fun VoiceScreen(
                 transcribeAndHandle(waiting)
             } else if (sawDownload) {
                 sawDownload = false
-                message = "Voice model ready. Tap the mic and speak."
+                if (!recording && working == null) message = "Voice model ready. Tap the mic and speak."
             }
         }
     }
@@ -249,11 +250,11 @@ fun VoiceScreen(
         scope.launch {
             val samples = recorder.stop()
             if (sounds) VoiceSounds.stop()
-            if (samples.size < MIN_SAMPLES) {
+            if (!recorder.wasGoogleOnly && samples.size < MIN_SAMPLES) {
                 message = "That was too short. Tap the mic and speak for at least a second."
                 return@launch
             }
-            if (!VoiceEngine.isModelReady(context)) {
+            if (!recorder.wasGoogleOnly && !VoiceEngine.isModelReady(context)) {
                 // First use: keep the recording and transcribe it as soon as the download is done
                 pendingSamples = samples
                 message = null
@@ -277,12 +278,14 @@ fun VoiceScreen(
                 delay(VoiceSounds.START_MS)
             }
             if (!recording) return@launch
+            PhoneRecogniser.attach(context)
             recorder.start(
                 scope = scope,
                 onSecond = { seconds = it },
                 onLimit = { finish() },
                 onError = { recording = false; message = it },
-                onSilence = if (autoListen) ({ finish() }) else null
+                onSilence = if (autoListen) ({ finish() }) else null,
+                useGoogleOnly = VoiceEngine.usesGoogleOnly(context)
             )
         }
     }
@@ -292,13 +295,18 @@ fun VoiceScreen(
     }
 
     fun onMicClick() {
+        val unavailable = VoiceEngine.unavailableReason(context)
+        val googleOnly = VoiceEngine.usesGoogleOnly(context)
+        // If the download had stopped, try it again; Google is used in the meantime
+        if (googleOnly && download is VoiceDownloadState.Failed) VoiceModelDownloader.start(context)
         when {
             working != null -> Unit
             recording -> finish()
+            unavailable != null -> message = unavailable
             // A recording is already waiting for the download: carry the download on, don't record over it
             pendingSamples != null -> VoiceModelDownloader.start(context)
             // The download had stopped: try it again
-            download is VoiceDownloadState.Failed && !VoiceEngine.isModelReady(context) -> {
+            !googleOnly && download is VoiceDownloadState.Failed && !VoiceEngine.isModelReady(context) -> {
                 message = null
                 VoiceModelDownloader.start(context)
             }
@@ -314,7 +322,9 @@ fun VoiceScreen(
     LaunchedEffect(Unit) {
         if (!autoListen) return@LaunchedEffect
         delay(450)   // let the screen finish sliding in
-        val idle = !recording && working == null && VoiceEngine.isModelReady(context)
+        VoiceEngine.unavailableReason(context)?.let { message = it; return@LaunchedEffect }
+        val idle = !recording && working == null &&
+            (VoiceEngine.isModelReady(context) || VoiceEngine.usesGoogleOnly(context))
         if (!idle) return@LaunchedEffect
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
             PackageManager.PERMISSION_GRANTED
@@ -480,7 +490,7 @@ fun VoiceScreen(
                 // The space is always kept, so the face and the mic do not move when it appears.
                 val status = when {
                     working != null -> working
-                    recording && autoListen -> "Listening… just stop speaking when you are done."
+                    recording && (autoListen || googleStandsIn) -> "Listening… just stop speaking when you are done."
                     recording -> "Listening… ${seconds}s. Tap to stop."
                     preparing != null -> preparing
                     else -> downloadNote ?: message

@@ -1,15 +1,22 @@
 package com.manu.txnkeeper
 
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.foundation.layout.Box
 import kotlin.math.sqrt
-import androidx.compose.foundation.border
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.SystemClock
+import android.speech.SpeechRecognizer
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,8 +53,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.TextButton
-import com.manu.manudesignsystem.components.ManuCard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.core.content.ContextCompat
@@ -89,6 +94,12 @@ class VoiceRecorder {
     private var job: Job? = null
     private var pcm = ShortArray(SAMPLE_RATE * 15)
     private var size = 0
+    private var googleOnly = false
+    private var stopping = false
+
+    /** After [stop]: true when Google listened by itself, so there is no recording to check or keep. */
+    var wasGoogleOnly = false
+        private set
 
     /** [onSecond] runs on the main thread once per second, [onLimit] when the time limit is hit. */
     @SuppressLint("MissingPermission") // the banner asks for the permission before calling this
@@ -98,9 +109,17 @@ class VoiceRecorder {
         onLimit: () -> Unit,
         onError: (String) -> Unit,
         /** Runs when you stop speaking (about a second of quiet after speech), or nothing was said for a while. */
-        onSilence: (() -> Unit)? = null
+        onSilence: (() -> Unit)? = null,
+        /** True: let Google listen through the microphone itself (see [VoiceEngine.usesGoogleOnly]). */
+        useGoogleOnly: Boolean = false
     ) {
         size = 0
+        googleOnly = useGoogleOnly
+        stopping = false
+        if (useGoogleOnly) {
+            startGoogleOnly(scope, onSecond, onLimit)
+            return
+        }
         job = scope.launch(Dispatchers.IO) {
             val minBuf = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
@@ -180,8 +199,36 @@ class VoiceRecorder {
         }
     }
 
-    /** Stops recording and returns what was recorded. */
+    /** Google records and decides when you have finished; this only counts the seconds. */
+    private fun startGoogleOnly(scope: CoroutineScope, onSecond: (Int) -> Unit, onEnd: () -> Unit) {
+        VoiceTap.newRecording()
+        VoiceEngine.clearAlternative()
+        job = scope.launch(Dispatchers.Main) {
+            try {
+                var second = 0
+                while (isActive) {
+                    onSecond(second)
+                    if (second >= MAX_RECORD_SECONDS) {
+                        onEnd()
+                        break
+                    }
+                    delay(1_000)
+                    second++
+                }
+                kotlinx.coroutines.awaitCancellation()
+            } finally {
+                // stop() asks for the text; anything else (the screen closed) throws it away
+                if (stopping) PhoneRecogniser.endInput() else PhoneRecogniser.cancel()
+            }
+        }
+        PhoneRecogniser.beginMic(onEnd)
+    }
+
+    /** Stops recording and returns what was recorded (empty when Google listened by itself). */
     suspend fun stop(): FloatArray {
+        wasGoogleOnly = googleOnly && job != null
+        googleOnly = false
+        stopping = true
         job?.cancelAndJoin()
         job = null
         return FloatArray(size) { pcm[it] / 32768f }
@@ -217,7 +264,10 @@ object VoiceEngine {
         val currentText: String, val currentEngine: String,
         /** True when the app thinks this other wording is the better one (the form is switched to it). */
         val preferred: Boolean
-    )
+    ) {
+        /** Set once a preferred wording has been put in the form, so that happens only one time. */
+        var applied = false
+    }
 
     var alternative by mutableStateOf<Alternative?>(null)
         private set
@@ -290,6 +340,21 @@ object VoiceEngine {
         onStatus: (String) -> Unit
     ): VoiceTranscript {
         val audioSeconds = samples.size / SAMPLE_RATE.toDouble()
+        if (PhoneRecogniser.isMicSession()) {
+            onStatus("Transcribing…")
+            val google = PhoneRecogniser.result(5_000) ?: throw IllegalStateException(
+                when (PhoneRecogniser.lastMicError) {
+                    "network", "network timeout", "server" -> "Voice needs internet right now. Check it and try again."
+                    "no match", "no speech heard" -> "Could not hear anything. Try again, a bit closer to the mic."
+                    "permission" -> "Microphone permission is needed for voice input."
+                    else -> "Voice input didn't work. Please try again."
+                }
+            )
+            return VoiceTranscript(
+                text = google.text.trim(), seconds = google.secondsAfterStop,
+                audioSeconds = audioSeconds, engine = "Google"
+            )
+        }
         if (PhoneRecogniser.isActive()) {
             onStatus("Transcribing…")
             val google = PhoneRecogniser.result(4_000)
@@ -301,7 +366,7 @@ object VoiceEngine {
                 }
                 if (PhoneRecogniser.alsoRunWhisper(context)) {
                     // Double-check: Whisper listens to the same recording in the background. If it understood the
-                    // transaction differently, the Add page offers its wording (tap "Use this" to switch).
+                    // transaction differently, the Add page offers its wording (the icon in its top bar).
                     scope.launch {
                         try {
                             val w = transcribeWithWhisper(context, samples) { }
@@ -380,7 +445,18 @@ object VoiceEngine {
 
     /** True when the speech model is already on the phone (so no download is needed). */
     fun isModelReady(context: Context): Boolean =
-        WhisperKit.isModelDownloaded(context.applicationContext, VOICE_MODEL)
+        WhisperKit.isSupported && WhisperKit.isModelDownloaded(context.applicationContext, VOICE_MODEL)
+
+    /** True while Whisper cannot be used (not downloaded yet, or not supported) and Google can stand in. */
+    fun usesGoogleOnly(context: Context): Boolean =
+        !isModelReady(context) && PhoneRecogniser.canUseMic(context)
+
+    /** Why voice cannot work at all on a phone without Whisper support; null when it can. */
+    fun unavailableReason(context: Context): String? = when {
+        WhisperKit.isSupported || PhoneRecogniser.canUseMic(context) -> null
+        !SpeechRecognizer.isRecognitionAvailable(context) -> "Voice entry isn't available on this phone."
+        else -> "To use voice on this phone, turn on Fast voice entry in Settings, then Defaults."
+    }
 
     /** Downloads the model if needed and loads it, without transcribing anything. */
     suspend fun prepare(context: Context, onStatus: (String) -> Unit) {
@@ -479,7 +555,7 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean 
         scope.launch {
             val samples = recorder.stop()
             if (sounds) VoiceSounds.stop()
-            if (samples.size < SAMPLE_RATE) {
+            if (!recorder.wasGoogleOnly && samples.size < SAMPLE_RATE) {
                 form.notice = "That was too short. Tap and speak for at least a second."
                 return@launch
             }
@@ -510,11 +586,13 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean 
                 kotlinx.coroutines.delay(VoiceSounds.START_MS)
             }
             if (!recording) return@launch
+            PhoneRecogniser.attach(context)
             recorder.start(
                 scope = scope,
                 onSecond = { seconds = it },
                 onLimit = { finish() },
-                onError = { recording = false; form.notice = it }
+                onError = { recording = false; form.notice = it },
+                useGoogleOnly = VoiceEngine.usesGoogleOnly(context)
             )
         }
     }
@@ -524,10 +602,15 @@ fun VoiceFab(form: TxnFormState, modifier: Modifier = Modifier, sounds: Boolean 
     }
 
     fun onClick() {
+        val unavailable = VoiceEngine.unavailableReason(context)
+        val googleOnly = VoiceEngine.usesGoogleOnly(context)
+        // If the download had stopped, try it again; Google is used in the meantime
+        if (googleOnly && download is VoiceDownloadState.Failed) VoiceModelDownloader.start(context)
         when {
             working != null -> Unit
             recording -> finish()
-            !VoiceEngine.isModelReady(context) -> {
+            unavailable != null -> form.notice = unavailable
+            !VoiceEngine.isModelReady(context) && !googleOnly -> {
                 // Not downloaded yet: show the progress, and start again if it had stopped
                 wantsVoice = true
                 VoiceModelDownloader.start(context)
@@ -596,16 +679,22 @@ internal fun fillFromSpeech(form: TxnFormState, text: String) {
 }
 
 /**
- * Shown on the Add page when the two speech engines understood the same recording differently:
- * the form has the first one's wording; this offers the other one.
+ * The icon at the right end of the Add page's top bar, there only when the two speech engines
+ * understood the same recording differently. Tap it to see both readings and tap the one you want.
+ * The form is never pushed down or covered unless the icon is tapped.
  */
 @Composable
-fun VoiceAlternativeBanner(form: TxnFormState, modifier: Modifier = Modifier) {
+fun VoiceOptionsButton(form: TxnFormState, modifier: Modifier = Modifier) {
     val alt = VoiceEngine.alternative ?: return
-    // When the app thinks the other wording is better, the form switches to it (once, when the card appears)
+    // When the app thinks the other wording is better, the form switches to it (once)
     LaunchedEffect(alt) {
-        if (alt.preferred) fillFromSpeech(form, alt.text)
+        if (alt.preferred && !alt.applied && form.notice != null) {
+            alt.applied = true
+            fillFromSpeech(form, alt.text)
+        }
     }
+    var open by remember(alt) { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
     val chosen = VoiceEngine.chosenEngine
     // Option 1 is the one the app suggests, Option 2 the other (people do not need to know which engine heard what)
     val options = if (alt.preferred) {
@@ -613,55 +702,58 @@ fun VoiceAlternativeBanner(form: TxnFormState, modifier: Modifier = Modifier) {
     } else {
         listOf(alt.currentEngine to alt.currentText, alt.engine to alt.text)
     }
-    ManuCard(modifier = modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    "We heard it two ways. Pick one:",
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.weight(1f)
+    Box(modifier = modifier) {
+        IconButton(onClick = {
+            focusManager.clearFocus()
+            open = true
+        }) {
+            BadgedBox(badge = { Badge { Text("${options.size}") } }) {
+                Icon(
+                    Icons.Default.Checklist,
+                    contentDescription = "Heard two ways. Choose one",
+                    tint = MaterialTheme.colorScheme.primary
                 )
-                TextButton(onClick = { VoiceEngine.clearAlternative() }) { Text("Close") }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                options.forEachIndexed { index, (engine, text) ->
-                    val on = chosen == engine
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .background(
-                                if (on) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f) else Color.Transparent,
-                                RoundedCornerShape(10.dp)
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            Text(
+                text = "We heard it two ways",
+                style = MaterialTheme.typography.titleSmall,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            )
+            options.forEachIndexed { index, (engine, text) ->
+                val on = chosen == engine
+                DropdownMenuItem(
+                    text = {
+                        Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                            Text(
+                                text = "Option ${index + 1}" + if (index == 0) " · suggested" else "",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
                             )
-                            .border(
-                                1.dp,
-                                if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
-                                RoundedCornerShape(10.dp)
+                            Text(
+                                text = "\u201C$text\u201D",
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 4,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            .padding(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Option ${index + 1}" + if (index == 0) " · suggested" else "",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Text(
-                            text = "\u201C$text\u201D",
-                            style = MaterialTheme.typography.bodySmall,
-                            maxLines = 4,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (on) {
-                            Text("In the form \u2713", style = MaterialTheme.typography.labelMedium)
-                        } else {
-                            TextButton(onClick = {
-                                fillFromSpeech(form, text)
-                                VoiceEngine.chosenEngine = engine
-                            }) { Text("Use this") }
+                        }
+                    },
+                    // A tick marks the one that is in the form now
+                    trailingIcon = if (on) {
+                        { Icon(Icons.Default.Check, contentDescription = "In the form") }
+                    } else {
+                        null
+                    },
+                    onClick = {
+                        open = false
+                        // Choosing the one already in the form keeps what was edited there
+                        if (!on) {
+                            fillFromSpeech(form, text)
+                            VoiceEngine.chosenEngine = engine
                         }
                     }
-                }
+                )
             }
         }
     }

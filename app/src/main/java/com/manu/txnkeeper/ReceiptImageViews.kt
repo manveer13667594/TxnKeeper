@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -51,7 +52,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.manu.manudesignsystem.components.ManuOutlineButton
 import kotlinx.coroutines.launch
 
 /**
@@ -216,10 +216,55 @@ fun ReceiptImageViewer(fileName: String, onDismiss: () -> Unit) {
     }
 }
 
+/** Opens the photo picker. [busy] is true while the picked image is being saved. */
+private class ImagePicker(val busy: Boolean, val open: () -> Unit)
+
+/**
+ * The system photo picker (no permission needed). The picked photo is shrunk and copied into the app
+ * ([ReceiptStore]); [onPicked] gets the new file's name.
+ */
+@Composable
+private fun rememberImagePicker(onPicked: (String) -> Unit): ImagePicker {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            busy = true
+            scope.launch {
+                val name = ReceiptStore.saveFromUri(context, uri)
+                busy = false
+                if (name == null) {
+                    Toast.makeText(context, "Couldn't read that image.", Toast.LENGTH_SHORT).show()
+                } else {
+                    onPicked(name)
+                }
+            }
+        }
+    }
+    return ImagePicker(busy) {
+        if (!busy) launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+}
+
+/** "Attach image" as a small pill that looks like the pickers (Compactform.kt). Show it while there is no image. */
+@Composable
+fun AttachImagePill(onPicked: (String) -> Unit, modifier: Modifier = Modifier) {
+    val picker = rememberImagePicker(onPicked)
+    PickChip(
+        icon = Icons.Default.AddPhotoAlternate,
+        text = if (picker.busy) "Saving image…" else "Attach image",
+        muted = picker.busy,
+        modifier = modifier,
+        onClick = picker.open
+    )
+}
+
 /**
  * The image part of the Add and Edit forms.
  *
- * - No image yet: an "Attach image" button (opens the system photo picker, no permission needed).
+ * - No image yet: shows nothing (the forms show [AttachImagePill] beside "Add items").
  * - An image: a small picture (tap it to see it full screen), the "Include image" box, and "Change".
  *
  * The picked photo is shrunk and copied into the app ([ReceiptStore]); [onPicked] gets the new file's
@@ -239,34 +284,11 @@ fun ReceiptImageField(
     /** Shown in red under the box while it is unticked, so losing the image is never a surprise. */
     excludedWarning: String? = null
 ) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var busy by remember { mutableStateOf(false) }
     var viewing by remember { mutableStateOf(false) }
+    val picker = rememberImagePicker(onPicked)
 
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) {
-            busy = true
-            scope.launch {
-                val name = ReceiptStore.saveFromUri(context, uri)
-                busy = false
-                if (name == null) {
-                    Toast.makeText(context, "Couldn't read that image.", Toast.LENGTH_SHORT).show()
-                } else {
-                    onPicked(name)
-                }
-            }
-        }
-    }
-    fun openPicker() {
-        if (!busy) picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-    }
-
-    if (imageFile == null) {
-        ManuOutlineButton(modifier = modifier.fillMaxWidth(), onClick = { openPicker() }) {
-            Text(if (busy) "Saving image…" else "Attach image", maxLines = 1)
-        }
-    } else {
+    // No image: nothing here. AttachImagePill is the way to add one.
+    if (imageFile != null) {
         Row(
             modifier = modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -297,8 +319,8 @@ fun ReceiptImageField(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
-                TextButton(onClick = { openPicker() }, enabled = !busy) {
-                    Text(if (busy) "Saving image…" else "Change image")
+                TextButton(onClick = picker.open, enabled = !picker.busy) {
+                    Text(if (picker.busy) "Saving image…" else "Change image")
                 }
             }
         }

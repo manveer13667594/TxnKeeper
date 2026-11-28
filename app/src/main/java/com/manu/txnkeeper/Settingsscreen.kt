@@ -1,5 +1,6 @@
 package com.manu.txnkeeper
 
+import io.whisperkit.WhisperKit
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
@@ -807,18 +808,21 @@ private fun DefaultsPage(
         SwitchRow(
             icon = Icons.Default.Mic,
             title = "Fast voice entry",
-            subtitle = "Get voice results quicker",
+            subtitle = if (WhisperKit.isSupported) "Get voice results quicker" else "Needed for voice on this phone",
             checked = settings.fastVoice,
             onCheckedChange = { settings.updateFastVoice(it) }
         )
-        HorizontalDivider()
-        SwitchRow(
-            icon = Icons.Default.Mic,
-            title = "Double-check voice",
-            subtitle = "Choose the right one if results differ",
-            checked = settings.doubleCheckVoice,
-            onCheckedChange = { settings.updateDoubleCheckVoice(it) }
-        )
+        // Needs offline voice, which some phones cannot run
+        if (WhisperKit.isSupported) {
+            HorizontalDivider()
+            SwitchRow(
+                icon = Icons.Default.Mic,
+                title = "Double-check voice",
+                subtitle = "Choose the right one if results differ",
+                checked = settings.doubleCheckVoice,
+                onCheckedChange = { settings.updateDoubleCheckVoice(it) }
+            )
+        }
         HorizontalDivider()
         SwitchRow(
             icon = Icons.Default.Mic,

@@ -49,6 +49,12 @@ object PhoneRecogniser {
         @Volatile var lastText = ""
         @Volatile var partials = 0
         @Volatile var finalCalls = 0
+
+        /** True when Google listens through the microphone itself (no recording of ours is passed to it). */
+        var usesMic = false
+        /** Only for [usesMic]: the running recogniser, and why it failed (null when it did not). */
+        @Volatile var recognizer: SpeechRecognizer? = null
+        @Volatile var error: String? = null
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -72,8 +78,8 @@ object PhoneRecogniser {
     /** On when the setting is on (default) and this phone can do it. */
     fun isEnabled(context: Context): Boolean =
         Build.VERSION.SDK_INT >= 33 &&
-            prefs(context).getBoolean(KEY_FAST_VOICE, true) &&
-            SpeechRecognizer.isRecognitionAvailable(context)
+                prefs(context).getBoolean(KEY_FAST_VOICE, true) &&
+                SpeechRecognizer.isRecognitionAvailable(context)
 
     /** Debug only: ask the recogniser to prefer an offline language pack. */
     fun preferOffline(context: Context): Boolean =
@@ -104,16 +110,116 @@ object PhoneRecogniser {
         else -> "code $code"
     }
 
+    // ---- Google on its own: used while Whisper is not downloaded yet, or the phone cannot run it.
+    // This is the ordinary speech recogniser, so it works on every Android version the app supports.
+
+    /** On when the Fast voice setting is on (default) and the phone has a speech service. */
+    fun canUseMic(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_FAST_VOICE, true) &&
+                SpeechRecognizer.isRecognitionAvailable(context)
+
+    /** True when the current recording is Google listening through the microphone itself. */
+    fun isMicSession(): Boolean = session?.usesMic == true
+
+    /** Why the last Google-only recording gave no text ("network", "no match"...). */
+    @Volatile var lastMicError: String? = null
+        private set
+
+    /** Starts Google on the microphone. [onEnd] runs on the main thread when it stops listening by itself. */
+    fun beginMic(onEnd: () -> Unit) {
+        val context = appContext ?: return
+        cancel()
+        lastMicError = null
+        val s = Session(VoiceTap.recordingId, false).apply { usesMic = true }
+        session = s
+        main.post {
+            liveText = ""
+            if (session !== s || s.done.isCompleted) return@post
+            val recognizer = try { SpeechRecognizer.createSpeechRecognizer(context) } catch (e: Exception) { null }
+            if (recognizer == null) {
+                s.error = "unavailable"
+                s.done.complete(null)
+                onEnd()
+                return@post
+            }
+            s.recognizer = recognizer
+            fun finish(text: String, error: String?) {
+                if (s.done.isCompleted) return
+                s.error = error
+                if (text.isNotBlank()) liveText = text
+                val after = if (s.stopAt > 0) maxOf(0.0, (SystemClock.elapsedRealtime() - s.stopAt) / 1000.0) else 0.0
+                s.done.complete(if (text.isBlank()) null else Result(text, after))
+                s.recognizer = null
+                runCatching { recognizer.destroy() }
+                if (DebugMode.on) {
+                    VoiceTap.publish("Google (microphone): \"$text\"" + (error?.let { ", error: $it" } ?: ""))
+                }
+                if (session === s) onEnd()
+            }
+            recognizer.setRecognitionListener(object : RecognitionListener {
+                override fun onReadyForSpeech(params: Bundle?) {}
+                override fun onBeginningOfSpeech() {}
+                override fun onRmsChanged(rmsdB: Float) {}
+                override fun onBufferReceived(buffer: ByteArray?) {}
+                override fun onEndOfSpeech() {}
+                override fun onEvent(eventType: Int, params: Bundle?) {}
+                override fun onPartialResults(partialResults: Bundle?) {
+                    val t = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                    if (t.isNotBlank() && !s.done.isCompleted) {
+                        s.lastText = t
+                        liveText = t
+                    }
+                }
+                override fun onResults(results: Bundle?) {
+                    val t = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
+                    finish(t.ifBlank { s.lastText }, null)
+                }
+                override fun onError(error: Int) = finish(s.lastText, errorName(error))
+            })
+            val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "en-IN")
+                putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+                // Asks it to wait a little through pauses between two entries (some phones ignore this)
+                putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 2_000L)
+            }
+            try {
+                recognizer.startListening(intent)
+            } catch (e: Exception) {
+                finish("", "unavailable")
+            }
+        }
+    }
+
+    /** Throws a Google-only recording away (the screen was closed). */
+    fun cancel() {
+        val s = session ?: return
+        if (!s.usesMic) return
+        session = null
+        main.post {
+            val recognizer = s.recognizer
+            s.recognizer = null
+            s.done.complete(null)
+            if (recognizer != null) {
+                runCatching { recognizer.cancel() }
+                runCatching { recognizer.destroy() }
+            }
+        }
+    }
+
     // ---- called by the recorder (any thread)
 
     /** A recording started: open the recogniser and a pipe that carries the audio to it. */
     fun begin() {
         val context = appContext ?: return
+        cancel()
         session = null
+        // Cleared even when Google is off, so words from an earlier entry never show up again
+        main.post { liveText = "" }
         if (!isEnabled(context)) return
         val s = Session(VoiceTap.recordingId, preferOffline(context))
         session = s
-        main.post { liveText = "" }
 
         val pipe = try { ParcelFileDescriptor.createPipe() } catch (e: Exception) {
             session = null; return
@@ -153,10 +259,10 @@ object PhoneRecogniser {
                     fun f(v: Double?) = if (v == null) "-" else "%.1f s".format(Locale.US, v)
                     VoiceTap.publish(
                         "Google (phone recogniser, en-IN${if (s.prefersOffline) ", offline preferred" else ""}): \"$text\", " +
-                            "first word ${f(first)}, final text ${f(after)} after Stop" + (error?.let { ", error: $it" } ?: "")
+                                "first word ${f(first)}, final text ${f(after)} after Stop" + (error?.let { ", error: $it" } ?: "")
                     )
                 }
-                if (text.isNotBlank()) liveText = text
+                if (text.isNotBlank() && session === s) liveText = text
                 s.done.complete(if (text.isBlank()) null else Result(text, after ?: 0.0))
                 runCatching { recognizer.destroy() }
                 runCatching { readEnd.close() }
@@ -174,7 +280,7 @@ object PhoneRecogniser {
                     if (t.isNotBlank()) {
                         if (s.firstWordAt == 0L) s.firstWordAt = SystemClock.elapsedRealtime()
                         s.lastText = t
-                        liveText = t
+                        if (session === s) liveText = t
                     }
                 }
                 override fun onResults(results: Bundle?) {
@@ -221,6 +327,7 @@ object PhoneRecogniser {
         val s = session ?: return
         s.stopAt = SystemClock.elapsedRealtime()
         s.queue.close()
+        if (s.usesMic) main.post { s.recognizer?.let { runCatching { it.stopListening() } } }
     }
 
     /** True when this recording is being recognised (so [result] can be asked for). */
@@ -229,8 +336,19 @@ object PhoneRecogniser {
     /** The text, waiting up to [timeoutMs] after Stop; null when it failed, heard nothing or timed out. */
     suspend fun result(timeoutMs: Long): Result? {
         val s = session ?: return null
-        val r = withTimeoutOrNull(timeoutMs) { s.done.await() }
-        if (session === s) session = null
+        var r = withTimeoutOrNull(timeoutMs) { s.done.await() }
+        if (s.usesMic) {
+            lastMicError = s.error
+            if (r == null && !s.done.isCompleted) {
+                // No final answer in time: keep the words shown so far, and shut the recogniser down
+                if (s.lastText.isNotBlank()) r = Result(s.lastText, timeoutMs / 1000.0)
+                cancel()
+            }
+        }
+        if (session === s) {
+            session = null
+            main.post { if (session == null) liveText = "" }
+        }
         return r
     }
 }
